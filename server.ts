@@ -73,7 +73,7 @@ async function generateContentWithRetry(params: {
   
   // Construct resilient cascade of candidate models
   const candidateModels: string[] = [selectedModel];
-  const fallbacks = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+  const fallbacks = ['gemini-3.8-flash', 'gemini-3.8-pro', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
   for (const m of fallbacks) {
     if (!candidateModels.includes(m)) {
       candidateModels.push(m);
@@ -1413,6 +1413,121 @@ MANDATORY REQUIREMENTS:
   } catch (error: any) {
     console.error('Error in /api/quick-refine:', error);
     res.status(500).json({ error: error.message || 'Failed to refine draft' });
+  }
+});
+
+// 7. Real-time line copy edit on a specific selection
+app.post('/api/edit-selection', async (req: Request, res: Response) => {
+  try {
+    const {
+      selectedText,
+      surroundingContext,
+      instruction,
+      tag,
+      profile,
+      exemplars,
+      model,
+      reasoningLevel,
+    } = req.body;
+
+    if (!selectedText || !selectedText.trim()) {
+      return res.status(400).json({ error: 'selectedText is required' });
+    }
+
+    const tagInstructionMap: Record<string, string> = {
+      too_formal: 'Make this less stiff and bureaucratic; adopt a conversational, grounded, tactile register.',
+      not_my_voice: "Recast this into the author's authentic cadence, muscular verbs, and direct rhythm.",
+      good: 'Preserve the core phrasing but polish the line flow slightly if needed.',
+      too_casual: 'Give this more weight, crisp precision, and authority without adding corporate jargon.',
+      too_verbose: 'Cut the padding, fluff, and filler words ruthlessly; make it punchy and concise.',
+      awkward_cadence: 'Fix the sentence rhythm and flow; create natural cadence and burstiness.',
+      domain_inaccurate: 'Correct domain terminology or framing to reflect grounded practitioner reality.',
+    };
+
+    const stylisticGoals: string[] = [];
+    if (tag && tagInstructionMap[tag]) {
+      stylisticGoals.push(`Stylistic Goal: ${tagInstructionMap[tag]}`);
+    }
+    if (instruction && instruction.trim()) {
+      stylisticGoals.push(`User Note/Instruction: "${instruction.trim()}"`);
+    }
+    const editorialGoal = stylisticGoals.length > 0
+      ? stylisticGoals.join('\n')
+      : 'Recast into the author’s authentic voice, cutting corporate jargon and filler.';
+
+    let exemplarsBlock = '';
+    if (exemplars && Array.isArray(exemplars) && exemplars.length > 0) {
+      exemplarsBlock = `\nAUTHOR WRITING EXEMPLARS (Anchor your cadence, rhythm, and vocabulary to these real excerpts):\n` +
+        exemplars.slice(0, 2).map((ex: any, i: number) => `--- Exemplar ${i + 1}: "${ex.title || 'Untitled'}" ---\n${(ex.excerpt || '').trim()}`).join('\n\n') + '\n';
+    }
+
+    const prompt = `You are an elite prose line editor and writing craftsman.
+Your mission is to perform an immediate line-level rewrite on a SPECIFIC HIGHLIGHTED PASSAGE within a draft.
+
+AUTHOR STYLE PROFILE:
+- Name: ${profile?.name || 'Author Style'}
+- Voice Manifesto: ${profile?.voiceManifesto || 'Clear, grounded, muscular prose.'}
+- Primary Rules: ${(profile?.synthesizedGuidelines?.doList || []).slice(0, 5).join('; ')}
+- What to Avoid: ${(profile?.synthesizedGuidelines?.dontList || []).slice(0, 5).join('; ')}
+
+CRITICAL ANTI-JARGON RULES (ABSOLUTELY BAN ALL CORPORATE BUZZWORDS):
+- NEVER use consulting/MBA filler: "lever" (as a metaphor), "scale" (as a verb for business growth), "friction points", "decision points", "high-leverage", "technical debt" (unless literally discussing broken code), "content design rigor", "synergies", "alignment", "stakeholders", "deliverables", "streamline", "utilize", "optimize", "bandwidth".
+- Ground all domain concepts in physical human reality, physical verbs, and direct craft actions.
+
+${exemplarsBlock}
+
+SURROUNDING CONTEXT (for continuity and seamless transition):
+"""
+${surroundingContext || selectedText}
+"""
+
+TARGET PASSAGE TO REWRITE:
+"""
+${selectedText}
+"""
+
+USER'S EDIT DIRECTION:
+${editorialGoal}
+
+MANDATORY EDITORIAL REQUIREMENTS:
+1. Rewrite ONLY the target passage. The replacement must plug seamlessly into the surrounding text without awkward seams, tense shifts, or tone clashes.
+2. Maintain all substantive factual points, numbers, and core intent, but completely strip out corporate filler, throat-clearing, and passive voice.
+3. Return a JSON object with:
+   - "replacementText": string (the rewritten replacement text for the target passage ONLY, no surrounding text)
+   - "explanation": string (one concise sentence explaining what changed)`;
+
+    const preferredModel = model || 'gemini-3.8-flash';
+    const response = await generateContentWithRetry({
+      endpoint: '/api/edit-selection',
+      contents: prompt,
+      preferredModel,
+      reasoningLevel: reasoningLevel || 'auto',
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            replacementText: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+          },
+          required: ['replacementText', 'explanation'],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    const modelUsed = (response as any).modelExecuted || preferredModel;
+    const durationMs = (response as any).durationMs || 0;
+
+    res.json({
+      replacementText: parsed.replacementText || selectedText,
+      explanation: parsed.explanation || 'Refined selection in author voice.',
+      modelUsed,
+      durationMs,
+    });
+  } catch (error: any) {
+    console.error('Error in /api/edit-selection:', error);
+    res.status(500).json({ error: error.message || 'Failed to edit selection' });
   }
 });
 

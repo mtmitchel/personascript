@@ -13,6 +13,7 @@ import {
   ModelSettings,
   PreservationSettings,
   HeadingTreatment,
+  FeedbackTag,
 } from '../types';
 import { DEFAULT_SAMPLES, DEFAULT_PROFILE, SAMPLE_DRAFT_TO_REWRITE } from '../data/defaultSamples';
 
@@ -76,6 +77,12 @@ interface WritingAssistantContextType {
   updateActiveProfile: (profile: StyleProfile) => void;
   performRewrite: () => Promise<void>;
   applyQuickRefine: (instruction: string) => Promise<void>;
+  editSelection: (
+    selectedText: string,
+    instruction: string,
+    tag?: FeedbackTag,
+    alsoSaveToProfile?: boolean
+  ) => Promise<{ replacementText: string; explanation: string }>;
   loadSampleDraft: () => void;
   resetAllData: () => void;
 }
@@ -592,6 +599,97 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     }
   };
 
+  const editSelection = async (
+    selectedText: string,
+    instruction: string,
+    tag?: FeedbackTag,
+    alsoSaveToProfile = false
+  ): Promise<{ replacementText: string; explanation: string }> => {
+    if (!rewriteResult?.rewrittenText || !selectedText.trim()) {
+      throw new Error('No active rewrite text or selection to edit');
+    }
+
+    const currentText = rewriteResult.rewrittenText;
+    const startIndex = currentText.indexOf(selectedText);
+
+    // Prepare surrounding context (up to 250 chars before and after for continuity)
+    const contextStart = Math.max(0, (startIndex >= 0 ? startIndex : 0) - 250);
+    const contextEnd = Math.min(
+      currentText.length,
+      (startIndex >= 0 ? startIndex + selectedText.length : selectedText.length) + 250
+    );
+    const surroundingContext = currentText.slice(contextStart, contextEnd);
+
+    // Extract exemplars from active samples
+    const exemplars = samples
+      .filter((s) => s.enabled)
+      .slice(0, 3)
+      .map((s) => ({
+        title: s.title,
+        excerpt:
+          s.notableExcerpts && s.notableExcerpts.length > 0
+            ? s.notableExcerpts.join('\n\n')
+            : s.content.slice(0, 500),
+      }));
+
+    const res = await fetch('/api/edit-selection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selectedText,
+        surroundingContext,
+        instruction,
+        tag,
+        profile: activeProfile,
+        exemplars,
+        model: modelSettings.model,
+        reasoningLevel: modelSettings.reasoningLevel,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to edit selection');
+    }
+
+    const { replacementText, explanation, modelUsed, durationMs } = await res.json();
+
+    // Replace selectedText in currentText
+    let newFullText = currentText;
+    if (startIndex >= 0) {
+      newFullText =
+        currentText.slice(0, startIndex) +
+        replacementText +
+        currentText.slice(startIndex + selectedText.length);
+    } else {
+      newFullText = currentText.replace(selectedText, replacementText);
+    }
+
+    const wordCountRewritten = newFullText.trim().split(/\s+/).filter(Boolean).length;
+    const updatedResult: RewriteResult = {
+      ...rewriteResult,
+      rewrittenText: newFullText,
+      wordCountRewritten,
+      modelUsed: modelUsed || rewriteResult.modelUsed,
+      durationMs: durationMs || rewriteResult.durationMs,
+      changesExplanation: `[Line Edit: ${explanation}]\n\n${rewriteResult.changesExplanation}`,
+    };
+
+    setRewriteResult(updatedResult);
+    setRewriteHistory((prev) => [updatedResult, ...prev.slice(0, 19)]);
+
+    if (alsoSaveToProfile) {
+      addFeedbackItem({
+        selectedText,
+        tag: tag || 'not_my_voice',
+        label: tag || 'Line Edit',
+        note: instruction || `Replaced with: "${replacementText.slice(0, 80)}"`,
+      });
+    }
+
+    return { replacementText, explanation };
+  };
+
   const loadSampleDraft = () => {
     setDraftText(SAMPLE_DRAFT_TO_REWRITE);
   };
@@ -661,6 +759,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         updateActiveProfile,
         performRewrite,
         applyQuickRefine,
+        editSelection,
         loadSampleDraft,
         resetAllData,
       }}

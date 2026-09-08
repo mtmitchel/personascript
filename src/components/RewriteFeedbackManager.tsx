@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   X,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 interface FeedbackTagOption {
@@ -78,10 +79,14 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
     learnFromFeedback,
     isLearningFeedback,
     setActiveTab,
+    editSelection,
   } = useWritingAssistant();
 
   const [activeTag, setActiveTag] = useState<FeedbackTag>('not_my_voice');
   const [customNote, setCustomNote] = useState('');
+  const [alsoSaveRule, setAlsoSaveRule] = useState(false);
+  const [isRewritingSelection, setIsRewritingSelection] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [learningResult, setLearningResult] = useState<LearnFromFeedbackResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
@@ -91,6 +96,21 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
     setLocalDrawerOpen(open);
     if (!open && onCloseDrawerProp) onCloseDrawerProp();
     if (open && onOpenDrawerProp) onOpenDrawerProp();
+  };
+
+  const handleRewriteSelection = async () => {
+    if (!selectedText || !selectedText.trim() || isRewritingSelection) return;
+    setIsRewritingSelection(true);
+    setSelectionError(null);
+    try {
+      await editSelection(selectedText.trim(), customNote.trim(), activeTag, alsoSaveRule);
+      setCustomNote('');
+      onClearSelection();
+    } catch (err: any) {
+      setSelectionError(err.message || 'Failed to rewrite selection');
+    } finally {
+      setIsRewritingSelection(false);
+    }
   };
 
   const handleAddFeedback = () => {
@@ -186,33 +206,76 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
               type="text"
               autoFocus
               value={customNote}
+              disabled={isRewritingSelection}
               onChange={(e) => setCustomNote(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddFeedback();
+                if (e.key === 'Enter') handleRewriteSelection();
                 if (e.key === 'Escape') onClearSelection();
               }}
-              placeholder="e.g. Cut filler; sound more candid"
-              className="w-full text-xs px-3 py-2 rounded-lg border border-neutral-200 bg-white focus:outline-none focus:border-neutral-900 text-neutral-900 shadow-xs"
+              placeholder="e.g. Cut filler; sound more candid, or punch up verb"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-neutral-200 bg-white focus:outline-none focus:border-neutral-900 text-neutral-900 shadow-xs disabled:opacity-60"
             />
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <label className="flex items-center gap-2 text-[11px] text-neutral-600 cursor-pointer select-none pt-0.5">
+            <input
+              type="checkbox"
+              checked={alsoSaveRule}
+              disabled={isRewritingSelection}
+              onChange={(e) => setAlsoSaveRule(e.target.checked)}
+              className="rounded border-neutral-300 text-neutral-900 focus:ring-0 cursor-pointer"
+            />
+            <span>Also save note to voice profile rules</span>
+          </label>
+
+          {selectionError && (
+            <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+              {selectionError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1 gap-2">
             <button
               type="button"
               onClick={onClearSelection}
-              className="text-xs text-neutral-500 hover:text-neutral-800 font-medium px-2 py-1 rounded cursor-pointer"
+              disabled={isRewritingSelection}
+              className="text-xs text-neutral-500 hover:text-neutral-800 font-medium px-1.5 py-1 rounded cursor-pointer disabled:opacity-50"
             >
               Cancel (Esc)
             </button>
-            <button
-              id="btn-save-feedback-item"
-              type="button"
-              onClick={handleAddFeedback}
-              className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium rounded-lg transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Save Note</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-save-note-only"
+                type="button"
+                disabled={isRewritingSelection}
+                onClick={handleAddFeedback}
+                className="px-2.5 py-1.5 border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium rounded-lg transition flex items-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
+                title="Queue note for Voice Blueprint profile learning without changing draft"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-neutral-500" />
+                <span>Save Note Only</span>
+              </button>
+              <button
+                id="btn-rewrite-selection"
+                type="button"
+                disabled={isRewritingSelection}
+                onClick={handleRewriteSelection}
+                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium rounded-lg transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                title="Immediately rewrite highlighted line in authentic voice (Enter)"
+              >
+                {isRewritingSelection ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>Rewriting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Rewrite Line</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
