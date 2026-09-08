@@ -73,7 +73,7 @@ async function generateContentWithRetry(params: {
   
   // Construct resilient cascade of candidate models
   const candidateModels: string[] = [selectedModel];
-  const fallbacks = ['gemini-3.8-flash', 'gemini-3.8-pro', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
+  const fallbacks = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview'];
   for (const m of fallbacks) {
     if (!candidateModels.includes(m)) {
       candidateModels.push(m);

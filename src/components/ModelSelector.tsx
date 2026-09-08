@@ -20,25 +20,25 @@ const MODEL_OPTIONS: ModelOption[] = [
     icon: Sparkles,
   },
   {
-    id: 'gemini-3.8-pro',
-    name: 'Gemini 3.8 Pro',
-    tag: 'Flagship reasoning',
-    description: 'Deep computational linguistics, cadence extraction, and blueprint synthesis',
-    icon: Brain,
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    tag: 'Fast',
+    description: 'High-speed drafting, tone adjustment, and responsive revision',
+    icon: Sparkles,
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    tag: 'Fast',
+    description: 'Lightweight, rapid response for iterative editing passes',
+    icon: Zap,
   },
   {
     id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro',
     tag: 'Deep reasoning',
-    description: 'Subtle cadence modeling and complex syntactic analysis',
+    description: 'Deep computational linguistics, cadence extraction, and blueprint synthesis',
     icon: Brain,
-  },
-  {
-    id: 'gemini-3.1-flash-lite',
-    name: 'Gemini 3.1 Flash Lite',
-    tag: 'Fastest',
-    description: 'Ultra fast response time for instant line tweaks',
-    icon: Zap,
   },
 ];
 
