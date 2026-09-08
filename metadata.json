@@ -1,0 +1,6 @@
+{
+  "name": "PersonaScript - Personal Writing Voice Assistant",
+  "description": "Upload writing samples in PDF, docx, or text format to analyze your linguistic style, cadence, and tone, then rewrite any draft into your authentic voice.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
