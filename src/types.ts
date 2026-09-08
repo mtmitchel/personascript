@@ -221,8 +221,12 @@ export type GeminiModelChoice =
 export type ReasoningLevelChoice = 'auto' | 'minimal' | 'low' | 'high';
 
 export interface ModelSettings {
-  model: GeminiModelChoice;
-  reasoningLevel: ReasoningLevelChoice;
+  writingModel: GeminiModelChoice;
+  writingReasoningLevel: ReasoningLevelChoice;
+  analysisModel: GeminiModelChoice;
+  analysisReasoningLevel: ReasoningLevelChoice;
+  model?: GeminiModelChoice;
+  reasoningLevel?: ReasoningLevelChoice;
 }
 
 export interface DiscoveredPortfolioPiece {

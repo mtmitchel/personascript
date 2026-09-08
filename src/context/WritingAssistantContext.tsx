@@ -46,6 +46,10 @@ interface WritingAssistantContextType {
   // Model and Reasoning Settings
   modelSettings: ModelSettings;
   setModelSettings: React.Dispatch<React.SetStateAction<ModelSettings>>;
+  updateWritingModel: (model: GeminiModelChoice) => void;
+  updateWritingReasoningLevel: (level: ReasoningLevelChoice) => void;
+  updateAnalysisModel: (model: GeminiModelChoice) => void;
+  updateAnalysisReasoningLevel: (level: ReasoningLevelChoice) => void;
   updateModel: (model: GeminiModelChoice) => void;
   updateReasoningLevel: (level: ReasoningLevelChoice) => void;
 
@@ -110,6 +114,10 @@ const DEFAULT_TONE_ADJUSTMENTS: ToneAdjustments = {
 };
 
 const DEFAULT_MODEL_SETTINGS: ModelSettings = {
+  writingModel: 'gemini-3.8-flash',
+  writingReasoningLevel: 'auto',
+  analysisModel: 'gemini-3.1-pro-preview',
+  analysisReasoningLevel: 'auto',
   model: 'gemini-3.8-flash',
   reasoningLevel: 'auto',
 };
@@ -170,19 +178,45 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const [modelSettings, setModelSettings] = useState<ModelSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_MODEL);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          writingModel: parsed.writingModel || parsed.model || 'gemini-3.8-flash',
+          writingReasoningLevel: parsed.writingReasoningLevel || parsed.reasoningLevel || 'auto',
+          analysisModel: parsed.analysisModel || 'gemini-3.1-pro-preview',
+          analysisReasoningLevel: parsed.analysisReasoningLevel || 'auto',
+          model: parsed.writingModel || parsed.model || 'gemini-3.8-flash',
+          reasoningLevel: parsed.writingReasoningLevel || parsed.reasoningLevel || 'auto',
+        };
+      }
     } catch (e) {
       console.warn('Could not read saved model settings', e);
     }
     return DEFAULT_MODEL_SETTINGS;
   });
 
+  const updateWritingModel = (writingModel: GeminiModelChoice) => {
+    setModelSettings((prev) => ({ ...prev, writingModel, model: writingModel }));
+  };
+
+  const updateWritingReasoningLevel = (writingReasoningLevel: ReasoningLevelChoice) => {
+    setModelSettings((prev) => ({ ...prev, writingReasoningLevel, reasoningLevel: writingReasoningLevel }));
+  };
+
+  const updateAnalysisModel = (analysisModel: GeminiModelChoice) => {
+    setModelSettings((prev) => ({ ...prev, analysisModel }));
+  };
+
+  const updateAnalysisReasoningLevel = (analysisReasoningLevel: ReasoningLevelChoice) => {
+    setModelSettings((prev) => ({ ...prev, analysisReasoningLevel }));
+  };
+
   const updateModel = (model: GeminiModelChoice) => {
-    setModelSettings((prev) => ({ ...prev, model }));
+    setModelSettings((prev) => ({ ...prev, model, writingModel: model }));
   };
 
   const updateReasoningLevel = (reasoningLevel: ReasoningLevelChoice) => {
-    setModelSettings((prev) => ({ ...prev, reasoningLevel }));
+    setModelSettings((prev) => ({ ...prev, reasoningLevel, writingReasoningLevel: reasoningLevel }));
   };
 
   const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>(
@@ -339,8 +373,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           feedbackItems,
           profile: activeProfile,
           rewrittenText: rewriteResult.rewrittenText,
-          model: modelSettings.model,
-          reasoningLevel: modelSettings.reasoningLevel,
+          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
+          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
         }),
       });
 
@@ -378,8 +412,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           title: newSample.title,
           text: newSample.content,
           fileType: newSample.fileType,
-          model: modelSettings.model,
-          reasoningLevel: modelSettings.reasoningLevel,
+          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
+          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
         }),
       });
 
@@ -420,8 +454,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           title: target.title,
           text: target.content,
           fileType: target.fileType,
-          model: modelSettings.model,
-          reasoningLevel: modelSettings.reasoningLevel,
+          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
+          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
         }),
       });
 
@@ -478,8 +512,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           samples: activeSamples,
           currentProfile: activeProfile,
           profileName: activeProfile.name,
-          model: modelSettings.model,
-          reasoningLevel: modelSettings.reasoningLevel,
+          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
+          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
         }),
       });
 
@@ -541,8 +575,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           toneAdjustments,
           domainExpertise,
           exemplars,
-          model: modelSettings.model,
-          reasoningLevel: modelSettings.reasoningLevel,
+          model: modelSettings.writingModel || 'gemini-3.8-flash',
+          reasoningLevel: modelSettings.writingReasoningLevel || 'auto',
         }),
       });
 
@@ -572,8 +606,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           currentText: rewriteResult.rewrittenText,
           instruction,
           profile: activeProfile,
-          model: modelSettings.model,
-          reasoningLevel: modelSettings.reasoningLevel,
+          model: modelSettings.writingModel || 'gemini-3.8-flash',
+          reasoningLevel: modelSettings.writingReasoningLevel || 'auto',
         }),
       });
 
@@ -642,8 +676,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         tag,
         profile: activeProfile,
         exemplars,
-        model: modelSettings.model,
-        reasoningLevel: modelSettings.reasoningLevel,
+        model: modelSettings.writingModel || 'gemini-3.8-flash',
+        reasoningLevel: modelSettings.writingReasoningLevel || 'auto',
       }),
     });
 
@@ -736,6 +770,10 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         setActiveSampleId,
         modelSettings,
         setModelSettings,
+        updateWritingModel,
+        updateWritingReasoningLevel,
+        updateAnalysisModel,
+        updateAnalysisReasoningLevel,
         updateModel,
         updateReasoningLevel,
         toneAdjustments,
