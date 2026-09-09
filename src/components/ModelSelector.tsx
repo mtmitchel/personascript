@@ -16,7 +16,7 @@ const MODEL_OPTIONS: ModelOption[] = [
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
     tag: 'Recommended',
-    description: 'Fast, nuanced prose synthesis and real-time line copy edits',
+    description: 'Fast drafting and responsive line copy edits',
     icon: Sparkles,
   },
   {
@@ -37,7 +37,7 @@ const MODEL_OPTIONS: ModelOption[] = [
     id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro',
     tag: 'Deep reasoning',
-    description: 'Deep computational linguistics, cadence extraction, and blueprint synthesis',
+    description: 'Deep reasoning for draft review and voice analysis',
     icon: Brain,
   },
 ];
@@ -74,9 +74,14 @@ const REASONING_OPTIONS: ReasoningOption[] = [
 interface ModelSelectorProps {
   variant?: 'compact' | 'inline' | 'card';
   className?: string;
+  initialRole?: 'writing' | 'analysis';
 }
 
-export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact', className = '' }) => {
+export const ModelSelector: React.FC<ModelSelectorProps> = ({
+  variant = 'compact',
+  className = '',
+  initialRole = 'writing',
+}) => {
   const {
     modelSettings,
     updateWritingModel,
@@ -86,8 +91,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
   } = useWritingAssistant();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [activeRoleTab, setActiveRoleTab] = useState<'writing' | 'analysis'>('writing');
+  const [activeRoleTab, setActiveRoleTab] = useState<'writing' | 'analysis'>(initialRole);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const activeWritingModel =
     MODEL_OPTIONS.find((m) => m.id === (modelSettings.writingModel || modelSettings.model)) || MODEL_OPTIONS[0];
@@ -108,11 +114,20 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
         setIsOpen(false);
       }
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -147,11 +162,12 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
   if (variant === 'card' || variant === 'inline') {
     return (
       <div className={`space-y-4 ${className}`} id="model-controls-panel">
-        <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
+        <div className="space-y-3 pb-2 border-b border-neutral-100">
           <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-lg text-xs font-medium">
             <button
               type="button"
               onClick={() => setActiveRoleTab('writing')}
+              aria-pressed={activeRoleTab === 'writing'}
               className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
                 activeRoleTab === 'writing'
                   ? 'bg-white text-neutral-900 shadow-xs'
@@ -164,6 +180,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             <button
               type="button"
               onClick={() => setActiveRoleTab('analysis')}
+              aria-pressed={activeRoleTab === 'analysis'}
               className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
                 activeRoleTab === 'analysis'
                   ? 'bg-white text-neutral-900 shadow-xs'
@@ -171,9 +188,15 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
               }`}
             >
               <Brain className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Voice Blueprint & Analysis</span>
+              <span>Review &amp; analysis</span>
             </button>
           </div>
+
+          <p className="text-[11px] leading-relaxed text-neutral-500">
+            <strong className="font-medium text-neutral-700">Drafting &amp; line edits</strong> writes drafts and applies
+            line edits. <strong className="font-medium text-neutral-700">Review &amp; analysis</strong> reviews drafts and
+            analyzes samples, voice blueprints, and domain knowledge. Changes apply to the next writing action.
+          </p>
 
           <button
             type="button"
@@ -189,7 +212,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             <label className="text-xs font-medium text-neutral-700 flex items-center gap-1.5">
               <Cpu className="w-3.5 h-3.5 text-neutral-500" />
               <span>
-                {isRoleWriting ? 'Drafting & Line Edits Model' : 'Voice Blueprint & Analysis Model'}
+                {isRoleWriting ? 'Drafting & line edits model' : 'Review & analysis model'}
               </span>
             </label>
             <span className="text-[11px] text-neutral-400">
@@ -197,7 +220,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {MODEL_OPTIONS.map((opt) => {
               const isSelected = selectedModelId === opt.id;
               const Icon = opt.icon;
@@ -207,6 +230,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
                   id={`btn-model-${opt.id}`}
                   type="button"
                   onClick={() => handleSelectModel(opt.id)}
+                  aria-pressed={isSelected}
                   className={`text-left p-3 rounded-lg border transition-all cursor-pointer ${
                     isSelected
                       ? 'border-neutral-900 bg-neutral-900 text-white shadow-xs'
@@ -244,7 +268,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {REASONING_OPTIONS.map((r) => {
               const isSelected = selectedReasoningId === r.id;
               const isDisabled = r.id === 'minimal' && selectedModelId.includes('pro');
@@ -256,6 +280,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
                   type="button"
                   disabled={isDisabled}
                   onClick={() => handleSelectReasoning(r.id)}
+                  aria-pressed={isSelected}
                   className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
                     isDisabled
                       ? 'opacity-40 cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-400'
@@ -286,10 +311,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
     <div className={`relative inline-block text-left ${className}`} ref={dropdownRef}>
       <button
         id="btn-open-model-selector"
+        ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        aria-controls="model-selector-popover"
+        aria-haspopup="dialog"
         className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-md transition-colors cursor-pointer"
-        title="Configure dual model routing: 3.8 Flash (Writing) & 3.1 Pro (Analysis)"
+        title="Choose the model for drafting and the model for review and analysis"
       >
         <Cpu className="w-3.5 h-3.5 text-neutral-500" />
         <span className="text-neutral-900">
@@ -297,7 +326,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
         </span>
         <span className="text-neutral-300">|</span>
         <span className="text-neutral-600 hidden md:inline">
-          Blueprint: <span className="font-semibold text-neutral-800">{activeAnalysisModel.name.replace('Gemini ', '')}</span>
+          Review: <span className="font-semibold text-neutral-800">{activeAnalysisModel.name.replace('Gemini ', '')}</span>
         </span>
         <ChevronDown
           className={`w-3 h-3 text-neutral-400 transition-transform duration-150 ${
@@ -309,21 +338,27 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
       {isOpen && (
         <div
           id="model-selector-popover"
+          role="dialog"
+          aria-labelledby="model-selector-title"
+          aria-describedby="model-selector-description"
           className="absolute right-0 mt-2 w-84 sm:w-96 rounded-xl bg-white border border-neutral-200 shadow-xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3.5"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
             <div>
-              <h4 className="text-xs font-semibold text-neutral-900">Dual Model Architecture</h4>
-              <p className="text-[11px] text-neutral-500">Route tasks to the optimal engine</p>
+              <h4 id="model-selector-title" className="text-xs font-semibold text-neutral-900">Choose your models</h4>
+              <p id="model-selector-description" className="text-[11px] leading-relaxed text-neutral-500">
+                Drafting writes and edits your text. Review &amp; analysis reviews drafts and analyzes samples, voice
+                blueprints, and domain knowledge. Changes apply to the next writing action.
+              </p>
             </div>
             <button
               type="button"
               onClick={setRecommendedSplit}
               className="text-[10px] text-neutral-600 hover:text-neutral-900 font-medium px-1.5 py-0.5 rounded bg-neutral-100 cursor-pointer"
-              title="Set Drafting -> 3.8 Flash, Blueprint -> 3.1 Pro"
+              title="Use Gemini 3.8 Flash for drafting and Gemini 3.1 Pro for review and analysis"
             >
-              Recommended Split
+              Use recommended models
             </button>
           </div>
 
@@ -332,6 +367,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             <button
               type="button"
               onClick={() => setActiveRoleTab('writing')}
+              aria-pressed={activeRoleTab === 'writing'}
               className={`py-1.5 px-2 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeRoleTab === 'writing'
                   ? 'bg-white text-neutral-900 shadow-xs'
@@ -344,6 +380,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             <button
               type="button"
               onClick={() => setActiveRoleTab('analysis')}
+              aria-pressed={activeRoleTab === 'analysis'}
               className={`py-1.5 px-2 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeRoleTab === 'analysis'
                   ? 'bg-white text-neutral-900 shadow-xs'
@@ -351,7 +388,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
               }`}
             >
               <Brain className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Blueprint & Analysis</span>
+              <span>Review &amp; analysis</span>
             </button>
           </div>
 
@@ -360,7 +397,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
             <span>
               Configuring:{' '}
               <strong className="text-neutral-800">
-                {isRoleWriting ? 'Drafting & Line Edits' : 'Voice Blueprint Synthesis'}
+                {isRoleWriting ? 'Drafting & edits' : 'Review & analysis'}
               </strong>
             </span>
             <span className="font-mono text-[10px] text-neutral-400">
@@ -379,6 +416,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
                   id={`popover-model-${opt.id}`}
                   type="button"
                   onClick={() => handleSelectModel(opt.id)}
+                  aria-pressed={isSelected}
                   className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-start justify-between gap-2 cursor-pointer ${
                     isSelected ? 'bg-neutral-900 text-white shadow-xs' : 'hover:bg-neutral-50 text-neutral-700'
                   }`}
@@ -446,6 +484,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
                     type="button"
                     disabled={isDisabled}
                     onClick={() => handleSelectReasoning(r.id)}
+                    aria-pressed={isSelected}
                     className={`py-1 text-center rounded text-[11px] font-medium transition cursor-pointer ${
                       isDisabled
                         ? 'opacity-30 cursor-not-allowed bg-neutral-100 text-neutral-400'
@@ -464,7 +503,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ variant = 'compact
 
           {/* Footer note */}
           <div className="pt-2 border-t border-neutral-100 text-[10px] text-neutral-400 flex items-center justify-between">
-            <span>Automatic routing active</span>
+            <span>Saved for the next writing action</span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}

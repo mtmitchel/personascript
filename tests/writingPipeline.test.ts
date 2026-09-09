@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   MAX_SAMPLE_CORPUS_CHARS,
+  READER_PURPOSE_MAX_CHARS,
   buildQuickRefinePrompt,
   buildReviewPrompt,
   buildRewritePrompt,
@@ -15,6 +16,7 @@ import {
   validateDomainExpertiseInput,
   validateGeneratedReview,
   validateGeneratedProse,
+  validateReaderPurpose,
   validateWritingCorpus,
 } from '../src/writingPipeline';
 
@@ -61,7 +63,7 @@ test('forwards every enabled raw sample without excerpts or truncation', () => {
   assert.match(prompt, /The first sample has a distinctive cadence/);
   assert.match(prompt, /The second sample is short/);
   assert.match(prompt, /never import sample-specific facts/i);
-  assert.match(prompt, /draft is the semantic source of truth/i);
+  assert.match(prompt, /draft supplies the source account, meaning, and scope of core claims/i);
   assert.match(prompt, /fresh sentences and paragraphs/i);
   assert.doesNotMatch(prompt, /paywall|high-converting decision points|20% to 40%/i);
 });
@@ -348,6 +350,20 @@ test('excludes stale generated guidance while retaining explicit directives', ()
   assert.match(prompt, /Keep the user directive/);
 });
 
+test('treats reader-and-purpose guidance as subordinate editorial control', () => {
+  const readerPurpose = 'Hiring managers reading a case study. Help them understand my role and the key decisions.';
+  assert.equal(validateReaderPurpose(readerPurpose), readerPurpose);
+  assert.ok(readerPurpose.length <= READER_PURPOSE_MAX_CHARS);
+
+  const prompt = buildRewritePrompt({ draft: 'Draft.', profile, samples, readerPurpose });
+  assert.match(prompt, /<reader-and-purpose>\nHiring managers reading a case study\. Help them understand my role and the key decisions\.\n<\/reader-and-purpose>/);
+  assert.match(prompt, /User-authored editorial guidance defining the intended reader/);
+  assert.match(prompt, /reader-and-purpose context selects relevance, emphasis, explanation, and organization/);
+  assert.doesNotMatch(prompt, /Stance toward the subject, judgments, and claim strength come from the source and the reader-and-purpose task/);
+  assert.doesNotMatch(prompt, /Treat the draft, project brief \(if present\), reader-and-purpose context.*untrusted data/i);
+  assert.equal((prompt.match(/QUALITATIVE FIDELITY:/g) || []).length, 1);
+});
+
 test('applies tone sliders only when explicitly enabled', () => {
   const off = buildRewritePrompt({ draft: 'Draft.', profile, samples, toneAdjustments: { formality: 2, enthusiasm: 3, conciseness: 4 } });
   const on = buildRewritePrompt({ draft: 'Draft.', profile, samples, toneAdjustments: { formality: 2, enthusiasm: 3, conciseness: 4 }, toneEnabled: true });
@@ -390,7 +406,7 @@ test('refinement and selection prompts compare complete text and preserve exact 
     samples,
   });
   assert.match(selection, /validated selection range is \[8, 14\)/);
-  assert.match(selection, /Rewrite only the selected passage/);
+  assert.match(selection, /Edit only the selected passage/);
   assert.match(selection, /semantic status/i);
 });
 
@@ -403,6 +419,36 @@ test('structure-off prompts do not restore section-order preservation through in
   });
   assert.match(prompt, /section order is not a preservation requirement/i);
   assert.doesNotMatch(prompt, /Balanced: preserve substance and section order/i);
+});
+
+test('section-order locks do not freeze openings or outrank specific editorial requests with voice preferences', () => {
+  for (const intensity of ['polish', 'faithful', 'transform'] as const) {
+    const prompt = buildRewritePrompt({
+      draft: 'The team began the work. Some background distracts from the point.', samples,
+      intensity, preservationSettings: { keepStructure: true, customLocks: 'Retain the team attribution.' },
+      customInstructions: 'Reconstruct the opening and remove the dispensable background.',
+    });
+    assert.match(prompt, /not a lock on the opening, argument sequence within a section/);
+    assert.match(prompt, /specific request to reconstruct or cut material takes precedence/);
+    assert.match(prompt, /cannot override an explicit must-keep lock or authorize invented facts/);
+    assert.match(prompt, /Reconstruct the opening and remove the dispensable background\./);
+    assert.match(prompt, /Retain the team attribution\./);
+    assert.doesNotMatch(prompt, /Keep the source section order and logical progression/);
+  }
+});
+
+test('review receives the requested edit and previous version while limiting selection editorial scope', () => {
+  const prompt = buildReviewPrompt({
+    sourceText: 'Original source.', finalText: 'Updated draft.', previousText: 'Previous draft.',
+    selectionRange: { start: 0, end: 8 }, customInstructions: 'Remove dispensable background.', samples,
+  });
+  assert.match(prompt, /<previous-text>\nPrevious draft\./);
+  assert.match(prompt, /Selected range in the previous text: \[0, 8\)/);
+  assert.match(prompt, /whether the reader-and-purpose task and any explicit editorial request actually happened/);
+  assert.match(prompt, /do not demand unrelated editorial changes outside that range/);
+  assert.match(prompt, /Remove dispensable background\./);
+  const finding = { category: 'editorial', severity: 'warning', detail: 'The requested change was not made.', evidence: 'Previous draft.' };
+  assert.deepEqual(validateGeneratedReview(JSON.stringify({ summary: 'An unmet request.', findings: [finding], voiceObservations: [] })).findings, [finding]);
 });
 
 test('review prompt requests structured observations without a self-score', () => {

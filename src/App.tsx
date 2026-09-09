@@ -8,6 +8,7 @@ import { SamplesView } from './components/SamplesView';
 import { ProfileView } from './components/ProfileView';
 import { DomainView } from './components/DomainView';
 import { DraftBriefView } from './components/DraftBriefView';
+import { WorkspaceSaveStatus } from './components/WorkspaceSaveStatus';
 import { StudioView } from './components/StudioView';
 
 function AppContent() {
@@ -16,6 +17,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col font-sans">
       <Header />
+      <WorkspaceSaveStatus />
 
       <main className="flex-1">
         {activeTab === 'samples' && <SamplesView />}

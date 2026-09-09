@@ -166,11 +166,21 @@ export type ReviewStatus = 'complete' | 'unavailable';
 export type ReviewFindingSeverity = 'info' | 'warning' | 'error';
 
 export interface ReviewFinding {
-  category: 'omission' | 'claim' | 'addition' | 'voice' | 'preservation' | 'local-check';
+  category: ReviewFindingCategory;
   severity: ReviewFindingSeverity;
   detail: string;
   evidence?: string;
 }
+
+/** Categories retained by the review wire contract, including legacy values. */
+export type ReviewFindingCategory =
+  | 'omission'
+  | 'claim'
+  | 'addition'
+  | 'voice'
+  | 'preservation'
+  | 'editorial'
+  | 'local-check';
 
 export interface LocalPreservationCheck {
   kind: 'numbers' | 'quotes' | 'headings';
@@ -238,6 +248,14 @@ export interface StylisticAudit {
 
 export interface RewriteResult {
   id: string;
+  parentId?: string;
+  revision?: {
+    kind: 'rewrite' | 'refine' | 'selection';
+    instruction?: string;
+    selectionRange?: SelectionRange;
+  };
+  /** Selected settings at generation time; result model attribution is stored separately. */
+  modelSettings?: ModelSettings;
   profileId: string;
   profileName: string;
   intensity: RewriteIntensity;
@@ -259,6 +277,8 @@ export interface RewriteResult {
   customInstructions?: string;
   preservationLocks?: string;
   projectBrief?: string;
+  /** Independent reader and purpose context for the rewrite, if supplied. */
+  readerPurpose?: string;
   modelUsed?: string;
   writingModelUsed?: string;
   analysisModelUsed?: string;

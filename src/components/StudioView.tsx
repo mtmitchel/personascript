@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { ToneSlidersControl } from './ToneSlidersControl';
 import { DiffViewer } from './DiffViewer';
 import { StyleSimilarityCard } from './StyleSimilarityCard';
 import { RewriteFeedbackManager } from './RewriteFeedbackManager';
 import { ModelSelector } from './ModelSelector';
+import { WritingReviewPanel } from './WritingReviewPanel';
+import { RewriteHistory } from './RewriteHistory';
 import { PreservationSettings, RewriteIntensity, SelectionRange } from '../types';
 import { hasFreshProfileGuidance, PROJECT_BRIEF_MAX_CHARS } from '../writingPipeline';
 import {
@@ -31,6 +33,7 @@ export const StudioView: React.FC = () => {
     samples,
     draftText,
     projectBrief,
+    readerPurpose,
     isUploadingDraft,
     isUploadingBrief,
     rewriteIntensity,
@@ -47,6 +50,7 @@ export const StudioView: React.FC = () => {
     performRewrite,
     isRewriting,
     rewriteResult,
+    usingSavedVersionContext,
     activeProfile,
     domainExpertise,
     updateDomainExpertise,
@@ -65,21 +69,38 @@ export const StudioView: React.FC = () => {
   const [selectedRange, setSelectedRange] = useState<SelectionRange | undefined>();
   const [showAdvancedLocks, setShowAdvancedLocks] = useState(false);
   const [showModelControls, setShowModelControls] = useState(false);
+  const [modelControlsRequest, setModelControlsRequest] = useState({ role: 'writing' as 'writing' | 'analysis', sequence: 0 });
+  const modelControlsRef = useRef<HTMLDivElement>(null);
   const [showAuditDetails, setShowAuditDetails] = useState(false);
 
   const modelDisplayNames: Record<string, string> = {
     'gemini-3.8-flash': 'Gemini 3.8 Flash',
-    'gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite',
+    'gemini-3.7-flash': 'Gemini 3.7 Flash',
+    'gemini-3.6-flash': 'Gemini 3.6 Flash',
     'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
   };
-  const currentModelName = modelDisplayNames[modelSettings.model] || modelSettings.model;
+  const currentModelName = modelDisplayNames[modelSettings.writingModel] || modelSettings.writingModel;
   const currentReasoningLabel =
-    modelSettings.reasoningLevel.charAt(0).toUpperCase() + modelSettings.reasoningLevel.slice(1);
+    modelSettings.writingReasoningLevel.charAt(0).toUpperCase() + modelSettings.writingReasoningLevel.slice(1);
+
+  useEffect(() => {
+    setSelectedHighlight('');
+    setSelectedRange(undefined);
+    setCopied(false);
+  }, [rewriteResult?.id]);
+
+  const configureReviewer = () => {
+    setModelControlsRequest((previous) => ({ role: 'analysis', sequence: previous.sequence + 1 }));
+    setShowModelControls(true);
+    modelControlsRef.current?.scrollIntoView({ block: 'center' });
+    modelControlsRef.current?.focus();
+  };
 
   const rewrittenProseRef = useRef<HTMLDivElement | null>(null);
 
   const wordCountOriginal = draftText.trim() ? draftText.trim().split(/\s+/).length : 0;
   const wordCountBrief = projectBrief.trim() ? projectBrief.trim().split(/\s+/).length : 0;
+  const wordCountReaderPurpose = readerPurpose.trim() ? readerPurpose.trim().split(/\s+/).length : 0;
   const wordCountSource = rewriteResult?.originalText.trim()
     ? rewriteResult.originalText.trim().split(/\s+/).length
     : 0;
@@ -265,6 +286,16 @@ export const StudioView: React.FC = () => {
                   {projectBrief.trim() ? projectBrief.trim().slice(0, 180) : 'No project brief provided (optional).'}
                 </p>
               </div>
+
+              <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono mb-1">
+                  <span className="font-sans font-medium text-neutral-800">Reader and purpose</span>
+                  <span>{wordCountReaderPurpose} words · {readerPurpose.length} chars</span>
+                </div>
+                <p className="text-neutral-600 line-clamp-2 leading-relaxed">
+                  {readerPurpose.trim() ? readerPurpose.trim().slice(0, 180) : 'No reader and purpose provided (optional).'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -366,6 +397,7 @@ export const StudioView: React.FC = () => {
                     key={opt.id}
                     id={`btn-intensity-${opt.id}`}
                     onClick={() => setRewriteIntensity(opt.id as RewriteIntensity)}
+                    aria-pressed={rewriteIntensity === opt.id}
                     className={`p-2.5 rounded-lg border text-left transition ${
                       rewriteIntensity === opt.id
                         ? 'border-neutral-900 bg-neutral-900 text-white'
@@ -383,12 +415,17 @@ export const StudioView: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-neutral-400 mt-2 flex items-center gap-1.5">
+              <p aria-live="polite" className="text-[11px] text-neutral-400 mt-2 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
                 <span>
+                  {rewriteIntensity === 'polish'
+                    ? 'Makes restrained edits to phrasing and sentence flow while preserving core meaning.'
+                    : rewriteIntensity === 'transform'
+                      ? 'Recasts sentences and paragraphs extensively and cuts dispensable exposition while preserving core substance.'
+                      : 'Reshapes sentences and paragraphs to match your voice, condensing where useful while preserving core substance.'}{' '}
                   {preservationSettings.keepStructure
-                    ? 'Preserves substance and section order while allowing natural sentence, paragraph, and length changes.'
-                    : 'Preserves substance while allowing section order, paragraph structure, and length to change.'}
+                    ? 'Keeps section order.'
+                    : 'May reorder sections.'}
                 </span>
               </p>
             </div>
@@ -465,7 +502,7 @@ export const StudioView: React.FC = () => {
 
             {/* Additional instructions */}
             <div className="space-y-1.5 pt-2 border-t border-neutral-100">
-              <label className="text-xs font-medium text-neutral-800 block">
+              <label htmlFor="input-custom-directives" className="text-xs font-medium text-neutral-800 block">
                 Additional instructions (optional)
               </label>
               <textarea
@@ -479,16 +516,18 @@ export const StudioView: React.FC = () => {
             </div>
 
             {/* Model and Reasoning Controls */}
-            <div className="pt-2 border-t border-neutral-100 space-y-2">
+            <div ref={modelControlsRef} tabIndex={-1} aria-label="Writer and reviewer settings" className="pt-2 border-t border-neutral-100 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700">
                   <Cpu className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Model & reasoning</span>
+                  <span>Writer &amp; reviewer</span>
                 </div>
                 <button
                   id="btn-toggle-model-settings"
                   type="button"
                   onClick={() => setShowModelControls(!showModelControls)}
+                  aria-expanded={showModelControls}
+                  aria-controls="studio-model-settings"
                   className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-0.5"
                 >
                   <span>{showModelControls ? 'Hide' : 'Configure'}</span>
@@ -500,14 +539,15 @@ export const StudioView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-neutral-600 bg-neutral-50 px-2.5 py-1.5 rounded-md border border-neutral-100">
-                <span className="font-medium text-neutral-900">{currentModelName}</span>
-                <span>{currentReasoningLabel} reasoning</span>
+              <div className="space-y-1 text-[11px] text-neutral-700 bg-neutral-50 px-2.5 py-2 rounded-md border border-neutral-100">
+                <p><span className="font-medium">Writer:</span> {currentModelName} · {currentReasoningLabel} reasoning</p>
+                <p><span className="font-medium">Reviewer:</span> {modelDisplayNames[modelSettings.analysisModel] || modelSettings.analysisModel} · {modelSettings.analysisReasoningLevel} reasoning</p>
+                <p className="text-neutral-600">These selections apply to the next rewrite or edit. Review shares the model used for voice analysis.</p>
               </div>
 
               {showModelControls && (
-                <div className="pt-1">
-                  <ModelSelector variant="inline" />
+                <div id="studio-model-settings" className="pt-1">
+                  <ModelSelector key={modelControlsRequest.sequence} variant="inline" initialRole={modelControlsRequest.role} />
                 </div>
               )}
             </div>
@@ -538,6 +578,7 @@ export const StudioView: React.FC = () => {
 
         {/* Right: Output */}
         <div className="lg:col-span-7 space-y-5">
+          <RewriteHistory />
           {rewriteResult ? (
             <div className="space-y-5">
               {/* Style Similarity */}
@@ -557,74 +598,12 @@ export const StudioView: React.FC = () => {
               )}
 
               {rewriteResult.review && (
-                <div
+                <WritingReviewPanel
+                  key={rewriteResult.id}
                   id="writing-review-panel"
-                  className={`rounded-xl border p-4 space-y-3 ${
-                    rewriteResult.review.status === 'complete'
-                      ? 'border-indigo-200 bg-indigo-50/40'
-                      : 'border-amber-200 bg-amber-50/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-xs font-semibold text-neutral-900">Review of this draft</h2>
-                      <p className="text-[11px] text-neutral-500 mt-0.5">
-                        {rewriteResult.review.status === 'complete'
-                          ? 'AI observations and local preservation checks'
-                          : 'Review unavailable; the generated draft was retained'}
-                      </p>
-                    </div>
-                    {rewriteResult.review.modelUsed && (
-                      <span className="text-[10px] font-mono text-neutral-500">{rewriteResult.review.modelUsed}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-neutral-700 leading-relaxed">{rewriteResult.review.summary}</p>
-                  {(rewriteResult.review.localChecks || []).length > 0 && (
-                    <div className="space-y-2">
-                      {(rewriteResult.review.localChecks || []).map((check) => (
-                        <div
-                          key={check.kind}
-                          className={`rounded border px-2 py-1.5 ${
-                            check.passed
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                              : 'border-amber-200 bg-amber-50 text-amber-800'
-                          }`}
-                        >
-                          <div className="text-[10px] font-medium">
-                            {check.kind}: {check.passed ? 'passed' : 'possible mismatch'}
-                          </div>
-                          <p className="mt-0.5 text-[11px] leading-relaxed">{check.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {((rewriteResult.review.findings || []).length > 0 || (rewriteResult.review.voiceObservations || []).length > 0) && (
-                    <div className="space-y-2 text-xs text-neutral-700">
-                      {(rewriteResult.review.findings || []).map((finding, index) => (
-                        <div key={`finding-${index}`} className="rounded border border-indigo-100 bg-white/70 px-2.5 py-2">
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700">
-                            <span>{finding.category}</span>
-                            <span className="text-neutral-400">·</span>
-                            <span>{finding.severity}</span>
-                          </div>
-                          <p className="mt-0.5">{finding.detail}</p>
-                          {finding.evidence && (
-                            <p className="mt-1 text-[11px] text-neutral-500">Evidence: {finding.evidence}</p>
-                          )}
-                        </div>
-                      ))}
-                      {(rewriteResult.review.voiceObservations || []).map((observation, index) => (
-                        <div key={`voice-${index}`} className="rounded border border-indigo-100 bg-white/70 px-2.5 py-2">
-                          <div className="text-[10px] font-medium uppercase tracking-wide text-indigo-700">voice observation</div>
-                          <p className="mt-0.5">{observation}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {rewriteResult.review.error && (
-                    <p className="text-[11px] text-amber-800">{rewriteResult.review.error}</p>
-                  )}
-                </div>
+                  review={rewriteResult.review}
+                  onConfigureReviewer={configureReviewer}
+                />
               )}
 
               {/* Output Container */}
@@ -714,7 +693,7 @@ export const StudioView: React.FC = () => {
                     )}
                     {rewriteResult.analysisModelUsed && (
                       <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-sans text-[10px]">
-                        Review: {modelDisplayNames[rewriteResult.analysisModelUsed] || rewriteResult.analysisModelUsed}
+                        {rewriteResult.review?.status === 'unavailable' ? 'Requested reviewer' : 'Review'}: {modelDisplayNames[rewriteResult.analysisModelUsed] || rewriteResult.analysisModelUsed}
                       </span>
                     )}
                   </div>
@@ -770,6 +749,13 @@ export const StudioView: React.FC = () => {
                 </div>
               </div>
 
+              <p className="text-[11px] text-neutral-600">
+                {usingSavedVersionContext
+                  ? 'Editing a saved version: follow-up edits use its original draft, saved brief, and saved reader and purpose.'
+                  : 'Follow-up edits use this result’s original draft, current project brief, and current reader and purpose.'}{' '}
+                A full rewrite starts from the current Draft &amp; Brief inputs.
+              </p>
+
               {/* Feedback Manager */}
               <RewriteFeedbackManager
                 selectedText={selectedHighlight}
@@ -815,6 +801,7 @@ export const StudioView: React.FC = () => {
                 <div className="flex items-center gap-2 pt-1">
                   <input
                     id="input-custom-refine"
+                    aria-label="Adjustment to the current draft"
                     type="text"
                     value={customRefineInput}
                     onChange={(e) => setCustomRefineInput(e.target.value)}

@@ -17,7 +17,9 @@ import {
   SelectionRange,
 } from '../types';
 import { DEFAULT_SAMPLES, DEFAULT_PROFILE, SAMPLE_DRAFT_TO_REWRITE } from '../data/defaultSamples';
-import { normalizeDomainExpertise, normalizePreservationSettings, validateProjectBrief } from '../writingPipeline';
+import { normalizeDomainExpertise, normalizePreservationSettings, validateProjectBrief, validateReaderPurpose } from '../writingPipeline';
+import { normalizeRewriteHistory, retainRewriteVersions, createVersionId } from '../utils/rewriteHistory';
+import { readStudioWorkspace, saveStudioWorkspace, StudioWorkspace } from '../utils/studioWorkspace';
 
 export type NavigationTab = 'samples' | 'profile' | 'draft-brief' | 'domain' | 'studio';
 
@@ -35,6 +37,8 @@ interface WritingAssistantContextType {
   setUseDraftAndBrief: (enabled: boolean) => void;
   projectBrief: string;
   setProjectBrief: (brief: string) => void;
+  readerPurpose: string;
+  setReaderPurpose: (readerPurpose: string) => void;
   isUploadingBrief: boolean;
   briefUploadError: string | null;
   uploadProjectBrief: (file: File) => Promise<void>;
@@ -49,8 +53,13 @@ interface WritingAssistantContextType {
   setCustomDirectives: (directives: string) => void;
   isRewriting: boolean;
   rewriteResult: RewriteResult | null;
+  usingSavedVersionContext: boolean;
   setRewriteResult: (result: RewriteResult | null) => void;
   rewriteHistory: RewriteResult[];
+  historyStorageError: string | null;
+  workspaceSaveError: string | null;
+  downloadWorkingCopy: () => void;
+  restoreRewriteVersion: (id: string) => void;
   isSynthesizingProfile: boolean;
   activeSampleId: string | null;
   setActiveSampleId: (id: string | null) => void;
@@ -101,7 +110,7 @@ interface WritingAssistantContextType {
     selectionRange?: SelectionRange
   ) => Promise<{ replacementText: string; explanation: string }>;
   loadSampleDraft: () => void;
-  resetAllData: () => void;
+  resetPresets: () => void;
 }
 
 const STORAGE_KEY_SAMPLES = 'personascript_samples_v2';
@@ -213,20 +222,24 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     return DEFAULT_PROFILE;
   });
 
-  const [rewriteHistory, setRewriteHistory] = useState<RewriteResult[]>(() => {
+  const [initialHistory] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_HISTORY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed)
-          ? parsed.map((result) => result.review ? result : { ...result, historicalAssessment: true })
-          : [];
-      }
+      return { entries: saved ? normalizeRewriteHistory(JSON.parse(saved)) : [], error: null };
     } catch (e) {
       console.warn('Could not read saved history from storage', e);
+      return { entries: [], error: 'Saved version history could not be read. It has not been overwritten. New versions are available only in this session; download drafts you want to keep.' };
     }
-    return [];
   });
+  const [rewriteHistory, setRewriteHistory] = useState<RewriteResult[]>(initialHistory.entries);
+  const [historyLoadError, setHistoryLoadError] = useState<string | null>(initialHistory.error);
+  const [historyStorageError, setHistoryStorageError] = useState<string | null>(initialHistory.error);
+
+  const [initialWorkspace] = useState(() => readStudioWorkspace({ getItem: (key) => localStorage.getItem(key) }));
+  const [workspaceSaveError, setWorkspaceSaveError] = useState<string | null>(initialWorkspace.error);
+  const initialResult = initialWorkspace.found
+    ? initialWorkspace.workspace.rewriteResult
+    : initialHistory.entries[0] || null;
 
   const [toneAdjustments, setToneAdjustments] = useState<ToneAdjustments>(() => {
     try {
@@ -285,16 +298,17 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const domainExpertise = activeProfile.domainExpertise || DEFAULT_PROFILE.domainExpertise!;
 
   const [activeTab, setActiveTab] = useState<NavigationTab>('studio');
-  const [draftText, setDraftText] = useState<string>('');
+  const [draftText, setDraftText] = useState<string>(initialWorkspace.workspace.draftText);
   const [isUploadingDraft, setIsUploadingDraft] = useState(false);
   const [draftUploadError, setDraftUploadError] = useState<string | null>(null);
   const draftUploadRef = useRef<symbol | null>(null);
   const [useDraftAndBrief, setUseDraftAndBrief] = useState(true);
-  const [projectBrief, setProjectBrief] = useState<string>('');
+  const [projectBrief, setProjectBrief] = useState<string>(initialWorkspace.workspace.projectBrief);
+  const [readerPurpose, setReaderPurpose] = useState<string>(initialWorkspace.workspace.readerPurpose);
   const [isUploadingBrief, setIsUploadingBrief] = useState(false);
   const [briefUploadError, setBriefUploadError] = useState<string | null>(null);
   const briefUploadRef = useRef<symbol | null>(null);
-  const [rewriteIntensity, setRewriteIntensity] = useState<RewriteIntensity>('faithful');
+  const [rewriteIntensity, setRewriteIntensity] = useState<RewriteIntensity>(initialWorkspace.workspace.rewriteIntensity);
 
   const [preservationSettings, setPreservationSettings] = useState<PreservationSettings>(() => {
     try {
@@ -331,16 +345,51 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     setPreservationSettings((prev) => ({ ...prev, customLocks: locks }));
   };
 
-  const [customDirectives, setCustomDirectives] = useState<string>('');
+  const [customDirectives, setCustomDirectives] = useState<string>(initialWorkspace.workspace.customDirectives);
   const [isRewriting, setIsRewriting] = useState<boolean>(false);
   const writingOperationLock = useRef(false);
-  const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null);
+  const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(initialResult);
+  const [usingSavedVersionContext, setUsingSavedVersionContext] = useState(initialWorkspace.found ? initialWorkspace.workspace.usingSavedVersionContext : Boolean(initialResult));
   const [isSynthesizingProfile, setIsSynthesizingProfile] = useState<boolean>(false);
   const [activeSampleId, setActiveSampleId] = useState<string | null>('sample-1');
 
   // Feedback state
-  const [feedbackItems, setFeedbackItems] = useState<RewriteFeedbackItem[]>([]);
+  const [feedbackItems, setFeedbackItems] = useState<RewriteFeedbackItem[]>(initialWorkspace.found ? initialWorkspace.workspace.feedbackItems : initialResult?.feedbackItems || []);
   const [isLearningFeedback, setIsLearningFeedback] = useState<boolean>(false);
+
+  const workingCopy: StudioWorkspace = {
+    draftText, projectBrief, readerPurpose, customDirectives, rewriteIntensity, rewriteResult,
+    usingSavedVersionContext, feedbackItems,
+  };
+
+  useEffect(() => {
+    if (initialWorkspace.error) return;
+    setWorkspaceSaveError(saveStudioWorkspace({ setItem: (key, value) => localStorage.setItem(key, value) }, {
+      draftText, projectBrief, readerPurpose, customDirectives, rewriteIntensity, rewriteResult,
+      usingSavedVersionContext, feedbackItems,
+    }));
+  }, [draftText, projectBrief, readerPurpose, customDirectives, rewriteIntensity, rewriteResult, usingSavedVersionContext, feedbackItems, initialWorkspace.error]);
+
+  useEffect(() => {
+    if (!workspaceSaveError && !historyStorageError) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [workspaceSaveError, historyStorageError]);
+
+  const downloadWorkingCopy = () => {
+    // Include in-memory versions when history storage failed but the current snapshot saved.
+    const blob = new Blob([JSON.stringify({ ...workingCopy, rewriteHistory }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'personascript-working-copy.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const updateDraftText = (text: string) => {
     if (draftUploadRef.current) return;
@@ -399,9 +448,10 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     }
   };
 
-  const beginWritingOperation = () => {
+  const beginWritingOperation = (effectiveBrief: string, effectiveReaderPurpose: string) => {
     if (draftUploadRef.current || briefUploadRef.current) throw new Error('Wait for draft and brief uploads to finish.');
-    validateProjectBrief(projectBrief);
+    validateProjectBrief(effectiveBrief);
+    validateReaderPurpose(effectiveReaderPurpose);
     if (writingOperationLock.current) return false;
     writingOperationLock.current = true;
     setIsRewriting(true);
@@ -431,12 +481,15 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   }, [activeProfile]);
 
   useEffect(() => {
+    if (historyLoadError) return;
     try {
       localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(rewriteHistory));
+      setHistoryStorageError(null);
     } catch (e) {
       console.error('Error saving history to storage', e);
+      setHistoryStorageError('Version history could not be saved in this browser. Keep this page open and download drafts you want to keep before refreshing.');
     }
-  }, [rewriteHistory]);
+  }, [rewriteHistory, historyLoadError]);
 
   useEffect(() => {
     try {
@@ -692,12 +745,35 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     setActiveProfile(normalized);
   };
 
+  const storeCompletedVersion = (result: RewriteResult) => {
+    setRewriteHistory((prev) => retainRewriteVersions(
+      prev, result, rewriteResult ? { ...rewriteResult, feedbackItems } : null,
+    ));
+    setRewriteResult(result);
+    setFeedbackItems(result.feedbackItems || []);
+  };
+
+  const restoreRewriteVersion = (id: string) => {
+    if (writingOperationLock.current || isLearningFeedback) return;
+    const saved = rewriteHistory.find((entry) => entry.id === id);
+    if (!saved || saved.id === rewriteResult?.id) return;
+    if (rewriteResult) {
+      const outgoing = { ...rewriteResult, feedbackItems };
+      setRewriteHistory((prev) => prev.some((entry) => entry.id === outgoing.id)
+        ? prev.map((entry) => entry.id === outgoing.id ? outgoing : entry)
+        : retainRewriteVersions(prev, outgoing));
+    }
+    setRewriteResult(saved);
+    setFeedbackItems(saved.feedbackItems || []);
+    setUsingSavedVersionContext(true);
+  };
+
   const performRewrite = async () => {
     if (!draftText || draftText.trim().length < 10) {
       throw new Error('Please enter draft text to rewrite (minimum 10 characters).');
     }
 
-    if (!beginWritingOperation()) return;
+    if (!beginWritingOperation(projectBrief, readerPurpose)) return;
     try {
       const activeSamples = samples.filter((s) => s.enabled);
       if (activeSamples.length === 0) {
@@ -705,6 +781,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
       }
       const corpus = activeSamples.map(({ id, title, content, enabled }) => ({ id, title, content, enabled }));
       const currentBrief = projectBrief;
+      const currentReaderPurpose = readerPurpose;
 
       const res = await fetch('/api/rewrite-draft', {
         method: 'POST',
@@ -712,6 +789,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         body: JSON.stringify({
           draft: draftText,
           projectBrief: currentBrief || undefined,
+          readerPurpose: currentReaderPurpose || undefined,
           profile: activeProfile,
           intensity: rewriteIntensity,
           preservationLocks,
@@ -736,11 +814,14 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
       const result: RewriteResult = await res.json();
       const finalResult: RewriteResult = {
         ...result,
+        id: createVersionId(),
+        revision: { kind: 'rewrite' },
+        modelSettings: { ...modelSettings },
         projectBrief: result.projectBrief || currentBrief || undefined,
+        readerPurpose: result.readerPurpose !== undefined ? result.readerPurpose : currentReaderPurpose || undefined,
       };
-      setRewriteResult(finalResult);
-      setRewriteHistory((prev) => [finalResult, ...prev.slice(0, 19)]);
-      setFeedbackItems([]);
+      storeCompletedVersion(finalResult);
+      setUsingSavedVersionContext(false);
     } finally {
       endWritingOperation();
     }
@@ -749,9 +830,10 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const applyQuickRefine = async (instruction: string) => {
     if (!rewriteResult?.rewrittenText) return;
 
-    if (!beginWritingOperation()) return;
+    const currentBrief = usingSavedVersionContext ? rewriteResult.projectBrief || '' : projectBrief;
+    const currentReaderPurpose = usingSavedVersionContext ? rewriteResult.readerPurpose || '' : readerPurpose;
+    if (!beginWritingOperation(currentBrief, currentReaderPurpose)) return;
     try {
-      const currentBrief = projectBrief;
       const res = await fetch('/api/quick-refine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -760,6 +842,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           originalText: rewriteResult.originalText,
           sourceDraft: rewriteResult.originalText,
           projectBrief: currentBrief || undefined,
+          readerPurpose: currentReaderPurpose || undefined,
           instruction,
           profile: activeProfile,
           samples: samples.filter((s) => s.enabled).map(({ id, title, content, enabled }) => ({ id, title, content, enabled })),
@@ -799,11 +882,24 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
 
       const updatedResult: RewriteResult = {
         ...rewriteResult,
+        id: createVersionId(),
+        parentId: rewriteResult.id,
+        createdAt: new Date().toISOString(),
+        revision: { kind: 'refine', instruction },
+        modelSettings: { ...modelSettings },
+        profileId: activeProfile.id,
+        profileName: activeProfile.name,
+        customInstructions: customDirectives,
+        preservationLocks,
+        toneAdjustments,
+        domainExpertise,
+        feedbackItems,
         rewrittenText: refinedText,
         wordCountRewritten,
         changesExplanation: `${tweakSummary}\n\n${rewriteResult.changesExplanation}`,
         review,
         projectBrief: currentBrief || undefined,
+        readerPurpose: currentReaderPurpose || undefined,
         modelUsed: modelUsed || writingModelUsed || modelSettings.writingModel || 'gemini-3.8-flash',
         durationMs: durationMs ?? rewriteResult.durationMs,
         writingModelUsed: writingModelUsed || modelUsed || modelSettings.writingModel || 'gemini-3.8-flash',
@@ -815,8 +911,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         historicalAssessment: undefined,
       };
 
-      setRewriteResult(updatedResult);
-      setRewriteHistory((prev) => [updatedResult, ...prev.slice(0, 19)]);
+      storeCompletedVersion(updatedResult);
     } finally {
       endWritingOperation();
     }
@@ -859,11 +954,12 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     );
     const surroundingContext = currentText.slice(contextStart, contextEnd);
 
-    if (!beginWritingOperation()) {
+    const currentBrief = usingSavedVersionContext ? rewriteResult.projectBrief || '' : projectBrief;
+    const currentReaderPurpose = usingSavedVersionContext ? rewriteResult.readerPurpose || '' : readerPurpose;
+    if (!beginWritingOperation(currentBrief, currentReaderPurpose)) {
       throw new Error('Another writing operation is already in progress.');
     }
     try {
-      const currentBrief = projectBrief;
       const res = await fetch('/api/edit-selection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -874,6 +970,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         originalText: rewriteResult.originalText,
         sourceDraft: rewriteResult.originalText,
         projectBrief: currentBrief || undefined,
+        readerPurpose: currentReaderPurpose || undefined,
         surroundingContext,
         instruction,
         tag,
@@ -918,9 +1015,22 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
       const wordCountRewritten = newFullText.trim().split(/\s+/).filter(Boolean).length;
       const updatedResult: RewriteResult = {
         ...rewriteResult,
+        id: createVersionId(),
+        parentId: rewriteResult.id,
+        createdAt: new Date().toISOString(),
+        revision: { kind: 'selection', instruction: instruction || tag, selectionRange: startIndex >= 0 ? { start: startIndex, end: startIndex + exactSelectedText.length } : undefined },
+        modelSettings: { ...modelSettings },
+        profileId: activeProfile.id,
+        profileName: activeProfile.name,
+        customInstructions: customDirectives,
+        preservationLocks,
+        toneAdjustments,
+        domainExpertise,
+        feedbackItems,
         rewrittenText: newFullText,
         wordCountRewritten,
         projectBrief: currentBrief || undefined,
+        readerPurpose: currentReaderPurpose || undefined,
         modelUsed: modelUsed || writingModelUsed || modelSettings.writingModel || 'gemini-3.8-flash',
         durationMs: durationMs ?? rewriteResult.durationMs,
         changesExplanation: `[Line Edit: ${explanation}]\n\n${rewriteResult.changesExplanation}`,
@@ -934,8 +1044,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         historicalAssessment: undefined,
       };
 
-      setRewriteResult(updatedResult);
-      setRewriteHistory((prev) => [updatedResult, ...prev.slice(0, 19)]);
+      storeCompletedVersion(updatedResult);
 
       if (alsoSaveToProfile) {
         addFeedbackItem({
@@ -956,23 +1065,11 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     updateDraftText(SAMPLE_DRAFT_TO_REWRITE);
   };
 
-  const resetAllData = () => {
+  const resetPresets = () => {
     setSamples(DEFAULT_SAMPLES);
     setActiveProfile(DEFAULT_PROFILE);
     setToneAdjustments(DEFAULT_TONE_ADJUSTMENTS);
     setModelSettings(DEFAULT_MODEL_SETTINGS);
-    setDraftText('');
-    draftUploadRef.current = null;
-    setIsUploadingDraft(false);
-    setDraftUploadError(null);
-    setUseDraftAndBrief(true);
-    briefUploadRef.current = null;
-    setIsUploadingBrief(false);
-    setBriefUploadError(null);
-    setProjectBrief('');
-    setRewriteResult(null);
-    setRewriteHistory([]);
-    setFeedbackItems([]);
     setActiveSampleId('sample-1');
   };
 
@@ -992,6 +1089,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         setUseDraftAndBrief,
         projectBrief,
         setProjectBrief: updateProjectBrief,
+        readerPurpose,
+        setReaderPurpose,
         isUploadingBrief,
         briefUploadError,
         uploadProjectBrief,
@@ -1006,8 +1105,13 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         setCustomDirectives,
         isRewriting,
         rewriteResult,
+        usingSavedVersionContext,
         setRewriteResult,
         rewriteHistory,
+        historyStorageError,
+        workspaceSaveError,
+        downloadWorkingCopy,
+        restoreRewriteVersion,
         isSynthesizingProfile,
         activeSampleId,
         setActiveSampleId,
@@ -1042,7 +1146,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         applyQuickRefine,
         editSelection,
         loadSampleDraft,
-        resetAllData,
+        resetPresets,
       }}
     >
       {children}

@@ -9,7 +9,7 @@ export const Header: React.FC = () => {
     setActiveTab,
     samples,
     activeProfile,
-    resetAllData,
+    resetPresets,
   } = useWritingAssistant();
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -80,7 +80,7 @@ export const Header: React.FC = () => {
             </span>
             <button
               id="btn-reset-demo"
-              title="Reset default samples and profile"
+              title="Reset voice and model presets"
               onClick={() => setShowResetConfirm(true)}
               className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors"
             >
@@ -108,10 +108,10 @@ export const Header: React.FC = () => {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-neutral-900">
-                  Reset to default presets?
+                  Reset voice and model presets?
                 </h3>
                 <p className="text-xs text-neutral-500 mt-1">
-                  This will reload standard writing samples and voice profile data.
+                  This restores default samples, voice, tone, and model choices. Your drafts, brief, and version history are kept.
                 </p>
               </div>
               <button
@@ -135,7 +135,7 @@ export const Header: React.FC = () => {
                 id="btn-confirm-reset-all"
                 type="button"
                 onClick={() => {
-                  resetAllData();
+                  resetPresets();
                   setShowResetConfirm(false);
                 }}
                 className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"

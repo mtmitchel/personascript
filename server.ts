@@ -13,6 +13,7 @@ import {
   normalizeDomainExpertise,
   normalizePreservationSettings,
   validateProjectBrief,
+  validateReaderPurpose,
   REVIEW_SYSTEM_INSTRUCTION,
   runLocalPreservationChecks,
   unavailableReview,
@@ -1062,6 +1063,7 @@ Synthesize a comprehensive profile including:
 async function reviewWrittenText(input: {
   sourceText: string;
   projectBrief?: string;
+  readerPurpose?: string;
   finalText: string;
   profile?: any;
   samples: RawWritingSample[];
@@ -1072,6 +1074,9 @@ async function reviewWrittenText(input: {
   analysisModel?: string;
   analysisReasoningLevel?: string;
   endpoint: string;
+  intensity?: 'polish' | 'faithful' | 'transform';
+  previousText?: string;
+  selectionRange?: SelectionRange;
 }) {
   const localChecks = runLocalPreservationChecks(
     input.sourceText,
@@ -1100,8 +1105,14 @@ async function reviewWrittenText(input: {
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  category: { type: Type.STRING },
-                  severity: { type: Type.STRING },
+                  category: {
+                    type: Type.STRING,
+                    enum: ['omission', 'claim', 'addition', 'voice', 'preservation', 'editorial', 'local-check'],
+                  },
+                  severity: {
+                    type: Type.STRING,
+                    enum: ['info', 'warning', 'error'],
+                  },
                   detail: { type: Type.STRING },
                   evidence: { type: Type.STRING },
                 },
@@ -1177,6 +1188,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
     const {
       draft,
       projectBrief,
+      readerPurpose,
       profile,
       intensity,
       preservationLocks,
@@ -1194,6 +1206,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
 
     const draftText = requireText(draft, 'Draft text', 10);
     const validProjectBrief = validateProjectBrief(projectBrief);
+    const validReaderPurpose = validateReaderPurpose(readerPurpose);
     requireObject(profile, 'profile');
     if (intensity !== undefined && !['polish', 'faithful', 'transform'].includes(intensity)) {
       throw new RequestValidationError('intensity is invalid.');
@@ -1213,6 +1226,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       contents: buildRewritePrompt({
         draft: draftText,
         projectBrief: validProjectBrief,
+        readerPurpose: validReaderPurpose,
         profile,
         samples: corpus,
         intensity,
@@ -1232,6 +1246,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
     const review = await reviewWrittenText({
       sourceText: draftText,
       projectBrief: validProjectBrief,
+      readerPurpose: validReaderPurpose,
       finalText: rewrittenText,
       profile,
       samples: corpus,
@@ -1242,6 +1257,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       analysisModel,
       analysisReasoningLevel,
       endpoint: '/api/rewrite-draft/review',
+      intensity,
     });
     const wordCountOriginal = draftText.trim().split(/\s+/).filter(Boolean).length;
     const wordCountRewritten = rewrittenText.split(/\s+/).filter(Boolean).length;
@@ -1267,6 +1283,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       customInstructions,
       preservationLocks,
       projectBrief: validProjectBrief,
+      readerPurpose: validReaderPurpose,
       preservationSettings: normalizedPreservation,
       writingModelUsed: (response as any).modelExecuted || selectedModel,
       analysisModelUsed: review.modelUsed || analysisModel || 'gemini-3.1-pro-preview',
@@ -1436,6 +1453,7 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
       originalText,
       sourceDraft,
       projectBrief,
+      readerPurpose,
       instruction,
       profile,
       samples,
@@ -1453,6 +1471,7 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
     const currentTextValue = requireText(currentText, 'currentText');
     const instructionValue = requireText(instruction, 'instruction');
     const validProjectBrief = validateProjectBrief(projectBrief);
+    const validReaderPurpose = validateReaderPurpose(readerPurpose);
     if (profile !== undefined && profile !== null) requireObject(profile, 'profile');
     const sourceDraftValue = optionalText(sourceDraft, 'sourceDraft');
     const originalTextValue = optionalText(originalText, 'originalText');
@@ -1472,6 +1491,7 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
       contents: buildQuickRefinePrompt({
         draft: source,
         projectBrief: validProjectBrief,
+        readerPurpose: validReaderPurpose,
         currentText: currentTextValue,
         instruction: instructionValue,
         profile,
@@ -1492,6 +1512,7 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
     const review = await reviewWrittenText({
       sourceText: source,
       projectBrief: validProjectBrief,
+      readerPurpose: validReaderPurpose,
       finalText: refinedText,
       profile,
       samples: corpus,
@@ -1502,10 +1523,12 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
       analysisModel,
       analysisReasoningLevel,
       endpoint: '/api/quick-refine/review',
+      previousText: currentTextValue,
     });
     res.json({
       refinedText,
       projectBrief: validProjectBrief,
+      readerPurpose: validReaderPurpose,
       tweakSummary: 'Refinement completed. Review findings are shown below.',
       review,
       modelUsed: (response as any).modelExecuted || selectedModel,
@@ -1534,6 +1557,7 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
       originalText,
       sourceDraft,
       projectBrief,
+      readerPurpose,
       surroundingContext,
       instruction,
       tag,
@@ -1553,6 +1577,7 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
     const selectedTextValue = requireText(selectedText, 'selectedText');
     const currentTextValue = requireText(currentText, 'currentText');
     const validProjectBrief = validateProjectBrief(projectBrief);
+    const validReaderPurpose = validateReaderPurpose(readerPurpose);
     if (profile !== undefined && profile !== null) requireObject(profile, 'profile');
     const sourceDraftValue = optionalText(sourceDraft, 'sourceDraft');
     const originalTextValue = optionalText(originalText, 'originalText');
@@ -1584,6 +1609,7 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
       contents: buildSelectionPrompt({
         draft: source,
         projectBrief: validProjectBrief,
+        readerPurpose: validReaderPurpose,
         currentText: currentTextValue,
         selectedText: selectedTextValue,
         selectionRange: range,
@@ -1609,6 +1635,7 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
     const review = await reviewWrittenText({
       sourceText: source,
       projectBrief: validProjectBrief,
+      readerPurpose: validReaderPurpose,
       finalText,
       profile,
       samples: corpus,
@@ -1619,10 +1646,13 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
       analysisModel,
       analysisReasoningLevel,
       endpoint: '/api/edit-selection/review',
+      previousText: currentTextValue,
+      selectionRange: range,
     });
     res.json({
       replacementText,
       projectBrief: validProjectBrief,
+      readerPurpose: validReaderPurpose,
       explanation: 'Selection edit completed. Review findings are shown below.',
       finalText,
       review,
