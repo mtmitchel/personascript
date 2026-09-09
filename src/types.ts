@@ -79,13 +79,28 @@ export interface ProfileMetrics {
   metaphorDensity: number; // 1-100
 }
 
+export type ConceptSourceStatus = 'supported' | 'adjacent';
+
+export interface ConceptAnnotation {
+  status: ConceptSourceStatus;
+  explanation?: string;
+}
+
 export interface DomainTopic {
   id: string;
   name: string; // e.g. "Content Design & UX Copywriting", "Monetization", "AI Translation", "AI Writing Assistance"
   category?: 'discipline' | 'intersecting' | 'topic';
   description?: string;
   keyTerminology: string[];
+  conceptAnnotations?: Record<string, ConceptAnnotation>;
   conventions: string[];
+  enabled: boolean;
+}
+
+export interface ProductReference {
+  id: string;
+  name: string;
+  notes: string;
   enabled: boolean;
 }
 
@@ -98,6 +113,7 @@ export interface DomainExpertise {
   conventions: string[];
   audienceContext: string;
   customNotes?: string;
+  productKnowledge?: ProductReference[];
 }
 
 export interface StyleProfile {
@@ -132,10 +148,47 @@ export interface PreservationSettings {
   customLocks: string;
 }
 
+export interface SelectionRange {
+  start: number;
+  end: number;
+}
+
 export interface ToneAdjustments {
   formality: number; // 0 (Informal and Conversational) - 100 (Formal and Treatise-grade)
   enthusiasm: number; // 0 (Subdued and Analytical) - 100 (Energetic and Inspiring)
   conciseness: number; // 0 (Expansive and Lyrical) - 100 (Direct and Razor-sharp)
+  /** Sliders are retained between runs but only affect writing when enabled. */
+  enabled?: boolean;
+}
+
+export type ReviewStatus = 'complete' | 'unavailable';
+
+export type ReviewFindingSeverity = 'info' | 'warning' | 'error';
+
+export interface ReviewFinding {
+  category: 'omission' | 'claim' | 'addition' | 'voice' | 'preservation' | 'local-check';
+  severity: ReviewFindingSeverity;
+  detail: string;
+  evidence?: string;
+}
+
+export interface LocalPreservationCheck {
+  kind: 'numbers' | 'quotes' | 'headings';
+  passed: boolean;
+  missing: string[];
+  unexpected: string[];
+  detail: string;
+}
+
+export interface WritingReview {
+  status: ReviewStatus;
+  summary: string;
+  findings: ReviewFinding[];
+  voiceObservations: string[];
+  localChecks: LocalPreservationCheck[];
+  modelUsed?: string;
+  durationMs?: number;
+  error?: string;
 }
 
 export type FeedbackTag =
@@ -193,15 +246,23 @@ export interface RewriteResult {
   wordCountOriginal: number;
   wordCountRewritten: number;
   changesExplanation: string;
-  stylisticAudit: StylisticAudit;
-  styleSimilarity: StyleSimilarityScore;
+  /** Kept optional so historical records made by the old scorer still render. */
+  stylisticAudit?: StylisticAudit;
+  styleSimilarity?: StyleSimilarityScore;
+  review?: WritingReview;
+  historicalAssessment?: boolean;
   toneAdjustments?: ToneAdjustments;
   domainExpertise?: DomainExpertise;
+  preservationSettings?: PreservationSettings;
   feedbackItems?: RewriteFeedbackItem[];
   createdAt: string;
   customInstructions?: string;
   preservationLocks?: string;
+  projectBrief?: string;
   modelUsed?: string;
+  writingModelUsed?: string;
+  analysisModelUsed?: string;
+  writingDurationMs?: number;
   durationMs?: number;
 }
 
@@ -252,4 +313,17 @@ export interface PortfolioDiscoveryResult {
   agentSummary: string;
 }
 
+export interface GenerateDomainKnowledgeRequest {
+  field?: string;
+  disciplines?: string[];
+  existingTopics?: string[];
+  targetTopic?: { name: string; category: 'discipline' | 'intersecting' };
+  draft?: string;
+  projectBrief?: string;
+  model?: GeminiModelChoice;
+  reasoningLevel?: ReasoningLevelChoice;
+}
 
+export interface GenerateDomainKnowledgeResponse {
+  topics: DomainTopic[];
+}

@@ -123,12 +123,12 @@ export const ProfileView: React.FC = () => {
           </button>
 
           <button
-            id="btn-profile-to-domain"
+            id="btn-profile-to-draft-brief"
             type="button"
-            onClick={() => setActiveTab('domain')}
+            onClick={() => setActiveTab('draft-brief')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
           >
-            <span>Domain Knowledge</span>
+            <span>Draft &amp; Brief</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -299,7 +299,7 @@ export const ProfileView: React.FC = () => {
             })
           }
           placeholder="e.g. Keep sentences concise. Avoid marketing buzzwords."
-          className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 text-neutral-900 resize-none placeholder:text-neutral-400"
+          className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-400"
         />
         <div className="flex items-center justify-between pt-1">
           <span className="text-xs text-neutral-400">
@@ -307,12 +307,12 @@ export const ProfileView: React.FC = () => {
           </span>
           <div className="flex gap-2">
             <button
-              id="btn-profile-next-domain"
+              id="btn-profile-next-draft-brief"
               type="button"
-              onClick={() => setActiveTab('domain')}
-              className="px-3.5 py-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition"
+              onClick={() => setActiveTab('draft-brief')}
+              className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
             >
-              Domain Knowledge
+              Draft &amp; Brief
             </button>
             <button
               id="btn-profile-next-studio"

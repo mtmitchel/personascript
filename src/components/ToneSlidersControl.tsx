@@ -45,23 +45,36 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
       className="bg-white border border-neutral-200 rounded-xl p-4 space-y-4"
     >
       <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
-        <h4 className="text-xs font-medium text-neutral-900">
-          Tone adjustments
-        </h4>
+        <div>
+          <h4 className="text-xs font-medium text-neutral-900">Tone adjustments</h4>
+          <p className="text-[11px] text-neutral-400 mt-0.5">Use the corpus tone by default; opt in to these saved values.</p>
+        </div>
 
-        <button
-          id="btn-reset-sliders"
-          type="button"
-          onClick={onReset}
-          title="Reset to profile default"
-          className="text-[11px] text-neutral-400 hover:text-neutral-800 flex items-center gap-1 transition"
-        >
-          <RotateCcw className="w-3 h-3" />
-          <span>Reset</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-[11px] text-neutral-600 cursor-pointer">
+            <input
+              id="toggle-tone-adjustments"
+              type="checkbox"
+              checked={Boolean(adjustments.enabled)}
+              onChange={(e) => onChange({ ...adjustments, enabled: e.target.checked })}
+              className="w-3.5 h-3.5 accent-neutral-900"
+            />
+            <span>Apply</span>
+          </label>
+          <button
+            id="btn-reset-sliders"
+            type="button"
+            onClick={onReset}
+            title="Reset saved tone values"
+            className="text-[11px] text-neutral-400 hover:text-neutral-800 flex items-center gap-1 transition"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Reset</span>
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-4">
+      <div className={`space-y-4 ${adjustments.enabled ? '' : 'opacity-50'}`}>
         {/* Formality Slider */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs">
@@ -79,6 +92,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
             max="100"
             step="5"
             value={adjustments.formality}
+            disabled={!adjustments.enabled}
             onChange={(e) =>
               onChange({ ...adjustments, formality: parseInt(e.target.value, 10) })
             }
@@ -108,6 +122,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
             max="100"
             step="5"
             value={adjustments.enthusiasm}
+            disabled={!adjustments.enabled}
             onChange={(e) =>
               onChange({ ...adjustments, enthusiasm: parseInt(e.target.value, 10) })
             }
@@ -137,6 +152,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
             max="100"
             step="5"
             value={adjustments.conciseness}
+            disabled={!adjustments.enabled}
             onChange={(e) =>
               onChange({ ...adjustments, conciseness: parseInt(e.target.value, 10) })
             }

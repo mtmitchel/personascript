@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useWritingAssistant, NavigationTab } from '../context/WritingAssistantContext';
-import { Feather, BookOpen, Wand2, Sliders, Database, RotateCcw, X } from 'lucide-react';
+import { Feather, BookOpen, Wand2, Sliders, Database, RotateCcw, X, FileText } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 
 export const Header: React.FC = () => {
@@ -19,6 +19,7 @@ export const Header: React.FC = () => {
   const navItems: Array<{ id: NavigationTab; label: string; icon: React.FC<{ className?: string }>; count?: number }> = [
     { id: 'samples', label: 'Writing Samples', icon: BookOpen, count: activeSamplesCount },
     { id: 'profile', label: 'Voice Blueprint', icon: Sliders },
+    { id: 'draft-brief', label: 'Draft & Brief', icon: FileText },
     { id: 'domain', label: 'Domain Knowledge', icon: Database },
     { id: 'studio', label: 'Rewrite Studio', icon: Wand2 },
   ];
@@ -47,7 +48,7 @@ export const Header: React.FC = () => {
                   key={item.id}
                   id={`nav-tab-${item.id}`}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap font-medium transition-colors ${
                     isActive
                       ? 'bg-neutral-900 text-white'
                       : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
@@ -74,7 +75,7 @@ export const Header: React.FC = () => {
           {/* Model Selector, Persona and Reset */}
           <div className="flex items-center space-x-2.5">
             <ModelSelector variant="compact" />
-            <span className="text-xs text-neutral-600 hidden lg:inline-block max-w-[150px] truncate">
+            <span className="text-xs text-neutral-600 hidden 2xl:inline-block max-w-[120px] truncate">
               {activeProfile.name}
             </span>
             <button

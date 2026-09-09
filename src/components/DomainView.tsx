@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { DomainExpertise, DomainTopic } from '../types';
+import { DomainExpertise, DomainTopic, ProductReference } from '../types';
 import {
   Plus,
   X,
@@ -19,27 +19,44 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Package,
+  RefreshCw,
+  Trash2,
+  AlertCircle,
 } from 'lucide-react';
-import { UX_PORTFOLIO_PRESET, SYSTEMS_ENGINEERING_PRESET, presetToDomainExpertise } from '../data/domainPresets';
+import { normalizeDomainExpertise } from '../writingPipeline';
 
 export const DomainView: React.FC = () => {
   const {
     domainExpertise,
     updateDomainExpertise,
     setActiveTab,
+    modelSettings,
+    draftText,
+    projectBrief,
+    isUploadingDraft,
+    isUploadingBrief,
+    useDraftAndBrief,
+    setUseDraftAndBrief,
   } = useWritingAssistant();
 
+  const sourceUploadPending = useDraftAndBrief && (isUploadingDraft || isUploadingBrief);
+
   const [localExpertise, setLocalExpertise] = useState<DomainExpertise>(() => {
-    // If the existing domain expertise has no topics, populate with UX_PORTFOLIO_PRESET
-    if (!domainExpertise.topics || domainExpertise.topics.length === 0) {
-      return presetToDomainExpertise(UX_PORTFOLIO_PRESET);
-    }
-    return { ...domainExpertise };
+    return normalizeDomainExpertise(domainExpertise);
   });
 
   const [newDisciplineInput, setNewDisciplineInput] = useState('');
-  const [newGlobalTermInput, setNewGlobalTermInput] = useState('');
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const generationBusy = useRef(false);
+  const generationController = useRef<AbortController | null>(null);
+  const [generatingTopicId, setGeneratingTopicId] = useState<string | null>(null);
+  const [topicGenerationError, setTopicGenerationError] = useState<{ id: string; message: string } | null>(null);
+
+  useEffect(() => () => generationController.current?.abort(), []);
+  const [focusProductId, setFocusProductId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // Quick state for adding a new topic
   const [isAddingTopic, setIsAddingTopic] = useState(false);
@@ -66,42 +83,28 @@ export const DomainView: React.FC = () => {
 
   // Sync from context when changed externally
   useEffect(() => {
-    if (!domainExpertise.topics || domainExpertise.topics.length === 0) {
-      const preset = presetToDomainExpertise(UX_PORTFOLIO_PRESET);
-      setLocalExpertise(preset);
-      updateDomainExpertise(preset);
-    } else {
-      setLocalExpertise({ ...domainExpertise });
-    }
+    setLocalExpertise(normalizeDomainExpertise(domainExpertise));
 
-    if (domainExpertise.customNotes && domainExpertise.customNotes.trim()) {
-      setGuidelinesText(domainExpertise.customNotes);
-    }
+    setGuidelinesText(domainExpertise.customNotes ?? (domainExpertise.conventions || []).join('\n'));
   }, [domainExpertise]);
+
+  useEffect(() => {
+    if (focusProductId) {
+      document.getElementById(`product-name-${focusProductId}`)?.focus();
+      setFocusProductId(null);
+    }
+  }, [focusProductId, localExpertise.productKnowledge]);
 
   const flashSaved = () => {
     setSavedFeedback(true);
     setTimeout(() => setSavedFeedback(false), 2000);
   };
 
-  // Helper to re-aggregate keyTerminology and conventions across active topics
-  const recomputeAndSave = (updated: DomainExpertise) => {
-    const activeTopics = (updated.topics || []).filter((t) => t.enabled);
-
-    const topicTerms = activeTopics.flatMap((t) => t.keyTerminology || []);
-    const mergedTerms = Array.from(new Set([...(updated.keyTerminology || []), ...topicTerms]));
-
-    const topicConventions = activeTopics.flatMap((t) => t.conventions || []);
-    const mergedConventions = Array.from(new Set([...(updated.conventions || []), ...topicConventions]));
-
-    const fullUpdated: DomainExpertise = {
-      ...updated,
-      keyTerminology: mergedTerms,
-      conventions: mergedConventions,
-    };
-
-    setLocalExpertise(fullUpdated);
-    updateDomainExpertise(fullUpdated);
+  // Save expertise with single-ownership normalization
+  const saveExpertise = (updated: DomainExpertise) => {
+    const normalized = normalizeDomainExpertise(updated);
+    setLocalExpertise(normalized);
+    updateDomainExpertise(normalized);
     flashSaved();
   };
 
@@ -161,7 +164,7 @@ export const DomainView: React.FC = () => {
     const updatedTopics = currentTopics.map((t) =>
       t.id === topicId ? { ...t, enabled: !t.enabled } : t
     );
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
@@ -185,7 +188,7 @@ export const DomainView: React.FC = () => {
     });
 
     setTopicTermInputs((prev) => ({ ...prev, [topicId]: '' }));
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
@@ -196,12 +199,19 @@ export const DomainView: React.FC = () => {
     const currentTopics = localExpertise.topics || [];
     const updatedTopics = currentTopics.map((topic) => {
       if (topic.id !== topicId) return topic;
+      const remainingTerms = (topic.keyTerminology || []).filter((t) => t !== termToRemove);
+      let updatedAnnotations = topic.conceptAnnotations ? { ...topic.conceptAnnotations } : undefined;
+      if (updatedAnnotations) {
+        delete updatedAnnotations[termToRemove];
+        delete updatedAnnotations[termToRemove.toLowerCase()];
+      }
       return {
         ...topic,
-        keyTerminology: (topic.keyTerminology || []).filter((t) => t !== termToRemove),
+        keyTerminology: remainingTerms,
+        conceptAnnotations: updatedAnnotations && Object.keys(updatedAnnotations).length > 0 ? updatedAnnotations : undefined,
       };
     });
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
@@ -221,7 +231,7 @@ export const DomainView: React.FC = () => {
       };
     });
 
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
@@ -239,7 +249,7 @@ export const DomainView: React.FC = () => {
       };
     });
 
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
@@ -271,7 +281,7 @@ export const DomainView: React.FC = () => {
     };
 
     const updatedTopics = [...(localExpertise.topics || []), newTopic];
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
@@ -287,21 +297,165 @@ export const DomainView: React.FC = () => {
   // Delete a topic
   const handleDeleteTopic = (topicId: string) => {
     const updatedTopics = (localExpertise.topics || []).filter((t) => t.id !== topicId);
-    recomputeAndSave({
+    saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
     });
   };
 
-  // Load preset
-  const handleApplyPreset = (preset: typeof UX_PORTFOLIO_PRESET) => {
-    const configured = presetToDomainExpertise(preset);
-    setLocalExpertise(configured);
-    updateDomainExpertise(configured);
-    if (configured.customNotes) {
-      setGuidelinesText(configured.customNotes);
+  // Product reference knowledge management
+  const createLocalProductId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `product-${crypto.randomUUID()}`;
     }
+    return `product-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  };
+
+  const handleAddProduct = () => {
+    const newId = createLocalProductId();
+    const newProduct: ProductReference = {
+      id: newId,
+      name: '',
+      notes: '',
+      enabled: true,
+    };
+    saveExpertise({
+      ...localExpertise,
+      productKnowledge: [...(localExpertise.productKnowledge || []), newProduct],
+    });
+    setFocusProductId(newId);
+  };
+
+  const handleUpdateProduct = (id: string, updates: Partial<ProductReference>) => {
+    const updated = (localExpertise.productKnowledge || []).map((p) =>
+      p.id === id ? { ...p, ...updates } : p
+    );
+    saveExpertise({
+      ...localExpertise,
+      productKnowledge: updated,
+    });
+  };
+
+  const handleDeleteProduct = (id: string) => {
+    const updated = (localExpertise.productKnowledge || []).filter((p) => p.id !== id);
+    saveExpertise({
+      ...localExpertise,
+      productKnowledge: updated,
+    });
+  };
+
+  const handleGenerateKnowledge = async (targetTopic?: DomainTopic) => {
+    if (generationBusy.current || sourceUploadPending) return;
+    generationBusy.current = true;
+    const controller = new AbortController();
+    generationController.current = controller;
+    if (targetTopic) {
+      setGeneratingTopicId(targetTopic.id);
+      setTopicGenerationError(null);
+    } else {
+      setIsGenerating(true);
+      setGenerationError(null);
+    }
+
+    try {
+      const existingTopicNames = (localExpertise.topics || [])
+        .map((t) => t.name)
+        .filter(Boolean);
+
+      const requestBody: Record<string, unknown> = {
+        field: localExpertise.field || (localExpertise.disciplines || []).join(' & '),
+        disciplines: localExpertise.disciplines || [],
+        existingTopics: targetTopic ? [] : existingTopicNames,
+        targetTopic: targetTopic ? { name: targetTopic.name, category: targetTopic.category === 'discipline' ? 'discipline' : 'intersecting' } : undefined,
+        model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
+        reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
+      };
+
+      if (useDraftAndBrief) {
+        if (draftText.trim()) requestBody.draft = draftText;
+        if (projectBrief.trim()) requestBody.projectBrief = projectBrief;
+      }
+
+      const res = await fetch('/api/generate-domain-knowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to generate domain knowledge');
+      }
+
+      const { topics: newTopics } = await res.json();
+      if (!Array.isArray(newTopics) || newTopics.length === 0) {
+        throw new Error('No domain topics returned by the server.');
+      }
+
+      if (controller.signal.aborted) return;
+      if (targetTopic) {
+        if (newTopics.length !== 1 || newTopics[0].name !== targetTopic.name.trim() ||
+            newTopics[0].category !== (targetTopic.category === 'discipline' ? 'discipline' : 'intersecting')) {
+          throw new Error('The model did not return the requested card. Your card has been kept.');
+        }
+        updateDomainExpertise((prev) => ({
+          ...prev,
+          topics: (prev.topics || []).map((topic) => topic.id === targetTopic.id
+            ? {
+                ...topic,
+                description: newTopics[0].description,
+                keyTerminology: newTopics[0].keyTerminology,
+                conceptAnnotations: newTopics[0].conceptAnnotations,
+                conventions: newTopics[0].conventions,
+              }
+            : topic),
+        }));
+      } else {
+        updateDomainExpertise((prev) => ({
+          ...prev,
+          topics: newTopics,
+          keyTerminology: [],
+          conventions: [],
+        }));
+      }
+      flashSaved();
+    } catch (err: any) {
+      if (controller.signal.aborted) return;
+      const message = err.message || 'Failed to generate domain knowledge';
+      if (targetTopic) setTopicGenerationError({ id: targetTopic.id, message });
+      else setGenerationError(message);
+    } finally {
+      generationBusy.current = false;
+      generationController.current = null;
+      setIsGenerating(false);
+      setGeneratingTopicId(null);
+    }
+  };
+
+  const handleClearTopic = (topicId: string) => {
+    if (isGenerating || generatingTopicId === topicId) return;
+    setTopicGenerationError((prev) => prev?.id === topicId ? null : prev);
+    setTopicTermInputs((prev) => ({ ...prev, [topicId]: '' }));
+    updateDomainExpertise((prev) => ({
+      ...prev,
+      topics: (prev.topics || []).map((topic) => topic.id === topicId
+        ? { ...topic, description: undefined, keyTerminology: [], conceptAnnotations: undefined, conventions: [] }
+        : topic),
+    }));
     flashSaved();
+  };
+
+  const handleClearTopics = () => {
+    if (generationBusy.current) return;
+    setGenerationError(null);
+    const updated: DomainExpertise = {
+      ...localExpertise,
+      topics: [],
+      keyTerminology: [],
+      conventions: [],
+    };
+    saveExpertise(updated);
   };
 
   const handleGuidelinesChange = (val: string) => {
@@ -331,7 +485,10 @@ export const DomainView: React.FC = () => {
     return <Layers className="w-3.5 h-3.5 text-neutral-600" />;
   };
 
-  const activeTopicCount = (localExpertise.topics || []).filter((t) => t.enabled).length;
+  const topicsList = localExpertise.topics || [];
+  const hasTopics = topicsList.length > 0;
+  const activeTopicCount = topicsList.filter((t) => t.enabled).length;
+  const activeProductCount = (localExpertise.productKnowledge || []).filter((p) => p.enabled).length;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
@@ -340,14 +497,14 @@ export const DomainView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
-              Domain Knowledge & Topics
+              Domain & Product Knowledge
             </h1>
             <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
-              Multi-Field Active
+              {localExpertise.enabled ? 'Knowledge enabled' : 'Knowledge off'}
             </span>
           </div>
           <p className="text-xs text-neutral-500 mt-1">
-            Configure your core fields (UX Copywriting & Content Design) and intersecting topics (Monetization, AI Translation, AI Writing Assistance).
+            Help the model recognize relevant ideas in your draft and understand the products you describe.
           </p>
         </div>
 
@@ -360,7 +517,10 @@ export const DomainView: React.FC = () => {
               onChange={(e) => handleToggleEnabled(e.target.checked)}
               className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900"
             />
-            <span className="font-medium">Active in rewrites</span>
+            <div className="flex flex-col">
+              <span className="font-medium">Active in rewrites</span>
+              <span className="text-[10px] text-neutral-400">Controls all domain topics and product references</span>
+            </div>
           </label>
 
           {savedFeedback && (
@@ -369,17 +529,6 @@ export const DomainView: React.FC = () => {
               Saved
             </span>
           )}
-
-          <button
-            id="btn-apply-ux-preset"
-            type="button"
-            onClick={() => handleApplyPreset(UX_PORTFOLIO_PRESET)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition"
-            title="Reset to default UX Portfolio configuration"
-          >
-            <RotateCcw className="w-3 h-3 text-neutral-500" />
-            <span>Load UX Portfolio Preset</span>
-          </button>
 
           <button
             id="btn-domain-to-studio"
@@ -394,7 +543,7 @@ export const DomainView: React.FC = () => {
       </div>
 
       {/* Top Overview Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-1">
           <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
             Primary Disciplines
@@ -417,7 +566,19 @@ export const DomainView: React.FC = () => {
             {activeTopicCount} of {(localExpertise.topics || []).length} topics active
           </div>
           <div className="text-[11px] text-neutral-400">
-            Monetization, AI Translation & AI Writing enabled
+            Concept recognition across enabled topics
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-1">
+          <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+            Product References
+          </div>
+          <div className="text-sm font-semibold text-neutral-900">
+            {activeProductCount} of {(localExpertise.productKnowledge || []).length} products active
+          </div>
+          <div className="text-[11px] text-neutral-400">
+            Factual reference background notes
           </div>
         </div>
 
@@ -512,7 +673,7 @@ export const DomainView: React.FC = () => {
               value={localExpertise.audienceContext || ''}
               onChange={(e) => handleAudienceChange(e.target.value)}
               placeholder="e.g. Design directors, VP of Product, hiring managers, and design leads evaluating portfolio case studies."
-              className="w-full text-xs p-2.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 resize-none leading-relaxed"
+              className="w-full text-xs p-2.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 leading-relaxed"
             />
             <p className="text-[11px] text-neutral-400">
               Who reads this portfolio case study and their expected depth of product understanding.
@@ -525,27 +686,124 @@ export const DomainView: React.FC = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-neutral-800" />
-              <span>Intersecting Fields, Disciplines & Topics</span>
-            </h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-neutral-800" />
+                <span>Intersecting Fields, Disciplines & Topics</span>
+              </h2>
+              <span className="text-[11px] font-mono text-neutral-400">
+                Model: {modelSettings.analysisModel || 'gemini-3.1-pro-preview'}
+              </span>
+            </div>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Toggle and customize the specific topics your case studies address (e.g., Monetization, AI Translation, and AI Writing Assistance).
+              Choose the fields the model should draw on. Concepts are examples to recognize when relevant, not a list of words to include.
             </p>
+            {hasTopics && (
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Use Clear or Regenerate on a card to change only that card. Clear keeps its name and empties its description, concepts, and rules.
+              </p>
+            )}
           </div>
 
-          <button
-            type="button"
-            id="btn-open-add-topic"
-            onClick={() => setIsAddingTopic(!isAddingTopic)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs self-start"
-          >
-            <Plus className="w-3.5 h-3.5 text-neutral-600" />
-            <span>Add field or topic</span>
-          </button>
+          <div className="flex items-center gap-2 self-start flex-wrap">
+            {hasTopics && (
+              <>
+                <button
+                  type="button"
+                  id="btn-regenerate-topics"
+                  disabled={isGenerating || generatingTopicId !== null || sourceUploadPending}
+                  onClick={() => handleGenerateKnowledge()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
+                  title="Regenerate topics and concepts from your configured fields (replaces this section)"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-neutral-500 ${isGenerating ? 'animate-spin' : ''}`} />
+                  <span>{isGenerating ? 'Regenerating all...' : 'Regenerate all'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-clear-topics"
+                  disabled={isGenerating || generatingTopicId !== null}
+                  onClick={handleClearTopics}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
+                  title="Clear all topics and concept examples from this section"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>Clear all</span>
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              id="btn-open-add-topic"
+              disabled={isGenerating}
+              onClick={() => setIsAddingTopic(!isAddingTopic)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs disabled:opacity-50"
+            >
+              <Plus className="w-3.5 h-3.5 text-neutral-600" />
+              <span>Add field or topic</span>
+            </button>
+          </div>
         </div>
 
+          {/* Source-Aware Checkbox and Edit Link */}
+          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-neutral-50 rounded-xl border border-neutral-200">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <input
+                type="checkbox"
+                id="checkbox-use-draft-brief"
+                checked={useDraftAndBrief}
+                disabled={isGenerating || generatingTopicId !== null}
+                onChange={(e) => setUseDraftAndBrief(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer shrink-0"
+              />
+              <div>
+                <label htmlFor="checkbox-use-draft-brief" className="text-xs font-medium text-neutral-900 cursor-pointer block">
+                  Use draft and brief
+                </label>
+                <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
+                  Generation uses your draft and brief to identify supported concepts and adjacent ideas. Labels reflect the sources used when generated; review them when your draft or brief changes.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              id="btn-link-edit-draft-brief"
+              onClick={() => setActiveTab('draft-brief')}
+              className="text-xs text-neutral-700 hover:text-neutral-900 font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded border border-neutral-200 bg-white hover:bg-neutral-50 transition"
+            >
+              <span>Edit draft &amp; brief</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+
+        {sourceUploadPending && (
+          <p role="status" className="text-xs text-neutral-600">Waiting for draft and brief uploads to finish before generating concepts.</p>
+        )}
+
+        {generationError && (
+          <div
+            id="domain-generation-error"
+            className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between animate-in fade-in"
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{generationError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setGenerationError(null)}
+              className="text-rose-500 hover:text-rose-700 p-1 rounded"
+              title="Dismiss error"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Add New Topic Form */}
+        <fieldset disabled={isGenerating} className="space-y-4 min-w-0">
         {isAddingTopic && (
           <form
             onSubmit={handleCreateTopic}
@@ -608,7 +866,7 @@ export const DomainView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-medium text-neutral-700 block mb-1">
-                  Key Terminology (comma-separated)
+                  Concept examples (comma-separated)
                 </label>
                 <input
                   type="text"
@@ -628,7 +886,7 @@ export const DomainView: React.FC = () => {
                   value={newTopicConventions}
                   onChange={(e) => setNewTopicConventions(e.target.value)}
                   placeholder="Always report both relative and absolute uplift&#10;Tie microcopy changes to behavioral metrics"
-                  className="w-full text-xs p-2 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 resize-none"
+                  className="w-full text-xs p-2 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
                 />
               </div>
             </div>
@@ -651,16 +909,42 @@ export const DomainView: React.FC = () => {
           </form>
         )}
 
-        {/* Topics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(localExpertise.topics || []).map((topic) => {
+        {!hasTopics ? (
+          <div className="p-8 rounded-xl bg-neutral-50/70 border border-dashed border-neutral-300 text-center space-y-3">
+            <Sparkles className="w-6 h-6 text-neutral-400 mx-auto" />
+            <div className="space-y-1">
+              <h3 className="text-xs font-semibold text-neutral-800">
+                No domain topics generated yet
+              </h3>
+              <p className="text-[11px] text-neutral-500 max-w-md mx-auto leading-relaxed">
+                Generate broad domain disciplines, intersecting topics, and concept examples based on your configured core disciplines above. You can also add topics manually.
+              </p>
+            </div>
+            <button
+              type="button"
+              id="btn-generate-topics-empty"
+              disabled={isGenerating || sourceUploadPending}
+              onClick={() => handleGenerateKnowledge()}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition shadow-xs disabled:opacity-50"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+              <span>{isGenerating ? 'Generating knowledge...' : 'Generate domain knowledge'}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {topicsList.map((topic) => {
             const isExpanded = expandedTopicIds.has(topic.id);
             const termInputVal = topicTermInputs[topic.id] || '';
 
             return (
-              <div
+              <fieldset
                 key={topic.id}
-                className={`rounded-xl border transition-all duration-200 p-4 space-y-3.5 ${
+                id={`topic-card-${topic.id}`}
+                aria-label={topic.name}
+                aria-busy={generatingTopicId === topic.id}
+                disabled={generatingTopicId === topic.id}
+                className={`min-w-0 rounded-xl border transition-all duration-200 p-4 space-y-3.5 ${
                   topic.enabled
                     ? 'bg-white border-neutral-300 shadow-xs'
                     : 'bg-neutral-50/80 border-neutral-200 opacity-60 hover:opacity-100'
@@ -734,32 +1018,101 @@ export const DomainView: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    id={`btn-regenerate-topic-${topic.id}`}
+                    aria-label={`Regenerate ${topic.name}`}
+                    disabled={generatingTopicId !== null || sourceUploadPending}
+                    onClick={() => handleGenerateKnowledge(topic)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${generatingTopicId === topic.id ? 'animate-spin' : ''}`} />
+                    <span>{generatingTopicId === topic.id ? 'Regenerating...' : 'Regenerate'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    id={`btn-clear-topic-${topic.id}`}
+                    aria-label={`Clear ${topic.name}`}
+                    onClick={() => handleClearTopic(topic.id)}
+                    disabled={!topic.description && !topic.keyTerminology?.length && !topic.conventions?.length}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear</span>
+                  </button>
+                </div>
+                {topicGenerationError?.id === topic.id && (
+                  <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">
+                    {topicGenerationError.message}
+                  </p>
+                )}
+
                 {/* Terminology Tags */}
                 <div className="space-y-1.5 pt-1 border-t border-neutral-100">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-medium text-neutral-700">Key Terminology</span>
+                    <span className="font-medium text-neutral-700">Concept examples</span>
                     <span className="text-neutral-400 font-mono">
-                      {(topic.keyTerminology || []).length} terms
+                      {(topic.keyTerminology || []).length} concepts
                     </span>
                   </div>
 
                   <div className="flex flex-wrap gap-1">
-                    {(topic.keyTerminology || []).map((term) => (
-                      <span
-                        key={term}
-                        className="inline-flex items-center gap-1 text-[10px] bg-neutral-100 text-neutral-700 border border-neutral-200 px-1.5 py-0.5 rounded-md"
-                      >
-                        <span>{term}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTermFromTopic(topic.id, term)}
-                          className="text-neutral-400 hover:text-neutral-700"
+                    {(topic.keyTerminology || []).map((term) => {
+                      const annotation = topic.conceptAnnotations?.[term] || topic.conceptAnnotations?.[term.toLowerCase()];
+                      const isSupported = annotation?.status === 'supported';
+                      const isAdjacent = annotation?.status === 'adjacent';
+
+                      let badgeClass = 'bg-neutral-100 text-neutral-700 border-neutral-200';
+                      if (isSupported) {
+                        badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                      } else if (isAdjacent) {
+                        badgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
+                      }
+
+                      return (
+                        <span
+                          key={term}
+                          title={annotation?.explanation || (isSupported ? 'Supported concept' : isAdjacent ? 'Adjacent suggestion' : undefined)}
+                          className={`inline-flex items-center gap-1 text-[10px] border px-1.5 py-0.5 rounded-md ${badgeClass}`}
                         >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </span>
-                    ))}
+                          {isSupported && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                          {isAdjacent && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+                          <span>{term}</span>
+                          {isSupported && <span className="text-[9px] text-emerald-600 font-normal">(supported)</span>}
+                          {isAdjacent && <span className="text-[9px] text-amber-600 font-normal">(adjacent)</span>}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTermFromTopic(topic.id, term)}
+                            className="text-neutral-400 hover:text-neutral-700 ml-0.5"
+                            title={`Remove ${term}`}
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
+
+                  {topic.conceptAnnotations && Object.keys(topic.conceptAnnotations).length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <div className="text-[10px] text-neutral-500 font-medium">Concept relevance:</div>
+                      <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                        {topic.keyTerminology.map((conceptTerm) => {
+                          const annot = topic.conceptAnnotations?.[conceptTerm];
+                          if (!annot) return null;
+                          return (
+                          <div key={conceptTerm} className="text-[10px] leading-snug flex items-start gap-1.5 text-neutral-600">
+                            <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${annot.status === 'supported' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            <span>
+                              <strong className="text-neutral-800">{conceptTerm}:</strong> {annot.explanation || (annot.status === 'supported' ? 'Demonstrated in source draft or brief.' : 'Related adjacent concept.')}
+                            </span>
+                          </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Add term inline */}
                   <div className="flex gap-1.5 pt-1">
@@ -775,7 +1128,7 @@ export const DomainView: React.FC = () => {
                           handleAddTermToTopic(topic.id);
                         }
                       }}
-                      placeholder="Add term (e.g. friction, trial-to-paid)"
+                      placeholder="Add concept (e.g. information hierarchy, comprehension)"
                       className="flex-1 text-[11px] px-2 py-1 bg-white rounded border border-neutral-200 focus:outline-none focus:border-neutral-900"
                     />
                     <button
@@ -832,10 +1185,123 @@ export const DomainView: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </div>
+              </fieldset>
             );
           })}
         </div>
+        )}
+        </fieldset>
+      </div>
+
+      {/* Product Knowledge Reference Section */}
+      <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-neutral-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-neutral-800" />
+              <h2 className="text-base font-semibold text-neutral-900">Product knowledge</h2>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200">
+                Reference notes
+              </span>
+            </div>
+            <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
+              Add what the model should know about a product. Include sources and dates when they matter. Enable the references relevant to your draft.
+            </p>
+            <p className="text-[11px] text-neutral-500 mt-0.5">
+              These notes help interpret product details. The review can flag possible conflicts; check its suggestions before changing facts.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            id="btn-add-product"
+            onClick={handleAddProduct}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs shrink-0 self-start"
+          >
+            <Plus className="w-3.5 h-3.5 text-neutral-600" />
+            <span>Add product</span>
+          </button>
+        </div>
+
+        {(!localExpertise.productKnowledge || localExpertise.productKnowledge.length === 0) ? (
+          <div className="p-6 rounded-xl bg-neutral-50/70 border border-dashed border-neutral-300 text-center space-y-2">
+            <Package className="w-6 h-6 text-neutral-500 mx-auto" />
+            <div className="text-xs font-medium text-neutral-700">No product references added yet</div>
+            <p className="text-[11px] text-neutral-500 max-w-md mx-auto">
+              Add a product, such as DeepL Translator or DeepL Write, and describe what it does.
+            </p>
+            <button
+              type="button"
+              id="btn-add-first-product"
+              onClick={handleAddProduct}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-800 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5 text-neutral-600" />
+              <span>Add product entry</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {localExpertise.productKnowledge.map((product) => (
+              <div
+                key={product.id}
+                className={`p-4 rounded-xl border transition-all ${
+                  product.enabled
+                    ? 'bg-white border-neutral-300 shadow-xs'
+                    : 'bg-neutral-50/70 border-neutral-200 '
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      id={`toggle-product-${product.id}`}
+                      aria-label={`Enable product ${product.name || 'entry'}`}
+                      checked={product.enabled}
+                      onChange={(e) => handleUpdateProduct(product.id, { enabled: e.target.checked })}
+                      className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      id={`product-name-${product.id}`}
+                      aria-label="Product name"
+                      value={product.name}
+                      onChange={(e) => handleUpdateProduct(product.id, { name: e.target.value })}
+                      placeholder="e.g. DeepL Translator"
+                      className="text-xs font-semibold text-neutral-900 bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 focus:outline-none px-1 py-0.5 w-full max-w-sm"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    id={`btn-delete-product-${product.id}`}
+                    aria-label={`Remove product ${product.name || 'entry'}`}
+                    onClick={() => handleDeleteProduct(product.id)}
+                    className="text-neutral-500 hover:text-rose-600 p-1 rounded transition"
+                    title="Remove product entry"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="mt-2.5 pl-6.5">
+                  <label htmlFor={`product-notes-${product.id}`} className="text-[11px] font-medium text-neutral-700 block mb-1">
+                    Reference notes
+                  </label>
+                  <textarea
+                    id={`product-notes-${product.id}`}
+                    aria-label="Reference notes"
+                    rows={4}
+                    value={product.notes}
+                    onChange={(e) => handleUpdateProduct(product.id, { notes: e.target.value })}
+                    placeholder="What does this product do? Add relevant features, naming, sources, and dates."
+                    className="w-full text-xs p-2 bg-neutral-50 rounded-lg border border-neutral-200 focus:bg-white focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-500 resize-y leading-relaxed"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Global Guidelines & Nuances */}
@@ -843,10 +1309,10 @@ export const DomainView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-neutral-900">
-              Cross-Topic Portfolio Guidelines & Case Study Context
+              Domain guidance
             </h2>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Specific writing rules, impact framing, or project-specific context that applies across all topics in this case study.
+              Explain how to apply domain knowledge while keeping the draft’s facts and your voice intact.
             </p>
           </div>
         </div>
@@ -856,21 +1322,16 @@ export const DomainView: React.FC = () => {
           id="textarea-domain-guidelines"
           value={guidelinesText}
           onChange={(e) => handleGuidelinesChange(e.target.value)}
-          placeholder={`e.g.
-• Focus on tangible product impact: user comprehension, cognitive load reduction, conversion uplift, and clear cross-functional collaboration.
-• Bridge visual UI design and user mental models using unambiguous, plain language.
-• When discussing monetization, frame paywalls around user value delivered rather than arbitrary gates.
-• When discussing AI translation and localization, mention character expansion factors and cultural nuances.
-• When discussing AI writing assistance, highlight human-in-the-loop agency and unobtrusive suggestion affordances.`}
+          placeholder="Name relevant concepts when they clarify a decision already described in the draft. Explain them in accessible language alongside the example."
           className="w-full text-xs p-3.5 bg-neutral-50/50 rounded-xl border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-400 font-sans leading-relaxed resize-y"
         />
 
         <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-600 space-y-1">
           <span className="font-medium text-neutral-800 block text-[11px]">
-            How multi-domain knowledge is integrated in rewrites:
+            How domain and product knowledge are integrated:
           </span>
           <p className="leading-relaxed text-[11px] text-neutral-500">
-            During rewrites, the engine checks all enabled disciplines and intersecting topics. The model naturally embeds the exact terminology (e.g. microcopy, conversion funnels, string keys, human-in-the-loop) and abides by the domain conventions of content design, monetization, AI translation, and AI writing assistance simultaneously, without sounding like forced jargon or disrupting your authentic authorial voice.
+            Domain knowledge helps explain the thinking already present in your draft. Product notes provide context for names and capabilities. Both guide the model; the draft and brief remain the sources for claims and outcomes.
           </p>
         </div>
       </div>

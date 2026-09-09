@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 import { SamplesView } from './components/SamplesView';
 import { ProfileView } from './components/ProfileView';
 import { DomainView } from './components/DomainView';
+import { DraftBriefView } from './components/DraftBriefView';
 import { StudioView } from './components/StudioView';
 
 function AppContent() {
@@ -19,6 +20,7 @@ function AppContent() {
       <main className="flex-1">
         {activeTab === 'samples' && <SamplesView />}
         {activeTab === 'profile' && <ProfileView />}
+        {activeTab === 'draft-brief' && <DraftBriefView />}
         {activeTab === 'domain' && <DomainView />}
         {activeTab === 'studio' && <StudioView />}
       </main>

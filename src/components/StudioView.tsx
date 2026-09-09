@@ -5,7 +5,8 @@ import { DiffViewer } from './DiffViewer';
 import { StyleSimilarityCard } from './StyleSimilarityCard';
 import { RewriteFeedbackManager } from './RewriteFeedbackManager';
 import { ModelSelector } from './ModelSelector';
-import { RewriteIntensity } from '../types';
+import { PreservationSettings, RewriteIntensity, SelectionRange } from '../types';
+import { hasFreshProfileGuidance, PROJECT_BRIEF_MAX_CHARS } from '../writingPipeline';
 import {
   FileText,
   Copy,
@@ -18,7 +19,6 @@ import {
   Sliders,
   ChevronDown,
   ChevronUp,
-  UploadCloud,
   ShieldCheck,
   Sparkles,
   ArrowRight,
@@ -28,8 +28,11 @@ import {
 
 export const StudioView: React.FC = () => {
   const {
+    samples,
     draftText,
-    setDraftText,
+    projectBrief,
+    isUploadingDraft,
+    isUploadingBrief,
     rewriteIntensity,
     setRewriteIntensity,
     toneAdjustments,
@@ -37,6 +40,8 @@ export const StudioView: React.FC = () => {
     resetToneAdjustments,
     preservationLocks,
     setPreservationLocks,
+    preservationSettings,
+    updatePreservationSettings,
     customDirectives,
     setCustomDirectives,
     performRewrite,
@@ -55,7 +60,9 @@ export const StudioView: React.FC = () => {
   const [isRefining, setIsRefining] = useState(false);
   const [customRefineInput, setCustomRefineInput] = useState('');
   const [refineError, setRefineError] = useState<string | null>(null);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [selectedHighlight, setSelectedHighlight] = useState('');
+  const [selectedRange, setSelectedRange] = useState<SelectionRange | undefined>();
   const [showAdvancedLocks, setShowAdvancedLocks] = useState(false);
   const [showModelControls, setShowModelControls] = useState(false);
   const [showAuditDetails, setShowAuditDetails] = useState(false);
@@ -69,37 +76,32 @@ export const StudioView: React.FC = () => {
   const currentReasoningLabel =
     modelSettings.reasoningLevel.charAt(0).toUpperCase() + modelSettings.reasoningLevel.slice(1);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const rewrittenProseRef = useRef<HTMLDivElement | null>(null);
 
   const wordCountOriginal = draftText.trim() ? draftText.trim().split(/\s+/).length : 0;
+  const wordCountBrief = projectBrief.trim() ? projectBrief.trim().split(/\s+/).length : 0;
+  const wordCountSource = rewriteResult?.originalText.trim()
+    ? rewriteResult.originalText.trim().split(/\s+/).length
+    : 0;
   const wordCountRewritten = rewriteResult?.rewrittenText.trim()
     ? rewriteResult.rewrittenText.trim().split(/\s+/).length
     : 0;
+  const enabledSamples = samples
+    .filter((sample) => sample.enabled)
+    .map(({ id, title, content, enabled }) => ({ id, title, content, enabled }));
+  const hasFreshBlueprint = hasFreshProfileGuidance(activeProfile, enabledSamples);
 
-  const standardPreserveOptions = [
-    { label: 'Names & technical terms', full: 'Technical terms and proper names' },
-    { label: 'Numbers & data points', full: 'Numbers, metrics, and data points' },
-    { label: 'Headings & structure', full: 'Structure, headings, and formatting' },
-    { label: 'Direct quotes', full: 'Direct quotations' },
+  const standardPreserveOptions: Array<{
+    label: string;
+    key: keyof Pick<PreservationSettings, 'preserveTerms' | 'preserveNumbers' | 'preserveQuotes'>;
+  }> = [
+    { label: 'Names & technical terms', key: 'preserveTerms' },
+    { label: 'Numbers & data points', key: 'preserveNumbers' },
+    { label: 'Direct quotes', key: 'preserveQuotes' },
   ];
 
-  const isOptionPreserved = (fullText: string) => {
-    return (preservationLocks || '').toLowerCase().includes(fullText.toLowerCase());
-  };
-
-  const togglePreserveOption = (fullText: string) => {
-    const parts = preservationLocks
-      ? preservationLocks.split(';').map((s) => s.trim()).filter(Boolean)
-      : [];
-    const exists = parts.some((p) => p.toLowerCase() === fullText.toLowerCase());
-    let nextParts: string[];
-    if (exists) {
-      nextParts = parts.filter((p) => p.toLowerCase() !== fullText.toLowerCase());
-    } else {
-      nextParts = [...parts, fullText];
-    }
-    setPreservationLocks(nextParts.join('; '));
+  const togglePreserveOption = (key: keyof Pick<PreservationSettings, 'preserveTerms' | 'preserveNumbers' | 'preserveQuotes'>) => {
+    updatePreservationSettings({ [key]: !preservationSettings[key] });
   };
 
   const handleCopy = () => {
@@ -122,74 +124,43 @@ export const StudioView: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const loadSampleDraft = () => {
-    setDraftText(
-      `Per our previous sync, I am circling back regarding the Q3 product roadmap deliverables. Moving forward, we need to leverage cross-functional synergies to optimize operational bandwidth. It is critical that all stakeholders align on the core KPIs prior to the end of the month. Furthermore, multiple pain points have been identified in the existing deployment paradigm that necessitate a paradigm shift. Please find attached the deck outlining our go-forward strategy. Let me know if you have any questions or feedback.`
-    );
-  };
-
-  const handleFileUpload = async (files: FileList | File[]) => {
-    const fileList = Array.from(files);
-    if (fileList.length === 0) return;
-
-    const extractedTexts: string[] = [];
-
-    for (const file of fileList) {
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      let detectedType = 'txt';
-      if (extension === 'pdf') detectedType = 'pdf';
-      else if (extension === 'docx') detectedType = 'docx';
-      else if (extension === 'md') detectedType = 'md';
-
-      try {
-        if (detectedType === 'pdf' || detectedType === 'docx') {
-          const reader = new FileReader();
-          const base64Data = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => resolve((reader.result as string).split(',')[1]);
-            reader.onerror = () => reject(new Error('Failed to read file'));
-            reader.readAsDataURL(file);
-          });
-
-          const res = await fetch('/api/extract-text', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileData: base64Data,
-              fileType: detectedType,
-              fileName: file.name,
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.text) extractedTexts.push(data.text);
-          }
-        } else {
-          const text = await file.text();
-          if (text) extractedTexts.push(text);
-        }
-      } catch (e) {
-        console.error(`Failed to extract ${file.name}:`, e);
-      }
-    }
-
-    if (extractedTexts.length > 0) {
-      setDraftText(extractedTexts.join('\n\n---\n\n'));
-    }
-  };
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
 
-    const text = selection.toString().trim();
-    if (text.length > 5) {
+    const text = selection.toString();
+    if (text.trim().length > 5) {
+      let range: SelectionRange | undefined;
+      const root = rewrittenProseRef.current;
+      if (root && viewMode === 'final') {
+        try {
+          const selectedRange = selection.getRangeAt(0);
+          if (root.contains(selectedRange.startContainer) && root.contains(selectedRange.endContainer)) {
+            const start = document.createRange();
+            start.selectNodeContents(root);
+            start.setEnd(selectedRange.startContainer, selectedRange.startOffset);
+            const end = document.createRange();
+            end.selectNodeContents(root);
+            end.setEnd(selectedRange.endContainer, selectedRange.endOffset);
+            const startOffset = start.toString().length;
+            const endOffset = end.toString().length;
+            const current = rewriteResult?.rewrittenText || '';
+            if (current.slice(startOffset, endOffset) === text) {
+              range = { start: startOffset, end: endOffset };
+            }
+          }
+        } catch {
+          range = undefined;
+        }
+      }
       setSelectedHighlight(text);
+      setSelectedRange(range);
     }
   };
 
   const handleQuickRefineAction = async (instruction: string) => {
-    if (!instruction.trim() || isRefining) return;
+    if (!instruction.trim() || isRefining || isRewriting) return;
     setIsRefining(true);
     setRefineError(null);
     try {
@@ -199,6 +170,16 @@ export const StudioView: React.FC = () => {
       setRefineError(err.message || 'Failed to refine draft');
     } finally {
       setIsRefining(false);
+    }
+  };
+
+  const handlePerformRewrite = async () => {
+    if (isRewriting) return;
+    setRewriteError(null);
+    try {
+      await performRewrite();
+    } catch (err: any) {
+      setRewriteError(err.message || 'Failed to rewrite draft');
     }
   };
 
@@ -224,64 +205,66 @@ export const StudioView: React.FC = () => {
         </div>
       </div>
 
+      {!hasFreshBlueprint && (
+        <div
+          id="stale-blueprint-notice"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900"
+        >
+          <span>Your voice blueprint may be stale because it does not match the enabled writing samples.</span>
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+          >
+            Review blueprint
+          </button>
+        </div>
+      )}
+
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Inputs and Parameters */}
         <div className="lg:col-span-5 space-y-5">
-          {/* Draft Input */}
+          {/* Source Summary and Edit Navigation */}
           <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
               <div className="flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-neutral-500" />
                 <span className="text-xs font-medium text-neutral-900">
-                  Original draft
+                  Source Draft &amp; Brief
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  id="btn-load-sample-draft"
-                  onClick={loadSampleDraft}
-                  className="text-[11px] text-neutral-500 hover:text-neutral-900"
-                >
-                  Load sample
-                </button>
-                <span className="text-neutral-300">•</span>
-                <button
-                  id="btn-upload-draft-file"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-[11px] text-neutral-500 hover:text-neutral-900 flex items-center gap-1"
-                >
-                  <UploadCloud className="w-3 h-3" />
-                  <span>Upload</span>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.doc,.txt,.md,.rtf"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      handleFileUpload(e.target.files);
-                      e.target.value = '';
-                    }
-                  }}
-                  className="hidden"
-                />
-              </div>
+              <button
+                type="button"
+                id="btn-edit-draft-brief"
+                onClick={() => setActiveTab('draft-brief')}
+                className="text-xs text-neutral-700 hover:text-neutral-900 font-medium flex items-center gap-1 px-2.5 py-1 rounded border border-neutral-200 bg-white hover:bg-neutral-50 transition shadow-2xs"
+              >
+                <span>Edit draft &amp; brief</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
             </div>
 
-            <textarea
-              id="textarea-draft-input"
-              rows={9}
-              value={draftText}
-              onChange={(e) => setDraftText(e.target.value)}
-              placeholder="Paste or write your raw draft here..."
-              className="w-full p-3 rounded-lg border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900"
-            />
+            <div className="space-y-2 text-xs">
+              <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono mb-1">
+                  <span className="font-sans font-medium text-neutral-800">Draft</span>
+                  <span>{wordCountOriginal} words · {draftText.length} chars</span>
+                </div>
+                <p className="text-neutral-600 line-clamp-2 leading-relaxed">
+                  {draftText.trim() ? draftText.trim().slice(0, 180) : 'No draft entered. Click Edit draft & brief to add text.'}
+                </p>
+              </div>
 
-            <div className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
-              <span>{wordCountOriginal} words</span>
-              <span>{draftText.length} chars</span>
+              <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
+                <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono mb-1">
+                  <span className="font-sans font-medium text-neutral-800">Project Brief</span>
+                  <span>{wordCountBrief} words · {projectBrief.length} chars</span>
+                </div>
+                <p className="text-neutral-600 line-clamp-2 leading-relaxed">
+                  {projectBrief.trim() ? projectBrief.trim().slice(0, 180) : 'No project brief provided (optional).'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -376,7 +359,7 @@ export const StudioView: React.FC = () => {
                   {
                     id: 'transform',
                     title: 'Thorough',
-                    desc: 'Full stylistic recasting; preserves full length & layout',
+                    desc: 'Deeper recasting while preserving substance',
                   },
                 ].map((opt) => (
                   <button
@@ -402,7 +385,11 @@ export const StudioView: React.FC = () => {
               </div>
               <p className="text-[11px] text-neutral-400 mt-2 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
-                <span>Preserves original paragraph breaks, headings, and complete document length.</span>
+                <span>
+                  {preservationSettings.keepStructure
+                    ? 'Preserves substance and section order while allowing natural sentence, paragraph, and length changes.'
+                    : 'Preserves substance while allowing section order, paragraph structure, and length to change.'}
+                </span>
               </p>
             </div>
 
@@ -413,19 +400,17 @@ export const StudioView: React.FC = () => {
                   <ShieldCheck className="w-3.5 h-3.5 text-neutral-500" />
                   <span>Keep unchanged</span>
                 </div>
-                <span className="text-[11px] text-neutral-400">
-                  Preserve verbatim
-                </span>
+                <span className="text-[11px] text-neutral-400">Control exact preservation</span>
               </div>
 
               <div className="flex flex-wrap gap-1.5">
                 {standardPreserveOptions.map((opt, idx) => {
-                  const isChecked = isOptionPreserved(opt.full);
+                  const isChecked = Boolean(preservationSettings[opt.key]);
                   return (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => togglePreserveOption(opt.full)}
+                      onClick={() => togglePreserveOption(opt.key)}
                       className={`text-[11px] px-2.5 py-1 rounded border transition ${
                         isChecked
                           ? 'bg-neutral-900 border-neutral-900 text-white font-medium'
@@ -437,14 +422,43 @@ export const StudioView: React.FC = () => {
                     </button>
                   );
                 })}
+                <button
+                  id="btn-preserve-headings"
+                  type="button"
+                  onClick={() => updatePreservationSettings({
+                    headingTreatment: preservationSettings.headingTreatment === 'preserve_verbatim' ? 'revise_in_voice' : 'preserve_verbatim',
+                  })}
+                  className={`text-[11px] px-2.5 py-1 rounded border transition ${
+                    preservationSettings.headingTreatment === 'preserve_verbatim'
+                      ? 'bg-neutral-900 border-neutral-900 text-white font-medium'
+                      : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                  }`}
+                >
+                  {preservationSettings.headingTreatment === 'preserve_verbatim' ? '✓ ' : '+ '}Headings verbatim
+                </button>
+                <button
+                  id="btn-preserve-structure"
+                  type="button"
+                  onClick={() => updatePreservationSettings({ keepStructure: !preservationSettings.keepStructure })}
+                  className={`text-[11px] px-2.5 py-1 rounded border transition ${
+                    preservationSettings.keepStructure
+                      ? 'bg-neutral-900 border-neutral-900 text-white font-medium'
+                      : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                  }`}
+                >
+                  {preservationSettings.keepStructure ? '✓ ' : '+ '}Section order
+                </button>
               </div>
 
-              <input
+              <textarea
                 id="input-preservation-locks"
-                type="text"
+                rows={2}
                 value={preservationLocks}
-                onChange={(e) => setPreservationLocks(e.target.value)}
-                placeholder="Specific terms to keep as-is (e.g. Acme Corp, Q3 roadmap, API v2)..."
+                onChange={(e) => {
+                  setPreservationLocks(e.target.value);
+                  updatePreservationSettings({ customLocks: e.target.value });
+                }}
+                placeholder="Additional facts, names, or constraints to protect..."
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-900"
               />
             </div>
@@ -454,9 +468,9 @@ export const StudioView: React.FC = () => {
               <label className="text-xs font-medium text-neutral-800 block">
                 Additional instructions (optional)
               </label>
-              <input
+              <textarea
                 id="input-custom-directives"
-                type="text"
+                rows={3}
                 value={customDirectives}
                 onChange={(e) => setCustomDirectives(e.target.value)}
                 placeholder="e.g. Keep under 250 words, make the conclusion stronger, focus on action items..."
@@ -501,19 +515,24 @@ export const StudioView: React.FC = () => {
             {/* Primary Action Button */}
             <button
               id="btn-perform-rewrite"
-              onClick={performRewrite}
-              disabled={isRewriting || wordCountOriginal === 0}
+              onClick={handlePerformRewrite}
+              disabled={isRewriting || isUploadingDraft || isUploadingBrief || projectBrief.length > PROJECT_BRIEF_MAX_CHARS || wordCountOriginal === 0}
               className="w-full py-2.5 px-4 rounded-lg font-medium text-xs bg-neutral-900 text-white hover:bg-neutral-800 transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isRewriting ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Rewriting draft...</span>
+                  <span>Writing and reviewing...</span>
                 </>
               ) : (
                 <span>Rewrite in my voice</span>
               )}
             </button>
+            {rewriteError && (
+              <p id="rewrite-error" className="text-xs text-rose-600 font-medium pt-1" role="alert">
+                {rewriteError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -522,11 +541,90 @@ export const StudioView: React.FC = () => {
           {rewriteResult ? (
             <div className="space-y-5">
               {/* Style Similarity */}
-              {rewriteResult.styleSimilarity && (
-                <StyleSimilarityCard
-                  score={rewriteResult.styleSimilarity}
-                  profileName={activeProfile.name}
-                />
+              {rewriteResult.historicalAssessment && rewriteResult.styleSimilarity && (
+                <div className="space-y-2">
+                  <p
+                    id="historical-score-notice"
+                    className="text-[11px] text-neutral-500"
+                  >
+                    Historical voice score · unverified for this current corpus
+                  </p>
+                  <StyleSimilarityCard
+                    score={rewriteResult.styleSimilarity}
+                    profileName={activeProfile.name}
+                  />
+                </div>
+              )}
+
+              {rewriteResult.review && (
+                <div
+                  id="writing-review-panel"
+                  className={`rounded-xl border p-4 space-y-3 ${
+                    rewriteResult.review.status === 'complete'
+                      ? 'border-indigo-200 bg-indigo-50/40'
+                      : 'border-amber-200 bg-amber-50/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xs font-semibold text-neutral-900">Review of this draft</h2>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">
+                        {rewriteResult.review.status === 'complete'
+                          ? 'AI observations and local preservation checks'
+                          : 'Review unavailable; the generated draft was retained'}
+                      </p>
+                    </div>
+                    {rewriteResult.review.modelUsed && (
+                      <span className="text-[10px] font-mono text-neutral-500">{rewriteResult.review.modelUsed}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-700 leading-relaxed">{rewriteResult.review.summary}</p>
+                  {(rewriteResult.review.localChecks || []).length > 0 && (
+                    <div className="space-y-2">
+                      {(rewriteResult.review.localChecks || []).map((check) => (
+                        <div
+                          key={check.kind}
+                          className={`rounded border px-2 py-1.5 ${
+                            check.passed
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border-amber-200 bg-amber-50 text-amber-800'
+                          }`}
+                        >
+                          <div className="text-[10px] font-medium">
+                            {check.kind}: {check.passed ? 'passed' : 'possible mismatch'}
+                          </div>
+                          <p className="mt-0.5 text-[11px] leading-relaxed">{check.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {((rewriteResult.review.findings || []).length > 0 || (rewriteResult.review.voiceObservations || []).length > 0) && (
+                    <div className="space-y-2 text-xs text-neutral-700">
+                      {(rewriteResult.review.findings || []).map((finding, index) => (
+                        <div key={`finding-${index}`} className="rounded border border-indigo-100 bg-white/70 px-2.5 py-2">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700">
+                            <span>{finding.category}</span>
+                            <span className="text-neutral-400">·</span>
+                            <span>{finding.severity}</span>
+                          </div>
+                          <p className="mt-0.5">{finding.detail}</p>
+                          {finding.evidence && (
+                            <p className="mt-1 text-[11px] text-neutral-500">Evidence: {finding.evidence}</p>
+                          )}
+                        </div>
+                      ))}
+                      {(rewriteResult.review.voiceObservations || []).map((observation, index) => (
+                        <div key={`voice-${index}`} className="rounded border border-indigo-100 bg-white/70 px-2.5 py-2">
+                          <div className="text-[10px] font-medium uppercase tracking-wide text-indigo-700">voice observation</div>
+                          <p className="mt-0.5">{observation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {rewriteResult.review.error && (
+                    <p className="text-[11px] text-amber-800">{rewriteResult.review.error}</p>
+                  )}
+                </div>
               )}
 
               {/* Output Container */}
@@ -601,21 +699,26 @@ export const StudioView: React.FC = () => {
                 </div>
 
                 {/* Metric Bar */}
-                <div className="px-4 py-2 bg-neutral-50/50 border-b border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-                  <div className="flex items-center gap-3 font-mono text-[11px]">
-                    <span>Original: {wordCountOriginal} words</span>
+                <div className="px-4 py-2 bg-neutral-50/50 border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-neutral-500">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] min-w-0">
+                    <span>Original: {wordCountSource} words</span>
                     <span>→</span>
                     <span className="text-neutral-900 font-medium">
                       Rewritten: {wordCountRewritten} words
                     </span>
-                    {rewriteResult.modelUsed && (
+                    {(rewriteResult.writingModelUsed || rewriteResult.modelUsed) && (
                       <span className="px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-700 font-sans text-[10px]">
-                        {rewriteResult.modelUsed}
-                        {rewriteResult.durationMs ? ` (${(rewriteResult.durationMs / 1000).toFixed(1)}s)` : ''}
+                        Writing: {modelDisplayNames[rewriteResult.writingModelUsed || rewriteResult.modelUsed || ''] || rewriteResult.writingModelUsed || rewriteResult.modelUsed}
+                        {rewriteResult.writingDurationMs ? ` (${(rewriteResult.writingDurationMs / 1000).toFixed(1)}s)` : ''}
+                      </span>
+                    )}
+                    {rewriteResult.analysisModelUsed && (
+                      <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-sans text-[10px]">
+                        Review: {modelDisplayNames[rewriteResult.analysisModelUsed] || rewriteResult.analysisModelUsed}
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-neutral-400">
+                  <span className="text-[11px] text-neutral-400 sm:ml-auto sm:text-right break-words">
                     Tip: Highlight any sentence to leave notes or request revisions
                   </span>
                 </div>
@@ -625,7 +728,10 @@ export const StudioView: React.FC = () => {
                   id="rendered-prose-container"
                   ref={rewrittenProseRef}
                   onMouseUp={handleTextSelection}
-                  className="p-5 select-text cursor-text"
+                  onKeyUp={handleTextSelection}
+                  tabIndex={0}
+                  aria-label="Rewritten draft. Select text with the mouse or keyboard to request a line edit."
+                  className="p-5 select-text cursor-text focus:outline-none focus:ring-2 focus:ring-neutral-200"
                 >
                   {viewMode === 'diff' && (
                     <DiffViewer
@@ -667,7 +773,11 @@ export const StudioView: React.FC = () => {
               {/* Feedback Manager */}
               <RewriteFeedbackManager
                 selectedText={selectedHighlight}
-                onClearSelection={() => setSelectedHighlight('')}
+                selectionRange={selectedRange}
+                onClearSelection={() => {
+                  setSelectedHighlight('');
+                  setSelectedRange(undefined);
+                }}
               />
 
               {/* Quick Refine */}
@@ -693,7 +803,7 @@ export const StudioView: React.FC = () => {
                   ].map((chip, idx) => (
                     <button
                       key={idx}
-                      disabled={isRefining}
+                      disabled={isRefining || isRewriting}
                       onClick={() => handleQuickRefineAction(chip)}
                       className="px-2.5 py-1 rounded text-xs bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition border border-neutral-200 disabled:opacity-40"
                     >
@@ -716,7 +826,7 @@ export const StudioView: React.FC = () => {
                   />
                   <button
                     id="btn-apply-refine"
-                    disabled={!customRefineInput.trim() || isRefining}
+                    disabled={!customRefineInput.trim() || isRefining || isRewriting}
                     onClick={() => handleQuickRefineAction(customRefineInput)}
                     className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-medium hover:bg-neutral-800 disabled:opacity-40"
                   >
@@ -759,7 +869,7 @@ export const StudioView: React.FC = () => {
                       {rewriteResult.changesExplanation}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {rewriteResult.stylisticAudit && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="p-3 rounded-lg border border-neutral-100 bg-neutral-50">
                         <span className="font-medium text-neutral-900 block mb-0.5">
                           Rhythm and pacing
@@ -776,7 +886,7 @@ export const StudioView: React.FC = () => {
                           {rewriteResult.stylisticAudit?.structuralTweaks}
                         </p>
                       </div>
-                    </div>
+                    </div>}
 
                     {rewriteResult.stylisticAudit?.vocabularySubstitutions &&
                       rewriteResult.stylisticAudit.vocabularySubstitutions.length > 0 && (
@@ -814,9 +924,18 @@ export const StudioView: React.FC = () => {
               <h3 className="text-sm font-medium text-neutral-900">
                 Rewritten draft will appear here
               </h3>
-              <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-                Paste a draft on the left and click "Rewrite in my voice".
+              <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                Add your draft and optional project brief in the Draft &amp; Brief tab, then click &ldquo;Rewrite in my voice&rdquo;.
               </p>
+              <button
+                type="button"
+                id="btn-empty-go-to-draft-brief"
+                onClick={() => setActiveTab('draft-brief')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs"
+              >
+                <span>Open Draft &amp; Brief</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>

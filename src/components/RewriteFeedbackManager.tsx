@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { FeedbackTag, LearnFromFeedbackResponse } from '../types';
+import { FeedbackTag, LearnFromFeedbackResponse, SelectionRange } from '../types';
 import {
   MessageSquarePlus,
   CheckCircle2,
@@ -58,6 +58,7 @@ const FEEDBACK_TAGS: FeedbackTagOption[] = [
 
 interface RewriteFeedbackManagerProps {
   selectedText: string;
+  selectionRange?: SelectionRange;
   onClearSelection: () => void;
   isDrawerOpen?: boolean;
   onCloseDrawer?: () => void;
@@ -66,6 +67,7 @@ interface RewriteFeedbackManagerProps {
 
 export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
   selectedText,
+  selectionRange,
   onClearSelection,
   isDrawerOpen: isDrawerOpenProp,
   onCloseDrawer: onCloseDrawerProp,
@@ -80,6 +82,7 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
     isLearningFeedback,
     setActiveTab,
     editSelection,
+    isRewriting,
   } = useWritingAssistant();
 
   const [activeTag, setActiveTag] = useState<FeedbackTag>('not_my_voice');
@@ -90,6 +93,7 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
   const [learningResult, setLearningResult] = useState<LearnFromFeedbackResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
+  const selectionBusy = isRewritingSelection || isRewriting;
 
   const isDrawerOpen = isDrawerOpenProp !== undefined ? isDrawerOpenProp : localDrawerOpen;
   const setIsDrawerOpen = (open: boolean) => {
@@ -99,11 +103,11 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
   };
 
   const handleRewriteSelection = async () => {
-    if (!selectedText || !selectedText.trim() || isRewritingSelection) return;
+    if (!selectedText || !selectedText.trim() || selectionBusy) return;
     setIsRewritingSelection(true);
     setSelectionError(null);
     try {
-      await editSelection(selectedText.trim(), customNote.trim(), activeTag, alsoSaveRule);
+      await editSelection(selectedText, customNote.trim(), activeTag, alsoSaveRule, selectionRange);
       setCustomNote('');
       onClearSelection();
     } catch (err: any) {
@@ -206,7 +210,7 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
               type="text"
               autoFocus
               value={customNote}
-              disabled={isRewritingSelection}
+              disabled={selectionBusy}
               onChange={(e) => setCustomNote(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRewriteSelection();
@@ -221,7 +225,7 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
             <input
               type="checkbox"
               checked={alsoSaveRule}
-              disabled={isRewritingSelection}
+              disabled={selectionBusy}
               onChange={(e) => setAlsoSaveRule(e.target.checked)}
               className="rounded border-neutral-300 text-neutral-900 focus:ring-0 cursor-pointer"
             />
@@ -238,7 +242,7 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
             <button
               type="button"
               onClick={onClearSelection}
-              disabled={isRewritingSelection}
+              disabled={selectionBusy}
               className="text-xs text-neutral-500 hover:text-neutral-800 font-medium px-1.5 py-1 rounded cursor-pointer disabled:opacity-50"
             >
               Cancel (Esc)
@@ -247,7 +251,7 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
               <button
                 id="btn-save-note-only"
                 type="button"
-                disabled={isRewritingSelection}
+              disabled={selectionBusy}
                 onClick={handleAddFeedback}
                 className="px-2.5 py-1.5 border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium rounded-lg transition flex items-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
                 title="Queue note for Voice Blueprint profile learning without changing draft"
@@ -258,12 +262,12 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
               <button
                 id="btn-rewrite-selection"
                 type="button"
-                disabled={isRewritingSelection}
+              disabled={selectionBusy}
                 onClick={handleRewriteSelection}
                 className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium rounded-lg transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                 title="Immediately rewrite highlighted line in authentic voice (Enter)"
               >
-                {isRewritingSelection ? (
+                {selectionBusy ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
                     <span>Rewriting...</span>

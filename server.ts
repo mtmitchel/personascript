@@ -5,6 +5,32 @@ import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
 import { createServer as createViteServer } from 'vite';
+import {
+  buildQuickRefinePrompt,
+  buildReviewPrompt,
+  buildRewritePrompt,
+  buildSelectionPrompt,
+  normalizeDomainExpertise,
+  normalizePreservationSettings,
+  validateProjectBrief,
+  REVIEW_SYSTEM_INSTRUCTION,
+  runLocalPreservationChecks,
+  unavailableReview,
+  validateDomainExpertiseInput,
+  validateGeneratedReview,
+  validateGeneratedProse,
+  ValidationError,
+  validateWritingCorpus,
+  WRITING_SYSTEM_INSTRUCTION,
+  type RawWritingSample,
+  type SelectionRange,
+} from './src/writingPipeline';
+import {
+  buildDomainGenerationPrompt,
+  DOMAIN_GENERATION_SCHEMA,
+  validateDomainGenerationRequest,
+  validateGeneratedDomainKnowledge,
+} from './src/domainGeneration';
 
 dotenv.config();
 
@@ -29,6 +55,126 @@ function getGeminiClient(): GoogleGenAI {
       },
     },
   });
+}
+
+class RequestValidationError extends Error {
+  readonly statusCode = 400;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function requireText(value: unknown, label: string, minimumLength = 1): string {
+  if (typeof value !== 'string' || value.trim().length < minimumLength) {
+    throw new RequestValidationError(`${label} is required${minimumLength > 1 ? ` (minimum ${minimumLength} characters)` : ''}.`);
+  }
+  return value;
+}
+
+function optionalText(value: unknown, label: string): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') throw new RequestValidationError(`${label} must be a string.`);
+  return value;
+}
+
+function requireObject(value: unknown, label: string): JsonRecord {
+  if (!isRecord(value)) throw new RequestValidationError(`${label} must be an object.`);
+  return value;
+}
+
+function validateSamplesInput(value: unknown): RawWritingSample[] {
+  if (!Array.isArray(value)) throw new RequestValidationError('samples must be an array of writing samples.');
+  for (const [index, sample] of value.entries()) {
+    if (!isRecord(sample)) throw new RequestValidationError(`samples[${index}] must be an object.`);
+    if (typeof sample.id !== 'string' || !sample.id.trim()) throw new RequestValidationError(`samples[${index}].id must be a non-empty string.`);
+    if (typeof sample.content !== 'string') throw new RequestValidationError(`samples[${index}].content must be a string.`);
+    if (sample.title !== undefined && typeof sample.title !== 'string') throw new RequestValidationError(`samples[${index}].title must be a string.`);
+    if (sample.enabled !== undefined && typeof sample.enabled !== 'boolean') throw new RequestValidationError(`samples[${index}].enabled must be a boolean.`);
+  }
+  try {
+    return validateWritingCorpus(value as RawWritingSample[]);
+  } catch (error) {
+    throw new RequestValidationError(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function validatePreservationInput(value: unknown): void {
+  if (value === undefined || value === null) return;
+  const settings = requireObject(value, 'preservationSettings');
+  for (const key of ['keepStructure', 'preserveNumbers', 'preserveQuotes', 'preserveTerms'] as const) {
+    if (settings[key] !== undefined && typeof settings[key] !== 'boolean') {
+      throw new RequestValidationError(`preservationSettings.${key} must be a boolean.`);
+    }
+  }
+  if (settings.headingTreatment !== undefined
+    && settings.headingTreatment !== 'revise_in_voice'
+    && settings.headingTreatment !== 'preserve_verbatim') {
+    throw new RequestValidationError('preservationSettings.headingTreatment is invalid.');
+  }
+  if (settings.customLocks !== undefined && typeof settings.customLocks !== 'string') {
+    throw new RequestValidationError('preservationSettings.customLocks must be a string.');
+  }
+}
+
+function validateControlInputs(input: {
+  model?: unknown;
+  reasoningLevel?: unknown;
+  analysisModel?: unknown;
+  analysisReasoningLevel?: unknown;
+  toneAdjustments?: unknown;
+  toneEnabled?: unknown;
+  domainExpertise?: unknown;
+}): void {
+  optionalText(input.model, 'model');
+  optionalText(input.analysisModel, 'analysisModel');
+  optionalText(input.reasoningLevel, 'reasoningLevel');
+  optionalText(input.analysisReasoningLevel, 'analysisReasoningLevel');
+  for (const [label, value] of [
+    ['reasoningLevel', input.reasoningLevel],
+    ['analysisReasoningLevel', input.analysisReasoningLevel],
+  ] as const) {
+    if (value !== undefined && !['auto', 'minimal', 'low', 'high'].includes(value as string)) {
+      throw new RequestValidationError(`${label} is invalid.`);
+    }
+  }
+  if (input.toneAdjustments !== undefined && input.toneAdjustments !== null) requireObject(input.toneAdjustments, 'toneAdjustments');
+  if (input.toneEnabled !== undefined && typeof input.toneEnabled !== 'boolean') {
+    throw new RequestValidationError('toneEnabled must be a boolean.');
+  }
+  if (input.domainExpertise !== undefined && input.domainExpertise !== null) {
+    validateDomainExpertiseInput(input.domainExpertise);
+  }
+}
+
+function validateSelectionRangeInput(
+  value: unknown,
+  currentText: string,
+  selectedText: string,
+): SelectionRange | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)
+    || !Number.isInteger(value.start)
+    || !Number.isInteger(value.end)) {
+    throw new RequestValidationError('selectionRange.start and selectionRange.end must be integers.');
+  }
+  const range = { start: value.start as number, end: value.end as number };
+  if (range.start < 0 || range.end <= range.start || range.end > currentText.length) {
+    throw new RequestValidationError('selectionRange is outside the current text.');
+  }
+  if (currentText.slice(range.start, range.end) !== selectedText) {
+    throw new RequestValidationError('selectionRange does not match selectedText. Select the passage again.');
+  }
+  return range;
+}
+
+function statusForError(error: unknown): number {
+  if (error instanceof RequestValidationError || error instanceof ValidationError) {
+    return error.statusCode;
+  }
+  return 500;
 }
 
 // Lightweight in-memory observability buffer
@@ -66,17 +212,20 @@ async function generateContentWithRetry(params: {
   preferredModel?: string;
   reasoningLevel?: 'auto' | 'minimal' | 'low' | 'high';
   endpoint?: string;
+  /** Writing and review stages must stay on the user-selected model. */
+  allowFallback?: boolean;
 }) {
   const startTime = Date.now();
   const ai = getGeminiClient();
   const selectedModel = params.preferredModel || 'gemini-3.8-flash';
   
-  // Construct resilient cascade of candidate models
+  // Keep the historical cascade for unrelated analysis/import routes. Writing and
+  // review calls opt out so a selected model is never silently replaced.
   const candidateModels: string[] = [selectedModel];
-  const fallbacks = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview'];
-  for (const m of fallbacks) {
-    if (!candidateModels.includes(m)) {
-      candidateModels.push(m);
+  if (params.allowFallback !== false) {
+    const fallbacks = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview'];
+    for (const m of fallbacks) {
+      if (!candidateModels.includes(m)) candidateModels.push(m);
     }
   }
 
@@ -135,9 +284,11 @@ async function generateContentWithRetry(params: {
         lastError = err;
         const msg = (err?.message || String(err)).toLowerCase();
 
-        // If 429 / quota exceeded on this specific model, break immediately to the next candidate model
+        // If quota is exhausted, a fallback is only allowed for legacy routes.
         if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
-          console.warn(`Model ${model} quota reached, falling back to next available model.`);
+          if (params.allowFallback !== false) {
+            console.warn(`Model ${model} quota reached, falling back to next available model.`);
+          }
           break;
         }
 
@@ -188,7 +339,10 @@ app.get('/api/logs', (req: Request, res: Response) => {
 // 2. Extract text from uploaded document (docx, pdf, txt)
 app.post('/api/extract-text', async (req: Request, res: Response) => {
   try {
-    const { fileData, fileType, fileName } = req.body;
+    const { fileData, fileType, fileName, localOnly } = req.body;
+    if (localOnly !== undefined && typeof localOnly !== 'boolean') {
+      return res.status(400).json({ error: 'localOnly must be a boolean.' });
+    }
     if (!fileData) {
       return res.status(400).json({ error: 'fileData (base64) is required' });
     }
@@ -216,6 +370,11 @@ app.post('/api/extract-text', async (req: Request, res: Response) => {
 
       // 2. If text is empty (e.g. scanned document), fallback to Gemini
       if (!extractedText || extractedText.trim().length === 0) {
+        if (localOnly) {
+          return res.status(400).json({
+            error: 'Could not extract usable text from this PDF locally. Please paste the text instead.',
+          });
+        }
         const response = await generateContentWithRetry({
           preferredModel: 'gemini-3.1-flash-lite',
           contents: [
@@ -813,10 +972,14 @@ Rules: ${(a.rules || []).join('; ')}
 Sample Excerpt: "${(s.content || '').trim().slice(0, 1500)}..."`;
     }).join('\n\n---\n\n');
 
-    const prompt = `You are a master literary editor. You are tasked with synthesizing multiple writing analyses from the same author into a unified, definitive "Writing Style Profile" (Voice Blueprint).
+    const prompt = `You are a master literary editor. You are tasked with synthesizing multiple writing analyses from the same author into a unified, qualitative "Writing Style Profile" (Voice Blueprint).
 
 SAMPLES DATA:
 ${sampleSummaries}
+
+CURRENT USER-OWNED SETTINGS (preserve exactly; these are not generated style hints):
+Custom directives: ${currentProfile?.customDirectives || 'None'}
+Domain expertise: ${JSON.stringify(currentProfile?.domainExpertise || {})}
 
 Synthesize a comprehensive profile including:
 1. An evocative profile name (or use: "${profileName || 'Master Writing Voice'}") and a 2-3 sentence overview description.
@@ -828,7 +991,8 @@ Synthesize a comprehensive profile including:
    - signatureHabits: 3-5 unique stylistic quirks or structural signatures
    - vocabularyPreferences: 3-4 bullet points of favored words and avoided replacements
    - pacingGuide: 2-3 sentences describing paragraph and sentence flow
-5. Custom Directives: A short default guiding principle for rewrites.`;
+5. Custom Directives: Keep the current user-owned custom directives unchanged. Do not replace them with generated prose.
+6. Domain expertise: Do not replace or erase the current domain field, topics, terminology, conventions, audience context, or custom notes.`;
 
     const response = await generateContentWithRetry({
       endpoint: '/api/synthesize-profile',
@@ -881,6 +1045,8 @@ Synthesize a comprehensive profile including:
       sampleIds: samples.map((s: any) => s.id),
       updatedAt: new Date().toISOString(),
       ...parsed,
+      customDirectives: currentProfile?.customDirectives ?? parsed.customDirectives ?? '',
+      domainExpertise: currentProfile?.domainExpertise,
     };
 
     res.json(synthesizedProfile);
@@ -890,326 +1056,225 @@ Synthesize a comprehensive profile including:
   }
 });
 
-// 5. Rewrite Draft to match Style Profile
+// 5. Shared corpus-grounded writing and review pipeline. New requests use plain
+// prose generation followed by a separate review call; historical records remain
+// readable on the client through their optional legacy fields.
+async function reviewWrittenText(input: {
+  sourceText: string;
+  projectBrief?: string;
+  finalText: string;
+  profile?: any;
+  samples: RawWritingSample[];
+  preservationSettings?: any;
+  preservationLocks?: string;
+  customInstructions?: string;
+  domainExpertise?: any;
+  analysisModel?: string;
+  analysisReasoningLevel?: string;
+  endpoint: string;
+}) {
+  const localChecks = runLocalPreservationChecks(
+    input.sourceText,
+    input.finalText,
+    input.preservationSettings,
+    input.projectBrief,
+  );
+  const reviewStart = Date.now();
+  const requestedAnalysisModel = input.analysisModel || 'gemini-3.1-pro-preview';
+  try {
+    const response = await generateContentWithRetry({
+      endpoint: input.endpoint,
+      contents: buildReviewPrompt(input),
+      preferredModel: requestedAnalysisModel,
+      reasoningLevel: input.analysisReasoningLevel as any,
+      allowFallback: false,
+      config: {
+        responseMimeType: 'application/json',
+        systemInstruction: REVIEW_SYSTEM_INSTRUCTION,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING },
+            findings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  category: { type: Type.STRING },
+                  severity: { type: Type.STRING },
+                  detail: { type: Type.STRING },
+                  evidence: { type: Type.STRING },
+                },
+                required: ['category', 'severity', 'detail'],
+              },
+            },
+            voiceObservations: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['summary', 'findings', 'voiceObservations'],
+        },
+      },
+    });
+    const parsed = validateGeneratedReview(response.text, response);
+    return {
+      status: 'complete' as const,
+      summary: parsed.summary,
+      findings: parsed.findings,
+      voiceObservations: parsed.voiceObservations,
+      localChecks,
+      modelUsed: (response as any).modelExecuted || requestedAnalysisModel,
+      durationMs: (response as any).durationMs,
+    };
+  } catch (error) {
+    const unavailable = unavailableReview(error, localChecks);
+    unavailable.modelUsed = requestedAnalysisModel;
+    unavailable.durationMs = Date.now() - reviewStart;
+    return unavailable;
+  }
+}
+
+app.post('/api/generate-domain-knowledge', async (req: Request, res: Response) => {
+  try {
+    const validatedInput = validateDomainGenerationRequest(req.body);
+    const prompt = buildDomainGenerationPrompt({
+      field: validatedInput.field,
+      disciplines: validatedInput.disciplines,
+      existingTopics: validatedInput.existingTopics,
+      targetTopic: validatedInput.targetTopic,
+      draft: validatedInput.draft,
+      projectBrief: validatedInput.projectBrief,
+    });
+
+    const response = await generateContentWithRetry({
+      contents: prompt,
+      preferredModel: validatedInput.model,
+      reasoningLevel: validatedInput.reasoningLevel,
+      endpoint: 'generate-domain-knowledge',
+      allowFallback: false,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: DOMAIN_GENERATION_SCHEMA,
+      },
+    });
+
+    const topics = validateGeneratedDomainKnowledge(response.text, response as any, Boolean(validatedInput.draft || validatedInput.projectBrief));
+    if (validatedInput.targetTopic && (topics.length !== 1 ||
+        topics[0].name !== validatedInput.targetTopic.name ||
+        topics[0].category !== validatedInput.targetTopic.category)) {
+      throw new Error('The model did not return the requested card. Existing knowledge has not been replaced.');
+    }
+    return res.json({ topics });
+  } catch (error: any) {
+    console.error('Error generating domain knowledge:', error);
+    return res.status(statusForError(error)).json({
+      error: error.message || 'Failed to generate domain knowledge',
+    });
+  }
+});
+
 app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
   try {
+    const operationStart = Date.now();
     const {
       draft,
+      projectBrief,
       profile,
       intensity,
       preservationLocks,
       preservationSettings,
       customInstructions,
       toneAdjustments,
+      toneEnabled,
       domainExpertise,
-      exemplars,
+      samples,
       model,
       reasoningLevel,
+      analysisModel,
+      analysisReasoningLevel,
     } = req.body;
 
-    if (!draft || draft.trim().length < 10) {
-      return res.status(400).json({ error: 'Draft text is required (minimum 10 characters).' });
+    const draftText = requireText(draft, 'Draft text', 10);
+    const validProjectBrief = validateProjectBrief(projectBrief);
+    requireObject(profile, 'profile');
+    if (intensity !== undefined && !['polish', 'faithful', 'transform'].includes(intensity)) {
+      throw new RequestValidationError('intensity is invalid.');
     }
-    if (!profile) {
-      return res.status(400).json({ error: 'A valid style profile is required for rewriting.' });
-    }
-
-    const ai = getGeminiClient();
-
-    // Preservation Controls: Headings vs. Structure
-    const headingTreatment = preservationSettings?.headingTreatment || (
-      preservationLocks && /headings?\b/i.test(preservationLocks) && !/revise\s+headings/i.test(preservationLocks)
-        ? 'preserve_verbatim'
-        : 'revise_in_voice'
-    );
-    const keepStructure = preservationSettings?.keepStructure !== false;
-    const preserveNumbers = preservationSettings?.preserveNumbers ?? true;
-    const preserveQuotes = preservationSettings?.preserveQuotes ?? true;
-    const preserveTerms = preservationSettings?.preserveTerms ?? false;
-    const customLocksText = preservationSettings?.customLocks || preservationLocks || '';
-
-    const headingDirective = headingTreatment === 'revise_in_voice'
-      ? `HEADINGS & SECTION TITLES (REVISE IN AUTHOR'S VOICE):
-   - You MAY and SHOULD revise headings and section titles into the author's authentic voice, punchy tone, and domain register (e.g. action-oriented UX copywriting style, compelling and crisp).
-   - Maintain the structural hierarchy and placement of each heading (e.g., if it was an H1, H2, or section title, keep it as the corresponding heading level in the same location).
-   - Elevate generic or flat titles into engaging, voice-aligned copy that reflects the author's vocabulary and voice manifesto.`
-      : `HEADINGS & SECTION TITLES (PRESERVE VERBATIM):
-   - Retain all original headings, subheadings, and section titles character-for-character without alteration.`;
-
-    const structureDirective = keepStructure
-      ? `1. STRUCTURAL & PARAGRAPH LAYOUT:
-   - Preserve the logical sequence, section flow, and all substantive arguments of the original draft.
-   - Maintain the overall structural progression, but you MAY split rambling paragraphs or join fragments where the author's rhythmic cadence and burstiness demand it (including signature single-sentence punch paragraphs).
-   - Do NOT turn narrative prose into bullet summaries, or vice versa.
-   - ${headingDirective}`
-      : `1. STRUCTURAL & PARAGRAPH LAYOUT:
-   - Preserve the logical sequence and all substantive arguments of the draft.
-   - ${headingDirective}`;
-
-    const locksList: string[] = [];
-    if (preserveNumbers) locksList.push('Numbers, statistics, metrics, and quantitative data points');
-    if (preserveQuotes) locksList.push('Direct quotations and cited statements');
-    if (preserveTerms) locksList.push('Technical terms, proper names, and product names');
-    if (headingTreatment === 'preserve_verbatim') locksList.push('Headings and section titles (keep verbatim)');
-    if (customLocksText.trim()) locksList.push(customLocksText.trim());
-
-    const formattedLocks = locksList.length > 0
-      ? locksList.map((item) => `• ${item}`).join('\n   ')
-      : 'Preserve all factual information, names, statistics, quotes, and core intent.';
-
-    const intensityInstructions = {
-      polish: `Light Polish (Conservative Phrasing & Flow):
-- Keep existing sentence boundaries and paragraph structure largely intact.
-- Tighten slack phrasing, eliminate passive voice, and inject the author's preferred tactile vocabulary choices.
-- Preserve 100% of factual data and logical points.`,
-      faithful: `Balanced (Faithful Voice Match):
-- Recast sentences line-by-line to embody the author's exact syntactic rhythm, burstiness, vocabulary level, voice, and tone.
-- Balance expansive clauses with punchy statements.
-- Strip bureaucratic padding, corporate throat-clearing, and management jargon; preserve all substantive arguments and data.`,
-      transform: `Thorough (Deep Stylistic Transformation):
-- Completely and comprehensively recast the entire draft through the author's authentic stylistic lens: tactile verbs, sharp rhythmic cadence, and sensory analogies.
-- Radically prune corporate filler, administrative justification, and consulting abstractions.
-- Translate every technical mechanism into concrete, human reality.
-- Preserve core facts, metrics, and arguments, but give the prose genuine authorial presence.`,
-    }[intensity as 'polish' | 'faithful' | 'transform'] || 'Balanced (Faithful Voice Match)';
-
-    // Tone & Voice Sliders instructions
-    const tone = toneAdjustments || { formality: 65, enthusiasm: 50, conciseness: 50 };
-    const formalityDesc =
-      tone.formality > 70
-        ? `Elevated & Precise (${tone.formality}/100): Elegant, muscular, treatise-grade articulation without bureaucratic or corporate jargon.`
-        : tone.formality < 40
-        ? `Low Formality (${tone.formality}/100): Conversational, intimate, grounded, highly approachable, colloquial flow.`
-        : `Grounded & Direct (${tone.formality}/100): Tactile, unpretentious, authentic, and clear. Zero corporate or academic stiffness.`;
-
-    const enthusiasmDesc =
-      tone.enthusiasm > 70
-        ? `High Enthusiasm (${tone.enthusiasm}/100): Inspiring, kinetic, bold conviction, active rallying energy.`
-        : tone.enthusiasm < 40
-        ? `Subdued Enthusiasm (${tone.enthusiasm}/100): Understated, calm, analytical, cool poise, zero cheerleading.`
-        : `Balanced Enthusiasm (${tone.enthusiasm}/100): Natural conviction and steady, quiet confidence.`;
-
-    const concisenessDesc =
-      tone.conciseness > 70
-        ? `High Conciseness (${tone.conciseness}/100): Crisp phrasing and vigorous verbs within each sentence. Eliminate verbal padding and throat-clearing, cutting word count by 25-40% while preserving all core facts and arguments.`
-        : tone.conciseness < 40
-        ? `Expansive Conciseness (${tone.conciseness}/100): Lyrical, richly descriptive, generous room for nuance, sensory detail, and flowing cadences.`
-        : `Balanced Conciseness (${tone.conciseness}/100): Crisp pacing with rhythmic breathing room, cutting unnecessary fluff while keeping all substantive points intact.`;
-
-    // Domain expertise instructions: Grounded context, NEVER a glossary dump
-    const activeDomain = domainExpertise || profile.domainExpertise;
-    let domainInstructions = 'General intellectual and professional non-fiction.';
-    if (activeDomain && activeDomain.enabled) {
-      const disciplinesList = activeDomain.disciplines && activeDomain.disciplines.length > 0
-        ? activeDomain.disciplines.join(', ')
-        : (activeDomain.field || 'Product & Technology');
-
-      domainInstructions = `DOMAIN CONTEXT (${disciplinesList}):
-- TARGET AUDIENCE: ${activeDomain.audienceContext || 'Domain practitioners and thoughtful leaders'}
-- CORE PRINCIPLES: ${(activeDomain.conventions || []).slice(0, 3).join('; ') || 'Be technically accurate and grounded.'}
-- CRITICAL ANTI-JARGON DIRECTIVE: Do NOT force marketing buzzwords or a glossary dump into the prose. Ground domain concepts in physical, human interactions and user agency, not abstract consultant speak.`;
-    }
-
-    const metricsBlock = profile.metrics ? `
-CALIBRATED PROFILE METRICS:
-- Formality: ${profile.metrics.formality ?? 65}/100
-- Average Sentence Length: ~${profile.metrics.avgSentenceLength ?? 14} words
-- Sentence Length Variance (Burstiness): ${profile.metrics.sentenceLengthVariance ?? 80}/100
-- Lexical Sophistication: ${profile.metrics.lexicalSophistication ?? 80}/100
-- Warmth: ${profile.metrics.warmth ?? 70}/100
-- Directness: ${profile.metrics.directness ?? 90}/100
-- Active Voice Ratio: ${profile.metrics.activeVoiceRatio ?? 90}/100
-- Metaphor Density: ${profile.metrics.metaphorDensity ?? 75}/100` : '';
-
-    let exemplarsBlock = '';
-    if (exemplars && Array.isArray(exemplars) && exemplars.length > 0) {
-      exemplarsBlock = `\n### AUTHENTIC AUTHOR WRITING EXEMPLARS (Anchor your cadence, rhythm, vocabulary, and sentence variety to these real excerpts):\n` +
-        exemplars.map((ex: any, i: number) => `--- Exemplar ${i + 1}: "${ex.title || 'Untitled'}" ---\n${(ex.excerpt || '').trim()}`).join('\n\n') + '\n';
-    }
-
-    const systemPrompt = `You are an elite prose stylist, personal ghostwriter, and domain editor. Your mission is to rewrite the user's draft so that it sounds authentically and naturally like the author whose Writing Style Profile and Exemplars are provided.
-
-CRITICAL EDITORIAL MANDATE (ANTI-CORPORATE DEMOLISHER):
-1. ZERO TOLERANCE FOR CORPORATE JARGON & ABSTRACTIONS:
-   - NEVER use consulting/MBA filler: "lever" (as a metaphor), "scale" (as a verb for business growth), "friction points", "decision points", "high-leverage", "technical debt" (unless literally discussing broken software code), "content design rigor", "synergies", "alignment", "stakeholders", "deliverables", "streamline", "utilize", "optimize", "bandwidth", "paradigm", "holistic", "ecosystem".
-   - NEVER use resume-padding preambles: "Collaborating closely with X, I led the strategy to...", "In order to ensure optimal outcomes...", "It was determined that...", "Set out to scale...".
-2. THE PHYSICAL TRANSLATION RULE:
-   - Translate all abstract business claims into physical human reality and tactile craft:
-     * BAD: "These friction points create prime opportunities where extra capacity delivers immediate high-leverage value."
-     * GOOD: "When a translator hits a paywall at 2 AM, they don't want a sales pitch. They want to finish their work."
-     * BAD: "I led the content design strategy to transform these dead ends into transparent, high-converting decision points."
-     * GOOD: "We tore down the dead ends and built clear doors."
-3. RADICAL CONDENSATION (PERMISSION TO CUT FLUFF):
-   - You have explicit permission to cut 20% to 40% of bloated corporate word count.
-   - Strip corporate throat-clearing, administrative justification, and hollow adverbs.
-   - Preserve all real facts, numbers, test metrics, and core reasoning—but compress the delivery into lean, muscular sentences.
-   - Never inflate a simple idea into two paragraphs of MBA jargon.
-
-FEW-SHOT VOICE TRANSFORMATION BENCHMARK:
----
-[BEFORE - Corporate Draft]:
-"In late 2024, our monetization team set out to scale self-serve conversions. Our primary lever was the in-product upgrade prompt catalog. These friction points—hitting a hard usage ceiling—create prime opportunities where extra capacity delivers immediate, high-leverage value. I led the content design strategy to transform dead ends into transparent, high-converting decision points."
-
-[AFTER - Author's Authentic Voice]:
-"Every software company loves the illusion of friction-free software. It isn't. When a translator hits a paywall in the middle of an urgent document, they are courting resistance. If the interface lectures them with sales copy, they close the tab and walk away. We didn't need clever marketing; we needed honesty. A paywall shouldn't be an ambush. It should be a doorway with a clear price tag."
----
-
-ABSOLUTE DIRECTIVES:
-${structureDirective}
-2. CONTENT FIDELITY & RADICAL CLARITY:
-   - Preserve all original ideas, arguments, data, statistics, figures, and examples.
-   - Cut throat-clearing preambles, bureaucratic padding, and hollow filler phrases.
-   - Do NOT invent unrelated facts or alter quantitative data points.
-3. ADOPT THE VOICE COMPLETELY:
-   - Rephrase, restructure, and recadence the text using the author's exact linguistic patterns:
-     * Sentence length and burstiness (variation between long flowing thoughts and punchy short clauses, e.g. "It isn't.")
-     * Punctuation signatures (em-dashes for internal realization, semicolons, fragments if favored)
-     * Vocabulary register (concrete tactile verbs, elimination of corporate/academic throat-clearing)
-     * Voice and authorial posture: quiet conviction, craftsmanship, unhurried precision
-4. INTENSITY LEVEL (${intensity.toUpperCase()}):
-${intensityInstructions}
-5. TONE & VOICE SLIDER CALIBRATIONS:
-   - Formality: ${formalityDesc}
-   - Enthusiasm: ${enthusiasmDesc}
-   - Conciseness: ${concisenessDesc}
-6. DOMAIN EXPERTISE & CONTEXT:
-${domainInstructions}
-7. PRESERVATION LOCKS (Preserve precisely according to policy):
-   ${formattedLocks}
-8. ADDITIONAL USER GUIDELINES: ${customInstructions || 'Follow the established style profile and eliminate all corporate filler.'}
-
-STYLE PROFILE TO EMULATE:
-Name: ${profile.name}
-Voice Manifesto: ${profile.voiceManifesto}
-${metricsBlock}
-Do List: ${(profile.synthesizedGuidelines?.doList || []).join('; ')}
-Don't List: ${(profile.synthesizedGuidelines?.dontList || []).join('; ')}
-Signature Habits: ${(profile.synthesizedGuidelines?.signatureHabits || []).join('; ')}
-Vocabulary Preferences: ${(profile.synthesizedGuidelines?.vocabularyPreferences || []).join('; ')}
-Pacing Guide: ${profile.synthesizedGuidelines?.pacingGuide || 'Follow profile metrics and burstiness target'}
-Custom Directives: ${profile.customDirectives || 'None'}
-${exemplarsBlock}
-ORIGINAL DRAFT TO REWRITE:
-"""
-${draft}
-"""`;
-
+    optionalText(preservationLocks, 'preservationLocks');
+    optionalText(customInstructions, 'customInstructions');
+    validatePreservationInput(preservationSettings);
+    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
+    const corpus = validateSamplesInput(samples);
+    const domainInput = domainExpertise || profile.domainExpertise;
+    validateDomainExpertiseInput(domainInput);
+    const activeDomain = normalizeDomainExpertise(domainInput);
+    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);
+    const selectedModel = model || 'gemini-3.8-flash';
     const response = await generateContentWithRetry({
       endpoint: '/api/rewrite-draft',
-      contents: systemPrompt,
-      preferredModel: model,
+      contents: buildRewritePrompt({
+        draft: draftText,
+        projectBrief: validProjectBrief,
+        profile,
+        samples: corpus,
+        intensity,
+        preservationSettings: normalizedPreservation,
+        preservationLocks,
+        customInstructions,
+        toneAdjustments,
+        toneEnabled,
+        domainExpertise: activeDomain,
+      }),
+      preferredModel: selectedModel,
       reasoningLevel,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            rewrittenText: {
-              type: Type.STRING,
-              description: 'The complete rewritten draft in the author authentic voice, strictly maintaining the original paragraph and structural layout and full length without omitting or summarizing content.',
-            },
-            changesExplanation: {
-              type: Type.STRING,
-              description: 'A 2-3 paragraph breakdown explaining how the draft was altered to fit the author linguistic profile, tone settings, and domain expectations.',
-            },
-            stylisticAudit: {
-              type: Type.OBJECT,
-              properties: {
-                cadenceChanges: {
-                  type: Type.STRING,
-                  description: 'How the sentence length and rhythm were restructured.',
-                },
-                structuralTweaks: {
-                  type: Type.STRING,
-                  description: 'How paragraph flow, transitions, and openers were adapted.',
-                },
-                vocabularySubstitutions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      from: { type: Type.STRING, description: 'Original generic/weak phrase' },
-                      to: { type: Type.STRING, description: 'New phrase in author voice' },
-                      reason: { type: Type.STRING, description: 'Linguistic rationale' },
-                    },
-                    required: ['from', 'to', 'reason'],
-                  },
-                },
-                voiceAlignmentScore: {
-                  type: Type.NUMBER,
-                  description: 'A percentage (80-99) reflecting alignment with profile rules.',
-                },
-              },
-              required: ['cadenceChanges', 'structuralTweaks', 'vocabularySubstitutions', 'voiceAlignmentScore'],
-            },
-            styleSimilarity: {
-              type: Type.OBJECT,
-              description: 'Detailed style similarity score and evaluation against user profile and calibrated sliders.',
-              properties: {
-                overallPercentage: {
-                  type: Type.NUMBER,
-                  description: 'An objective percentage score (e.g. 88 to 98) measuring how closely the rewritten text matches the user established writing style profile.',
-                },
-                explanation: {
-                  type: Type.STRING,
-                  description: 'A concise 2-3 sentence explanation of what this score represents, highlighting cadence, lexical choices, and how requested tone adjustments were balanced with the author baseline.',
-                },
-                breakdown: {
-                  type: Type.OBJECT,
-                  properties: {
-                    cadenceMatch: { type: Type.NUMBER, description: 'Score 0-100 for sentence rhythm and length distribution match' },
-                    vocabularyFidelity: { type: Type.NUMBER, description: 'Score 0-100 for adherence to favored and taboo word choices' },
-                    toneConsistency: { type: Type.NUMBER, description: 'Score 0-100 for voice persona, posture, and emotional resonance' },
-                    domainConformance: { type: Type.NUMBER, description: 'Score 0-100 for accurate terminology and field conventions' },
-                  },
-                  required: ['cadenceMatch', 'vocabularyFidelity', 'toneConsistency', 'domainConformance'],
-                },
-                strengths: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: '2 to 3 prominent stylistic strengths where this rewrite matches the author profile',
-                },
-                deviationsNote: {
-                  type: Type.STRING,
-                  description: 'A brief note explaining any deliberate stylistic variance (e.g. intentional shift due to conciseness slider or domain conventions).',
-                },
-              },
-              required: ['overallPercentage', 'explanation', 'breakdown', 'strengths'],
-            },
-          },
-          required: ['rewrittenText', 'changesExplanation', 'stylisticAudit', 'styleSimilarity'],
-        },
-      },
+      allowFallback: false,
+      config: { responseMimeType: 'text/plain', systemInstruction: WRITING_SYSTEM_INSTRUCTION },
     });
-
-    const parsed = JSON.parse(response.text || '{}');
-    const wordCountOriginal = draft.trim().split(/\s+/).filter(Boolean).length;
-    const wordCountRewritten = (parsed.rewrittenText || '').trim().split(/\s+/).filter(Boolean).length;
+    const rewrittenText = validateGeneratedProse(response.text, response);
+    const review = await reviewWrittenText({
+      sourceText: draftText,
+      projectBrief: validProjectBrief,
+      finalText: rewrittenText,
+      profile,
+      samples: corpus,
+      preservationSettings: normalizedPreservation,
+      preservationLocks,
+      customInstructions,
+      domainExpertise: activeDomain,
+      analysisModel,
+      analysisReasoningLevel,
+      endpoint: '/api/rewrite-draft/review',
+    });
+    const wordCountOriginal = draftText.trim().split(/\s+/).filter(Boolean).length;
+    const wordCountRewritten = rewrittenText.split(/\s+/).filter(Boolean).length;
 
     res.json({
       id: `rewrite-${Date.now()}`,
       profileId: profile.id,
       profileName: profile.name,
-      modelUsed: (response as any).modelExecuted || model || 'gemini-3.8-flash',
-      durationMs: (response as any).durationMs,
+      modelUsed: (response as any).modelExecuted || selectedModel,
+      durationMs: Date.now() - operationStart,
+      writingDurationMs: (response as any).durationMs,
       intensity,
-      originalText: draft,
-      rewrittenText: parsed.rewrittenText,
+      originalText: draftText,
+      rewrittenText,
       wordCountOriginal,
       wordCountRewritten,
-      changesExplanation: parsed.changesExplanation,
-      stylisticAudit: parsed.stylisticAudit,
-      styleSimilarity: parsed.styleSimilarity,
-      toneAdjustments: tone,
+      changesExplanation: 'Plain-prose rewrite completed. Review findings are shown below.',
+      review,
+      toneAdjustments: toneAdjustments || undefined,
       domainExpertise: activeDomain,
       feedbackItems: [],
       createdAt: new Date().toISOString(),
       customInstructions,
       preservationLocks,
+      projectBrief: validProjectBrief,
+      preservationSettings: normalizedPreservation,
+      writingModelUsed: (response as any).modelExecuted || selectedModel,
+      analysisModelUsed: review.modelUsed || analysisModel || 'gemini-3.1-pro-preview',
     });
   } catch (error: any) {
     console.error('Error in /api/rewrite-draft:', error);
-    res.status(500).json({ error: error.message || 'Failed to rewrite draft' });
+    const message = error.message || 'Failed to rewrite draft';
+    res.status(statusForError(error)).json({ error: message });
   }
 });
 
@@ -1362,172 +1427,216 @@ Generate an updated StyleProfile object, along with a clear summary of what was 
   }
 });
 
-// 6. Quick iterative refine on a rewritten draft
+// 6. Quick iterative refine on a rewritten draft through the same corpus path.
 app.post('/api/quick-refine', async (req: Request, res: Response) => {
   try {
-    const { currentText, instruction, profile, model, reasoningLevel } = req.body;
-    if (!currentText || !instruction) {
-      return res.status(400).json({ error: 'currentText and instruction are required' });
-    }
-
-    const ai = getGeminiClient();
-    const prompt = `You are a writing assistant fine-tuning a draft that has already been rewritten in the author's style.
-Author Style Profile:
-Name: ${profile?.name || 'Master Style'}
-Voice Manifesto: ${profile?.voiceManifesto || ''}
-Rules: ${(profile?.synthesizedGuidelines?.doList || []).join('; ')}
-
-Current Text:
-"""
-${currentText}
-"""
-
-User refinement instruction: "${instruction}"
-
-MANDATORY REQUIREMENTS:
-- You MUST maintain the exact layout, paragraph breaks, and overall length of the text.
-- Do NOT delete, condense, or summarize paragraphs.
-- Apply this refinement while strictly maintaining the author's core voice, cadence, and meaning. Return a JSON object with:
-- refinedText: string (the full updated text)
-- tweakSummary: string (a one-sentence explanation of what changed)`;
-
-    const response = await generateContentWithRetry({
-      contents: prompt,
-      preferredModel: model,
+    const operationStart = Date.now();
+    const {
+      currentText,
+      originalText,
+      sourceDraft,
+      projectBrief,
+      instruction,
+      profile,
+      samples,
+      preservationLocks,
+      preservationSettings,
+      customInstructions,
+      toneAdjustments,
+      toneEnabled,
+      domainExpertise,
+      model,
       reasoningLevel,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            refinedText: { type: Type.STRING },
-            tweakSummary: { type: Type.STRING },
-          },
-          required: ['refinedText', 'tweakSummary'],
-        },
-      },
+      analysisModel,
+      analysisReasoningLevel,
+    } = req.body;
+    const currentTextValue = requireText(currentText, 'currentText');
+    const instructionValue = requireText(instruction, 'instruction');
+    const validProjectBrief = validateProjectBrief(projectBrief);
+    if (profile !== undefined && profile !== null) requireObject(profile, 'profile');
+    const sourceDraftValue = optionalText(sourceDraft, 'sourceDraft');
+    const originalTextValue = optionalText(originalText, 'originalText');
+    optionalText(preservationLocks, 'preservationLocks');
+    optionalText(customInstructions, 'customInstructions');
+    validatePreservationInput(preservationSettings);
+    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
+    const corpus = validateSamplesInput(samples);
+    const source = sourceDraftValue || originalTextValue || currentTextValue;
+    const domainInput = domainExpertise || profile?.domainExpertise;
+    validateDomainExpertiseInput(domainInput);
+    const activeDomain = normalizeDomainExpertise(domainInput);
+    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);
+    const selectedModel = model || 'gemini-3.8-flash';
+    const response = await generateContentWithRetry({
+      endpoint: '/api/quick-refine',
+      contents: buildQuickRefinePrompt({
+        draft: source,
+        projectBrief: validProjectBrief,
+        currentText: currentTextValue,
+        instruction: instructionValue,
+        profile,
+        samples: corpus,
+        preservationSettings: normalizedPreservation,
+        preservationLocks,
+        customInstructions,
+        toneAdjustments,
+        toneEnabled,
+        domainExpertise: activeDomain,
+      }),
+      preferredModel: selectedModel,
+      reasoningLevel,
+      allowFallback: false,
+      config: { responseMimeType: 'text/plain', systemInstruction: WRITING_SYSTEM_INSTRUCTION },
     });
-
-    const parsed = JSON.parse(response.text || '{}');
-    res.json(parsed);
+    const refinedText = validateGeneratedProse(response.text, response);
+    const review = await reviewWrittenText({
+      sourceText: source,
+      projectBrief: validProjectBrief,
+      finalText: refinedText,
+      profile,
+      samples: corpus,
+      preservationSettings: normalizedPreservation,
+      preservationLocks,
+      customInstructions: `${customInstructions || ''}\nRefinement request: ${instructionValue}`,
+      domainExpertise: activeDomain,
+      analysisModel,
+      analysisReasoningLevel,
+      endpoint: '/api/quick-refine/review',
+    });
+    res.json({
+      refinedText,
+      projectBrief: validProjectBrief,
+      tweakSummary: 'Refinement completed. Review findings are shown below.',
+      review,
+      modelUsed: (response as any).modelExecuted || selectedModel,
+      durationMs: Date.now() - operationStart,
+      writingDurationMs: (response as any).durationMs,
+      writingModelUsed: (response as any).modelExecuted || selectedModel,
+      analysisModelUsed: review.modelUsed || analysisModel || 'gemini-3.1-pro-preview',
+      preservationSettings: normalizedPreservation,
+    });
   } catch (error: any) {
     console.error('Error in /api/quick-refine:', error);
-    res.status(500).json({ error: error.message || 'Failed to refine draft' });
+    const message = error.message || 'Failed to refine draft';
+    res.status(statusForError(error)).json({ error: message });
   }
 });
 
-// 7. Real-time line copy edit on a specific selection
+// 7. Real-time line copy edit on a specific selection. The complete resulting
+// text is reviewed against the original source, so earlier omissions stay visible.
 app.post('/api/edit-selection', async (req: Request, res: Response) => {
   try {
+    const operationStart = Date.now();
     const {
       selectedText,
+      selectionRange,
+      currentText,
+      originalText,
+      sourceDraft,
+      projectBrief,
       surroundingContext,
       instruction,
       tag,
       profile,
-      exemplars,
+      samples,
+      preservationLocks,
+      preservationSettings,
+      customInstructions,
+      toneAdjustments,
+      toneEnabled,
+      domainExpertise,
       model,
       reasoningLevel,
+      analysisModel,
+      analysisReasoningLevel,
     } = req.body;
-
-    if (!selectedText || !selectedText.trim()) {
-      return res.status(400).json({ error: 'selectedText is required' });
+    const selectedTextValue = requireText(selectedText, 'selectedText');
+    const currentTextValue = requireText(currentText, 'currentText');
+    const validProjectBrief = validateProjectBrief(projectBrief);
+    if (profile !== undefined && profile !== null) requireObject(profile, 'profile');
+    const sourceDraftValue = optionalText(sourceDraft, 'sourceDraft');
+    const originalTextValue = optionalText(originalText, 'originalText');
+    optionalText(surroundingContext, 'surroundingContext');
+    optionalText(instruction, 'instruction');
+    optionalText(tag, 'tag');
+    optionalText(preservationLocks, 'preservationLocks');
+    optionalText(customInstructions, 'customInstructions');
+    validatePreservationInput(preservationSettings);
+    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
+    const corpus = validateSamplesInput(samples);
+    const source = sourceDraftValue || originalTextValue || currentTextValue;
+    const domainInput = domainExpertise || profile?.domainExpertise;
+    validateDomainExpertiseInput(domainInput);
+    const activeDomain = normalizeDomainExpertise(domainInput);
+    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);
+    let range = validateSelectionRangeInput(selectionRange, currentTextValue, selectedTextValue);
+    if (!range) {
+      const first = currentTextValue.indexOf(selectedTextValue);
+      const second = first >= 0 ? currentTextValue.indexOf(selectedTextValue, first + selectedTextValue.length) : -1;
+      if (first < 0) return res.status(400).json({ error: 'The selected passage is no longer present. Select it again.' });
+      if (second >= 0) return res.status(400).json({ error: 'This passage appears more than once. Select the exact occurrence again.' });
+      range = { start: first, end: first + selectedTextValue.length };
     }
 
-    const tagInstructionMap: Record<string, string> = {
-      too_formal: 'Make this less stiff and bureaucratic; adopt a conversational, grounded, tactile register.',
-      not_my_voice: "Recast this into the author's authentic cadence, muscular verbs, and direct rhythm.",
-      good: 'Preserve the core phrasing but polish the line flow slightly if needed.',
-      too_casual: 'Give this more weight, crisp precision, and authority without adding corporate jargon.',
-      too_verbose: 'Cut the padding, fluff, and filler words ruthlessly; make it punchy and concise.',
-      awkward_cadence: 'Fix the sentence rhythm and flow; create natural cadence and burstiness.',
-      domain_inaccurate: 'Correct domain terminology or framing to reflect grounded practitioner reality.',
-    };
-
-    const stylisticGoals: string[] = [];
-    if (tag && tagInstructionMap[tag]) {
-      stylisticGoals.push(`Stylistic Goal: ${tagInstructionMap[tag]}`);
-    }
-    if (instruction && instruction.trim()) {
-      stylisticGoals.push(`User Note/Instruction: "${instruction.trim()}"`);
-    }
-    const editorialGoal = stylisticGoals.length > 0
-      ? stylisticGoals.join('\n')
-      : 'Recast into the author’s authentic voice, cutting corporate jargon and filler.';
-
-    let exemplarsBlock = '';
-    if (exemplars && Array.isArray(exemplars) && exemplars.length > 0) {
-      exemplarsBlock = `\nAUTHOR WRITING EXEMPLARS (Anchor your cadence, rhythm, and vocabulary to these real excerpts):\n` +
-        exemplars.slice(0, 2).map((ex: any, i: number) => `--- Exemplar ${i + 1}: "${ex.title || 'Untitled'}" ---\n${(ex.excerpt || '').trim()}`).join('\n\n') + '\n';
-    }
-
-    const prompt = `You are an elite prose line editor and writing craftsman.
-Your mission is to perform an immediate line-level rewrite on a SPECIFIC HIGHLIGHTED PASSAGE within a draft.
-
-AUTHOR STYLE PROFILE:
-- Name: ${profile?.name || 'Author Style'}
-- Voice Manifesto: ${profile?.voiceManifesto || 'Clear, grounded, muscular prose.'}
-- Primary Rules: ${(profile?.synthesizedGuidelines?.doList || []).slice(0, 5).join('; ')}
-- What to Avoid: ${(profile?.synthesizedGuidelines?.dontList || []).slice(0, 5).join('; ')}
-
-CRITICAL ANTI-JARGON RULES (ABSOLUTELY BAN ALL CORPORATE BUZZWORDS):
-- NEVER use consulting/MBA filler: "lever" (as a metaphor), "scale" (as a verb for business growth), "friction points", "decision points", "high-leverage", "technical debt" (unless literally discussing broken code), "content design rigor", "synergies", "alignment", "stakeholders", "deliverables", "streamline", "utilize", "optimize", "bandwidth".
-- Ground all domain concepts in physical human reality, physical verbs, and direct craft actions.
-
-${exemplarsBlock}
-
-SURROUNDING CONTEXT (for continuity and seamless transition):
-"""
-${surroundingContext || selectedText}
-"""
-
-TARGET PASSAGE TO REWRITE:
-"""
-${selectedText}
-"""
-
-USER'S EDIT DIRECTION:
-${editorialGoal}
-
-MANDATORY EDITORIAL REQUIREMENTS:
-1. Rewrite ONLY the target passage. The replacement must plug seamlessly into the surrounding text without awkward seams, tense shifts, or tone clashes.
-2. Maintain all substantive factual points, numbers, and core intent, but completely strip out corporate filler, throat-clearing, and passive voice.
-3. Return a JSON object with:
-   - "replacementText": string (the rewritten replacement text for the target passage ONLY, no surrounding text)
-   - "explanation": string (one concise sentence explaining what changed)`;
-
-    const preferredModel = model || 'gemini-3.8-flash';
+    const selectedModel = model || 'gemini-3.8-flash';
     const response = await generateContentWithRetry({
       endpoint: '/api/edit-selection',
-      contents: prompt,
-      preferredModel,
-      reasoningLevel: reasoningLevel || 'auto',
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            replacementText: { type: Type.STRING },
-            explanation: { type: Type.STRING },
-          },
-          required: ['replacementText', 'explanation'],
-        },
-      },
+      contents: buildSelectionPrompt({
+        draft: source,
+        projectBrief: validProjectBrief,
+        currentText: currentTextValue,
+        selectedText: selectedTextValue,
+        selectionRange: range,
+        surroundingContext,
+        instruction,
+        tag,
+        profile,
+        samples: corpus,
+        preservationSettings: normalizedPreservation,
+        preservationLocks,
+        customInstructions,
+        toneAdjustments,
+        toneEnabled,
+        domainExpertise: activeDomain,
+      }),
+      preferredModel: selectedModel,
+      reasoningLevel,
+      allowFallback: false,
+      config: { responseMimeType: 'text/plain', systemInstruction: WRITING_SYSTEM_INSTRUCTION },
     });
-
-    const parsed = JSON.parse(response.text || '{}');
-    const modelUsed = (response as any).modelExecuted || preferredModel;
-    const durationMs = (response as any).durationMs || 0;
-
+    const replacementText = validateGeneratedProse(response.text, response);
+    const finalText = currentTextValue.slice(0, range.start) + replacementText + currentTextValue.slice(range.end);
+    const review = await reviewWrittenText({
+      sourceText: source,
+      projectBrief: validProjectBrief,
+      finalText,
+      profile,
+      samples: corpus,
+      preservationSettings: normalizedPreservation,
+      preservationLocks,
+      customInstructions: `${customInstructions || ''}\nSelection edit: ${instruction || tag || 'voice edit'}`,
+      domainExpertise: activeDomain,
+      analysisModel,
+      analysisReasoningLevel,
+      endpoint: '/api/edit-selection/review',
+    });
     res.json({
-      replacementText: parsed.replacementText || selectedText,
-      explanation: parsed.explanation || 'Refined selection in author voice.',
-      modelUsed,
-      durationMs,
+      replacementText,
+      projectBrief: validProjectBrief,
+      explanation: 'Selection edit completed. Review findings are shown below.',
+      finalText,
+      review,
+      modelUsed: (response as any).modelExecuted || selectedModel,
+      durationMs: Date.now() - operationStart,
+      writingDurationMs: (response as any).durationMs,
+      writingModelUsed: (response as any).modelExecuted || selectedModel,
+      analysisModelUsed: review.modelUsed || analysisModel || 'gemini-3.1-pro-preview',
+      preservationSettings: normalizedPreservation,
     });
   } catch (error: any) {
     console.error('Error in /api/edit-selection:', error);
-    res.status(500).json({ error: error.message || 'Failed to edit selection' });
+    const message = error.message || 'Failed to edit selection';
+    res.status(statusForError(error)).json({ error: message });
   }
 });
 
