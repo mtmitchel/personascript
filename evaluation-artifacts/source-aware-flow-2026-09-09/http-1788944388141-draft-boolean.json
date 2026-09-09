@@ -1,0 +1,13 @@
+{
+  "input": {
+    "field": "UX",
+    "draft": false
+  },
+  "response": {
+    "error": "draft must be a string."
+  },
+  "name": "draft-boolean",
+  "status": 400,
+  "passed": true,
+  "providerRequests": []
+}

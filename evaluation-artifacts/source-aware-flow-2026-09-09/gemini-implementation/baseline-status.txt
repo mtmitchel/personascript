@@ -1,0 +1,18 @@
+ M README.md
+ M package.json
+ M server.ts
+ M src/components/DomainView.tsx
+ M src/components/ProfileView.tsx
+ M src/components/RewriteFeedbackManager.tsx
+ M src/components/StudioView.tsx
+ M src/components/ToneSlidersControl.tsx
+ M src/context/WritingAssistantContext.tsx
+ M src/data/defaultSamples.ts
+ D src/data/domainPresets.ts
+ M src/index.css
+ M src/types.ts
+ M tsconfig.json
+?? evaluation-artifacts/
+?? src/domainGeneration.ts
+?? src/writingPipeline.ts
+?? tests/

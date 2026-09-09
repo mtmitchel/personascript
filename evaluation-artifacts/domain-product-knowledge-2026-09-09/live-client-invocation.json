@@ -1,0 +1,10 @@
+{
+  "method": "POST",
+  "url": "http://localhost:3105/api/rewrite-draft",
+  "inputFile": "live-input.json",
+  "writing": "gemini-3.8-flash",
+  "review": "gemini-3.1-pro-preview",
+  "reasoning": "auto",
+  "data": "repository demo samples and synthetic fictional product draft",
+  "started": "2026-09-09T07:39:25.447Z"
+}

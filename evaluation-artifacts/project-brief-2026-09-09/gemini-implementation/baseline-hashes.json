@@ -1,0 +1,10 @@
+{
+  "src/components/StudioView.tsx": "560257646fbad8225a3a67367e139ce91972907fa36fadb5653fee5e61872c4f",
+  "src/context/WritingAssistantContext.tsx": "b3592733ccb46db6a8ee94c9a907d8ada0055ddc9afdd3cd88b76d2679ae476f",
+  "src/writingPipeline.ts": "1f6b4c5f24409e4052fea34c55f80a2f7d4d84497e3b627c9dfcdf6c4c4a4891",
+  "src/types.ts": "0158422b222544a6f7cda6452aa879e39d91d52cc499192eedeb08a3b77b5ea2",
+  "server.ts": "2c6733e1e5bad8e3513a88ecb369e2c07b6ffa4f499b2af873f23631a1803539",
+  "README.md": "64eafb8feb440b799c28ae71e1a980ad1347c89e6aefb94760c1de349229271d",
+  "src/index.css": "e172d030ae0c2f6a781d1c998e6936465ab90d9881ec6893e49b1dd715bb824b",
+  "tests/writingPipeline.test.ts": "b614460c1aa0fb2bd98a30733a3ae617b0d7cf85b0a807065d07f0be3a4722c7"
+}

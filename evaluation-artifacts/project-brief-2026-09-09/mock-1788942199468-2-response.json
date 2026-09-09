@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"summary\":\"Deterministic review fixture; not an editorial-quality assessment.\",\"findings\":[],\"voiceObservations\":[]}"
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-project-brief-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

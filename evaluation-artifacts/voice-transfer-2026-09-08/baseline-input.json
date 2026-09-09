@@ -1,0 +1,363 @@
+{
+  "draft": "Subject: Proposal for Improving Team Documentation and Productivity\n\nIn today's fast-paced corporate environment, it is arguably imperative that our cross-functional teams look into the strategic optimization of our internal documentation workflows. It has been observed by several stakeholders that there are a lot of inefficiencies currently existing in the manner in which knowledge transfer is being executed across different departmental silos.\n\nIn order to address these challenges, we should probably consider implementing a new centralized documentation platform that can streamline our processes and maximize collaborative bandwidth. When documentation is created in an ad-hoc fashion without synergistic alignment, key insights are often lost, which can lead to suboptimal outcomes for all involved parties.\n\nMoving forward, it is recommended that team members should try to dedicate some time each week toward updating their respective project trackers. By leveraging these modern collaborative tools, our overall velocity could potentially be increased by a significant margin. We hope everyone will get on board with this important initiative so we can hit our quarterly deliverables.",
+  "profile": {
+    "id": "profile-primary",
+    "name": "Authentic Craftsman and Essayist",
+    "description": "Synthesized from your essays on craft and unhurried thought. A tactile, rhythmic, high-conviction voice that balances sensory metaphors with punchy declarative clarity.",
+    "sampleIds": [
+      "sample-1",
+      "sample-2"
+    ],
+    "updatedAt": "2026-09-02T15:00:00.000Z",
+    "metrics": {
+      "formality": 65,
+      "avgSentenceLength": 14.3,
+      "sentenceLengthVariance": 86,
+      "lexicalSophistication": 85,
+      "warmth": 72,
+      "directness": 91,
+      "activeVoiceRatio": 95,
+      "metaphorDensity": 80
+    },
+    "voiceManifesto": "You write with the tactile assurance of someone who views prose as sculpture. You hate hollow jargon, buzzwords, and passive evasion. Every sentence has a rhythmic reason to exist. You balance lush, sensory analogies—frequently drawn from physical craft, geology, natural light, and manual labor—with staccato, unapologetic declarative punches. You never explain what can be felt, and you treat white space as an active instrument of punctuation.",
+    "synthesizedGuidelines": {
+      "doList": [
+        "Alternate between expansive rolling clauses (25-35 words) and sharp declarative punches (3-6 words).",
+        "Use physical, tactile verbs (excavate, wrestle, court, strike, anchor) over passive or abstract phrasing.",
+        "Ground intellectual insights with tangible material metaphors (stone, timber, grain, river).",
+        "Use em-dashes for spontaneous internal reflection and semicolons for rhythmic parallelism.",
+        "Cut throat-clearing openers (\"It is worth noting that...\", \"In today's fast-paced world...\")."
+      ],
+      "dontList": [
+        "Never use corporate buzzwords (\"synergy\", \"streamline\", \"leverage\", \"paradigm shift\").",
+        "Avoid passive voice (\"It was decided by the team\").",
+        "Do not write uniform, monotone sentence lengths.",
+        "Avoid weak hedge words (\"somewhat\", \"arguably\", \"perhaps it could be said\").",
+        "Never sacrifice concrete meaning for empty ornamental adjectives."
+      ],
+      "signatureHabits": [
+        "Isolated single-line paragraphs (\"It isn't.\") acting as intellectual tripwires.",
+        "Metaphors contrasting speed/velocity with depth/discernment.",
+        "Rhythmic dualities (\"It is not X; it is Y\").",
+        "Closing on a memorable imperative sentence."
+      ],
+      "vocabularyPreferences": [
+        "Tactile nouns: grain, timber, stone, friction, weight, texture, blueprint",
+        "Kinetic verbs: tumble, churn, carve, court, prune, anchor, strike",
+        "Avoid: utilize, implement, maximize, bandwidth, low-hanging fruit"
+      ],
+      "pacingGuide": "High burstiness. Build tension through layered, sensory description, then shatter it with an immediate, definitive statement."
+    },
+    "customDirectives": "Maintain strong authorial conviction. Never apologize for having an opinion. Always keep the reader leaning in.",
+    "domainExpertise": {
+      "enabled": false,
+      "field": "UX Copywriting & Content Design",
+      "disciplines": [
+        "UX Copywriting",
+        "Content Design"
+      ],
+      "audienceContext": "Design directors, VP of Product, hiring managers, and design leads evaluating portfolio case studies.",
+      "customNotes": "Demonstrate tangible product impact: user comprehension, cognitive load reduction, conversion uplift, and clear cross-functional collaboration. Seamlessly integrate monetization mechanics, AI translation/localization constraints, and human-in-the-loop AI writing affordances without corporate jargon.",
+      "keyTerminology": [
+        "microcopy",
+        "affordances",
+        "content design systems",
+        "information architecture",
+        "progressive disclosure",
+        "empty states & error recovery",
+        "voice & tone matrix",
+        "scannability",
+        "accessibility (a11y)",
+        "paywalls & gating UX",
+        "conversion funnels",
+        "pricing page transparency",
+        "subscription tiers",
+        "localization (l10n) & internationalization (i18n)",
+        "transcreation",
+        "machine translation post-editing (MTPE)",
+        "text expansion factor",
+        "human-in-the-loop (HITL)",
+        "prompt scaffolding & affordances",
+        "inline completions & ghost text",
+        "suggestion density",
+        "user agency & overwrite control"
+      ],
+      "conventions": [
+        "Keep interface copy action-oriented, clear, and scannable",
+        "Eliminate dead ends by providing clear next steps and error recovery paths",
+        "Frame monetization around delivered user value rather than artificial barrier gates",
+        "Account for character expansion in UI buttons across translated locales",
+        "Ensure the human author always retains ultimate editorial agency over AI suggestions"
+      ],
+      "topics": [
+        {
+          "id": "topic-content-design",
+          "name": "UX Copywriting & Content Design",
+          "category": "discipline",
+          "description": "Microcopy, design systems, user journeys, error recovery, and clear product information architecture.",
+          "enabled": true,
+          "keyTerminology": [
+            "microcopy",
+            "affordances",
+            "design systems & content components",
+            "information architecture",
+            "progressive disclosure",
+            "empty states & error recovery",
+            "voice & tone matrix",
+            "scannability",
+            "accessibility (a11y)",
+            "user journey mapping"
+          ],
+          "conventions": [
+            "Keep interface copy action-oriented, clear, and scannable",
+            "Eliminate dead ends by providing clear next steps and error recovery paths",
+            "Bridge visual UI design and user mental models using unambiguous, plain language",
+            "Ensure microcopy adheres to design system tokens and component patterns"
+          ]
+        },
+        {
+          "id": "topic-monetization",
+          "name": "Monetization & Conversion UX",
+          "category": "intersecting",
+          "description": "Paywalls, subscription tiers, conversion funnels, trial-to-paid transitions, and pricing clarity.",
+          "enabled": true,
+          "keyTerminology": [
+            "paywalls & gating UX",
+            "freemium friction & drop-off",
+            "conversion funnels",
+            "pricing page transparency",
+            "value metric alignment",
+            "subscription tiers (Annual vs Monthly)",
+            "trial-to-paid conversion",
+            "upgrade triggers & contextual nudges",
+            "cancellation & retention flows",
+            "LTV / CAC economics"
+          ],
+          "conventions": [
+            "Frame monetization around delivered user value rather than artificial barrier gates",
+            "Explain pricing tiers and feature entitlements with radical clarity and zero hidden gotchas",
+            "Avoid deceptive dark patterns in trial expirations, billing, or subscription cancellation",
+            "Place contextual upgrade triggers at moments of high user accomplishment or genuine need"
+          ]
+        },
+        {
+          "id": "topic-ai-translation",
+          "name": "AI Translation & Localization",
+          "category": "intersecting",
+          "description": "Internationalization (i18n), localization (l10n), transcreation, MT post-editing, and cultural adaptation.",
+          "enabled": true,
+          "keyTerminology": [
+            "localization (l10n) & internationalization (i18n)",
+            "transcreation",
+            "machine translation post-editing (MTPE)",
+            "locale string keys",
+            "text expansion factor (+30% in German/French)",
+            "cultural nuance & idiomatic adaptation",
+            "pseudo-localization testing",
+            "glossary constraints & terminology locking",
+            "RTL (right-to-left) layout considerations"
+          ],
+          "conventions": [
+            "Account for character expansion in UI buttons, badges, and headers across different locales",
+            "Avoid culture-specific idioms, slang, and metaphors that degrade in machine translation",
+            "Maintain consistent terminology keys and glossary definitions across translated surfaces",
+            "Design modular content blocks that preserve syntactic integrity when localized"
+          ]
+        },
+        {
+          "id": "topic-ai-writing-assistance",
+          "name": "AI Writing Assistance",
+          "category": "intersecting",
+          "description": "Human-in-the-loop interfaces, inline completions, prompt scaffolding, model confidence, and user agency.",
+          "enabled": true,
+          "keyTerminology": [
+            "human-in-the-loop (HITL)",
+            "prompt scaffolding & affordances",
+            "inline completions & ghost text",
+            "suggestion density & cognitive load",
+            "model steerability & voice preservation",
+            "confidence thresholds & hallucination mitigation",
+            "generative UI & progressive reveal",
+            "user agency & overwrite control",
+            "latency perception & streaming feedback"
+          ],
+          "conventions": [
+            "Ensure the human author always retains ultimate editorial agency and effortless veto power",
+            "Keep AI suggestions unobtrusive, low-friction, and easy to accept, tweak, or dismiss",
+            "Provide transparent feedback on what changed and why, maintaining the author's authentic style",
+            "Calibrate suggestion frequency to avoid cognitive fatigue or breaking the user's flow state"
+          ]
+        }
+      ]
+    }
+  },
+  "intensity": "faithful",
+  "preservationSettings": {
+    "keepStructure": true,
+    "headingTreatment": "revise_in_voice",
+    "preserveNumbers": true,
+    "preserveQuotes": true,
+    "preserveTerms": false,
+    "customLocks": "Keep all core metrics, statistics, and organizational roles intact."
+  },
+  "preservationLocks": "Keep all core metrics, statistics, and organizational roles intact.",
+  "customInstructions": "",
+  "toneAdjustments": {
+    "formality": 65,
+    "enthusiasm": 50,
+    "conciseness": 50
+  },
+  "domainExpertise": {
+    "enabled": false,
+    "field": "UX Copywriting & Content Design",
+    "disciplines": [
+      "UX Copywriting",
+      "Content Design"
+    ],
+    "audienceContext": "Design directors, VP of Product, hiring managers, and design leads evaluating portfolio case studies.",
+    "customNotes": "Demonstrate tangible product impact: user comprehension, cognitive load reduction, conversion uplift, and clear cross-functional collaboration. Seamlessly integrate monetization mechanics, AI translation/localization constraints, and human-in-the-loop AI writing affordances without corporate jargon.",
+    "keyTerminology": [
+      "microcopy",
+      "affordances",
+      "content design systems",
+      "information architecture",
+      "progressive disclosure",
+      "empty states & error recovery",
+      "voice & tone matrix",
+      "scannability",
+      "accessibility (a11y)",
+      "paywalls & gating UX",
+      "conversion funnels",
+      "pricing page transparency",
+      "subscription tiers",
+      "localization (l10n) & internationalization (i18n)",
+      "transcreation",
+      "machine translation post-editing (MTPE)",
+      "text expansion factor",
+      "human-in-the-loop (HITL)",
+      "prompt scaffolding & affordances",
+      "inline completions & ghost text",
+      "suggestion density",
+      "user agency & overwrite control"
+    ],
+    "conventions": [
+      "Keep interface copy action-oriented, clear, and scannable",
+      "Eliminate dead ends by providing clear next steps and error recovery paths",
+      "Frame monetization around delivered user value rather than artificial barrier gates",
+      "Account for character expansion in UI buttons across translated locales",
+      "Ensure the human author always retains ultimate editorial agency over AI suggestions"
+    ],
+    "topics": [
+      {
+        "id": "topic-content-design",
+        "name": "UX Copywriting & Content Design",
+        "category": "discipline",
+        "description": "Microcopy, design systems, user journeys, error recovery, and clear product information architecture.",
+        "enabled": true,
+        "keyTerminology": [
+          "microcopy",
+          "affordances",
+          "design systems & content components",
+          "information architecture",
+          "progressive disclosure",
+          "empty states & error recovery",
+          "voice & tone matrix",
+          "scannability",
+          "accessibility (a11y)",
+          "user journey mapping"
+        ],
+        "conventions": [
+          "Keep interface copy action-oriented, clear, and scannable",
+          "Eliminate dead ends by providing clear next steps and error recovery paths",
+          "Bridge visual UI design and user mental models using unambiguous, plain language",
+          "Ensure microcopy adheres to design system tokens and component patterns"
+        ]
+      },
+      {
+        "id": "topic-monetization",
+        "name": "Monetization & Conversion UX",
+        "category": "intersecting",
+        "description": "Paywalls, subscription tiers, conversion funnels, trial-to-paid transitions, and pricing clarity.",
+        "enabled": true,
+        "keyTerminology": [
+          "paywalls & gating UX",
+          "freemium friction & drop-off",
+          "conversion funnels",
+          "pricing page transparency",
+          "value metric alignment",
+          "subscription tiers (Annual vs Monthly)",
+          "trial-to-paid conversion",
+          "upgrade triggers & contextual nudges",
+          "cancellation & retention flows",
+          "LTV / CAC economics"
+        ],
+        "conventions": [
+          "Frame monetization around delivered user value rather than artificial barrier gates",
+          "Explain pricing tiers and feature entitlements with radical clarity and zero hidden gotchas",
+          "Avoid deceptive dark patterns in trial expirations, billing, or subscription cancellation",
+          "Place contextual upgrade triggers at moments of high user accomplishment or genuine need"
+        ]
+      },
+      {
+        "id": "topic-ai-translation",
+        "name": "AI Translation & Localization",
+        "category": "intersecting",
+        "description": "Internationalization (i18n), localization (l10n), transcreation, MT post-editing, and cultural adaptation.",
+        "enabled": true,
+        "keyTerminology": [
+          "localization (l10n) & internationalization (i18n)",
+          "transcreation",
+          "machine translation post-editing (MTPE)",
+          "locale string keys",
+          "text expansion factor (+30% in German/French)",
+          "cultural nuance & idiomatic adaptation",
+          "pseudo-localization testing",
+          "glossary constraints & terminology locking",
+          "RTL (right-to-left) layout considerations"
+        ],
+        "conventions": [
+          "Account for character expansion in UI buttons, badges, and headers across different locales",
+          "Avoid culture-specific idioms, slang, and metaphors that degrade in machine translation",
+          "Maintain consistent terminology keys and glossary definitions across translated surfaces",
+          "Design modular content blocks that preserve syntactic integrity when localized"
+        ]
+      },
+      {
+        "id": "topic-ai-writing-assistance",
+        "name": "AI Writing Assistance",
+        "category": "intersecting",
+        "description": "Human-in-the-loop interfaces, inline completions, prompt scaffolding, model confidence, and user agency.",
+        "enabled": true,
+        "keyTerminology": [
+          "human-in-the-loop (HITL)",
+          "prompt scaffolding & affordances",
+          "inline completions & ghost text",
+          "suggestion density & cognitive load",
+          "model steerability & voice preservation",
+          "confidence thresholds & hallucination mitigation",
+          "generative UI & progressive reveal",
+          "user agency & overwrite control",
+          "latency perception & streaming feedback"
+        ],
+        "conventions": [
+          "Ensure the human author always retains ultimate editorial agency and effortless veto power",
+          "Keep AI suggestions unobtrusive, low-friction, and easy to accept, tweak, or dismiss",
+          "Provide transparent feedback on what changed and why, maintaining the author's authentic style",
+          "Calibrate suggestion frequency to avoid cognitive fatigue or breaking the user's flow state"
+        ]
+      }
+    ]
+  },
+  "exemplars": [
+    {
+      "title": "The Architecture of Unhurried Thought",
+      "excerpt": "\"A three-word sentence after a rolling forty-word clause isn't an accident; it is an ambush.\" - Signature rhythmic signature: combines meta-commentary with tactile military metaphor and semicolon balance.\n\"Writing is not transcription. It is excavation.\" - Staccato dual-beat aphorism establishing strong authority."
+    },
+    {
+      "title": "On Tools, Craft, and the Myth of Raw Speed",
+      "excerpt": "\"It isn't.\" - Rhetorical knockout punch after a long multi-clause opening paragraph.\n\"Build things that remember human hands were on them.\" - Poetic imperative conclusion tying together tactile and moral philosophy."
+    }
+  ],
+  "model": "gemini-3.8-flash",
+  "reasoningLevel": "auto"
+}

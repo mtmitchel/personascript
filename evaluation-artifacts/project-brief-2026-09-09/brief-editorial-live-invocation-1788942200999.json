@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "file": "server.ts",
+      "artifact": "brief-editorial-live-1788942200999-server.ts.source.txt",
+      "sha256": "18132d68406b1178ad4f82f47ae9923f2ae361285f9edf5e6e0a144df9d58589"
+    },
+    {
+      "file": "src/writingPipeline.ts",
+      "artifact": "brief-editorial-live-1788942200999-src-writingPipeline.ts.source.txt",
+      "sha256": "6c742b96896980c6b1493eacea3467da5006ac95ae13a34b6fb2d5580b925397"
+    }
+  ],
+  "cwd": "/home/mason/Projects/persona script",
+  "command": "DISABLE_HMR=true QA_RUN_LABEL=brief-editorial-live PORT=3107 ./node_modules/.bin/tsx evaluation-artifacts/project-brief-2026-09-09/recorded-server.ts",
+  "provider": "Gemini API through production application handlers",
+  "writingModel": "gemini-3.8-flash",
+  "reviewModel": "gemini-3.1-pro-preview",
+  "reasoning": "auto",
+  "data": "fictional QA project and repository demo writing samples only",
+  "instrumentation": "Capture SDK generation input, raw response, timing, and errors. Reject unapproved models. No production files modified."
+}

@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { GenerateContentResponse, GoogleGenAI } from '@google/genai';
+const directory = path.resolve('evaluation-artifacts/card-controls-2026-09-09');
+const client = new GoogleGenAI({ apiKey: 'unused-mocked-qa' });
+let sequence = 0;
+Object.getPrototypeOf(client.models).generateContentInternal = async function(params: any) {
+  const id = `mock-${Date.now()}-${++sequence}`;
+  fs.writeFileSync(path.join(directory, `${id}-request.json`), JSON.stringify(params, null, 2));
+  const prompt = String(params.contents);
+  const match = prompt.match(/<target-topic category="(.*?)">(.*?)<\/target-topic>/);
+  const make = (name: string, category = 'intersecting') => ({ name, category, description: 'Refreshed overview of ' + name, keyTerminology: ['information hierarchy', 'comprehension'], conventions: ['Explain concepts through concrete decisions.'] });
+  if (match) await new Promise(resolve => setTimeout(resolve, 1600));
+  const topics = match ? [make(match[2], match[1])] : [make('Content Design', 'discipline'), make('Monetization UX'), make('Failure fixture')];
+  if (match?.[2] === 'Failure fixture' || match?.[2] === 'Wrong name') topics[0].name = 'Unrequested topic';
+  if (match?.[2] === 'Multiple results') topics.push(make('Extra topic'));
+  if (match?.[2] === 'Wrong category') topics[0].category = match[1] === 'discipline' ? 'intersecting' : 'discipline';
+  const text = JSON.stringify({topics});
+  const response = new GenerateContentResponse();
+  Object.assign(response,{candidates:[{finishReason:'STOP',content:{role:'model',parts:[{text}]}}],modelVersion:'deterministic-card-qa',usageMetadata:{promptTokenCount:0,candidatesTokenCount:0}});
+  fs.writeFileSync(path.join(directory, `${id}-response.json`),JSON.stringify(response,null,2));
+  return response;
+};
+await import('../../server.ts');

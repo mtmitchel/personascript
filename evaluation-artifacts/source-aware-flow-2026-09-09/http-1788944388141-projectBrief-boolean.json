@@ -1,0 +1,13 @@
+{
+  "input": {
+    "field": "UX",
+    "projectBrief": false
+  },
+  "response": {
+    "error": "projectBrief must be a string."
+  },
+  "name": "projectBrief-boolean",
+  "status": 400,
+  "passed": true,
+  "providerRequests": []
+}

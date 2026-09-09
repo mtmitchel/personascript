@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"name\":\"Mock synthesized voice\",\"description\":\"QA profile\",\"metrics\":{},\"voiceManifesto\":\"Mock guidance\",\"synthesizedGuidelines\":{},\"customDirectives\":\"MODEL TRIED TO OVERWRITE USER DIRECTIVE\",\"domainExpertise\":{\"enabled\":false,\"field\":\"MODEL OVERWRITE\"}}"
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  },
+  "modelVersion": "mocked-qa-no-provider-call"
+}

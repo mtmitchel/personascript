@@ -1,0 +1,174 @@
+[
+  {
+    "name": "source-generation",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388192-4-request.json"
+    ]
+  },
+  {
+    "name": "source-single-card",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388206-5-request.json"
+    ]
+  },
+  {
+    "name": "generic-off",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388213-6-request.json"
+    ]
+  },
+  {
+    "name": "brief-only",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388219-7-request.json"
+    ]
+  },
+  {
+    "name": "draft-object",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "draft-array",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "draft-boolean",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "draft-oversized",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "projectBrief-object",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "projectBrief-array",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "projectBrief-boolean",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "projectBrief-oversized",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "reject-samples",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "reject-productKnowledge",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "reject-customNotes",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "source-limit",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388312-8-request.json"
+    ]
+  },
+  {
+    "name": "incomplete-annotations",
+    "status": 500,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388325-9-request.json"
+    ]
+  },
+  {
+    "name": "wrong-card",
+    "status": 500,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388332-10-request.json"
+    ]
+  },
+  {
+    "name": "false-provenance",
+    "status": 500,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388340-11-request.json"
+    ]
+  },
+  {
+    "name": "rewrite-with-annotations",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388350-12-request.json",
+      "mock-1788944388352-13-request.json"
+    ]
+  },
+  {
+    "name": "refine-with-annotations",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388362-14-request.json",
+      "mock-1788944388363-15-request.json"
+    ]
+  },
+  {
+    "name": "selection-with-annotations",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388371-16-request.json",
+      "mock-1788944388372-17-request.json"
+    ]
+  },
+  {
+    "name": "review-failure-preserves-draft",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788944388380-18-request.json",
+      "mock-1788944388381-19-request.json"
+    ]
+  },
+  {
+    "name": "invalid-saved-annotation",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  }
+]

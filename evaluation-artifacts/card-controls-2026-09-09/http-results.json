@@ -1,0 +1,156 @@
+[
+  {
+    "name": "single-card",
+    "input": {
+      "targetTopic": {
+        "name": "Content Design",
+        "category": "discipline"
+      }
+    },
+    "status": 200,
+    "body": {
+      "topics": [
+        {
+          "id": "topic-1788942759881-1-jhunk",
+          "name": "Content Design",
+          "category": "discipline",
+          "description": "Refreshed overview of Content Design",
+          "keyTerminology": [
+            "information hierarchy",
+            "comprehension"
+          ],
+          "conventions": [
+            "Explain concepts through concrete decisions."
+          ],
+          "enabled": true
+        }
+      ]
+    },
+    "passed": true
+  },
+  {
+    "name": "wrong-name",
+    "input": {
+      "targetTopic": {
+        "name": "Wrong name",
+        "category": "discipline"
+      }
+    },
+    "status": 500,
+    "body": {
+      "error": "The model did not return the requested card. Existing knowledge has not been replaced."
+    },
+    "passed": true
+  },
+  {
+    "name": "multiple-results",
+    "input": {
+      "targetTopic": {
+        "name": "Multiple results",
+        "category": "discipline"
+      }
+    },
+    "status": 500,
+    "body": {
+      "error": "The model did not return the requested card. Existing knowledge has not been replaced."
+    },
+    "passed": true
+  },
+  {
+    "name": "wrong-category",
+    "input": {
+      "targetTopic": {
+        "name": "Wrong category",
+        "category": "discipline"
+      }
+    },
+    "status": 500,
+    "body": {
+      "error": "The model did not return the requested card. Existing knowledge has not been replaced."
+    },
+    "passed": true
+  },
+  {
+    "name": "invalid-target",
+    "input": {
+      "targetTopic": {
+        "name": "Content Design",
+        "category": "topic"
+      }
+    },
+    "status": 400,
+    "body": {
+      "error": "targetTopic must contain a name of 1–200 characters and a valid category only."
+    },
+    "passed": true
+  },
+  {
+    "name": "private-target",
+    "input": {
+      "targetTopic": {
+        "name": "Content Design",
+        "category": "discipline",
+        "notes": "private fixture"
+      }
+    },
+    "status": 400,
+    "body": {
+      "error": "targetTopic must contain a name of 1–200 characters and a valid category only."
+    },
+    "passed": true
+  },
+  {
+    "name": "all-topics",
+    "input": {
+      "field": "UX"
+    },
+    "status": 200,
+    "body": {
+      "topics": [
+        {
+          "id": "topic-1788942764747-1-64zvb",
+          "name": "Content Design",
+          "category": "discipline",
+          "description": "Refreshed overview of Content Design",
+          "keyTerminology": [
+            "information hierarchy",
+            "comprehension"
+          ],
+          "conventions": [
+            "Explain concepts through concrete decisions."
+          ],
+          "enabled": true
+        },
+        {
+          "id": "topic-1788942764747-2-oe30w",
+          "name": "Monetization UX",
+          "category": "intersecting",
+          "description": "Refreshed overview of Monetization UX",
+          "keyTerminology": [
+            "information hierarchy",
+            "comprehension"
+          ],
+          "conventions": [
+            "Explain concepts through concrete decisions."
+          ],
+          "enabled": true
+        },
+        {
+          "id": "topic-1788942764747-3-6p8q5",
+          "name": "Failure fixture",
+          "category": "intersecting",
+          "description": "Refreshed overview of Failure fixture",
+          "keyTerminology": [
+            "information hierarchy",
+            "comprehension"
+          ],
+          "conventions": [
+            "Explain concepts through concrete decisions."
+          ],
+          "enabled": true
+        }
+      ]
+    },
+    "passed": true
+  }
+]

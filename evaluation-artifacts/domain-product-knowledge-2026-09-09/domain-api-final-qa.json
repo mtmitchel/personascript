@@ -1,0 +1,53 @@
+{
+  "checks": {
+    "typescript": "passed",
+    "unitTests": {
+      "passed": 30,
+      "failed": 0
+    },
+    "build": "passed",
+    "diffWhitespace": "passed",
+    "mockedApi": {
+      "passed": 8,
+      "artifact": "domain-api-http-qa.json"
+    },
+    "desktop": [
+      "Regenerate replaces topics",
+      "Topic controls disabled during request",
+      "Product entry creation and focus",
+      "Product/audience/guidance edits while request pending survived completion and reload",
+      "Failure retains old topics",
+      "Clear empties topics and preserves products/audience/guidance",
+      "Generate from empty succeeds"
+    ],
+    "liveApi": {
+      "recordedRun": {
+        "model": "gemini-3.1-pro-preview",
+        "reasoning": "auto",
+        "status": 200,
+        "topicCount": 7,
+        "artifact": "domain-api-live-result.json"
+      },
+      "normalPreviewUi": {
+        "url": "http://localhost:3102/",
+        "topicCount": 6,
+        "persistedAfterReload": true,
+        "preservedProductCount": 1,
+        "masterEnabled": false
+      }
+    },
+    "limitations": [
+      "Generated topic coverage varies between calls.",
+      "Original Add product failure was not reproducible after preview restart; focus and state updates were improved and verified.",
+      "Initial live QA client started before server listened; retried successfully."
+    ]
+  },
+  "sourceHashes": {
+    "server.ts": "2c6733e1e5bad8e3513a88ecb369e2c07b6ffa4f499b2af873f23631a1803539",
+    "src/domainGeneration.ts": "1da68b5e6302f4ad12ce9c26a1f0bb7661bf0fcd199ed3f3a54d814f292a524e",
+    "src/components/DomainView.tsx": "4d034f52bd22aa755395d913b40add3157f6b30d060f03babf20807d3f32d666",
+    "src/context/WritingAssistantContext.tsx": "b3592733ccb46db6a8ee94c9a907d8ada0055ddc9afdd3cd88b76d2679ae476f",
+    "src/data/defaultSamples.ts": "f8b589f7789ad01c5eb495edf708b573cb6ecd3a57cd100b79bd624c13935728",
+    "tests/domainGeneration.test.ts": "5395a5633ea82c52b198ed21c5b8ee009a31e0ed199245d6dabbc34e3a6854a9"
+  }
+}

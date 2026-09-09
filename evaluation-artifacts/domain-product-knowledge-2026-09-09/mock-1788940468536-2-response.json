@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"topics\":[{\"name\":42,\"description\":\"Bad fixture\",\"category\":\"other\",\"keyTerminology\":\"bad\"}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  },
+  "modelVersion": "mocked-qa-no-provider-call"
+}

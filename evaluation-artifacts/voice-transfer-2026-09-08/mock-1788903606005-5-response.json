@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "SAFETY",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "Subject: Clearer records, better work\n\nPeople across our teams have noticed how awkward it is to pass knowledge between departments. Our documentation could work better.\n\nWe should consider one shared place for it. Scattered notes and work done without coordination can lose the insights other people need. That can leave everyone with poorer results.\n\nTeam members should try to set aside some time each week to update their project trackers. Shared tools may help us work faster. We hope everyone will take part so we can meet our quarterly commitments."
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  },
+  "modelVersion": "mocked-qa-no-provider-call"
+}

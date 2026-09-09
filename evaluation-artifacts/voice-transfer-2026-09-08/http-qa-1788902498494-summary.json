@@ -1,0 +1,116 @@
+[
+  {
+    "name": "rewrite",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902498569-1-request.json",
+      "mock-1788902498574-2-request.json"
+    ]
+  },
+  {
+    "name": "empty-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "disabled-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "oversized-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "empty-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": [
+      "mock-1788902498648-3-request.json"
+    ]
+  },
+  {
+    "name": "truncated-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788902498656-4-request.json"
+    ]
+  },
+  {
+    "name": "blocked-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788902498666-5-request.json"
+    ]
+  },
+  {
+    "name": "generation-error",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788902498675-6-request.json"
+    ]
+  },
+  {
+    "name": "review-error",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902498763-7-request.json",
+      "mock-1788902498765-8-request.json"
+    ]
+  },
+  {
+    "name": "malformed-review",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902498775-10-request.json",
+      "mock-1788902498775-9-request.json"
+    ]
+  },
+  {
+    "name": "quick-refine",
+    "route": "/api/quick-refine",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902498782-11-request.json",
+      "mock-1788902498784-12-request.json"
+    ]
+  },
+  {
+    "name": "selection-edit",
+    "route": "/api/edit-selection",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902498789-13-request.json",
+      "mock-1788902498790-14-request.json"
+    ]
+  },
+  {
+    "name": "invalid-selection",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  }
+]

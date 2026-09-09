@@ -1,0 +1,10 @@
+{
+  "route": "http://localhost:3107/api/rewrite-draft",
+  "method": "POST",
+  "inputFile": "live-input.json",
+  "writingModel": "gemini-3.8-flash",
+  "analysisModel": "gemini-3.1-pro-preview",
+  "reasoning": "auto",
+  "data": "fictional project plus repository demo samples",
+  "startedAt": 1788942212537
+}

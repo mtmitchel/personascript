@@ -1,0 +1,14 @@
+{
+  "input": {
+    "field": "[QA_FALSE_PROVENANCE]"
+  },
+  "response": {
+    "error": "The model labelled concepts without source material. Existing knowledge has not been replaced."
+  },
+  "name": "false-provenance",
+  "status": 500,
+  "passed": true,
+  "providerRequests": [
+    "mock-1788944388340-11-request.json"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "file": "server.ts",
+      "artifact": "knowledge-live-1788939538144-server.ts.source.txt",
+      "sha256": "c472628a9c754451b4a37f0431d6ad7863d6a50a4934a18267cd8d1edbf8e8b9"
+    },
+    {
+      "file": "src/writingPipeline.ts",
+      "artifact": "knowledge-live-1788939538144-src-writingPipeline.ts.source.txt",
+      "sha256": "1f6b4c5f24409e4052fea34c55f80a2f7d4d84497e3b627c9dfcdf6c4c4a4891"
+    }
+  ],
+  "cwd": "/home/mason/Projects/persona script",
+  "command": "DISABLE_HMR=true QA_RUN_LABEL=knowledge-live PORT=3105 ./node_modules/.bin/tsx evaluation-artifacts/domain-product-knowledge-2026-09-09/recorded-server.ts",
+  "provider": "Gemini API through production application handlers",
+  "writingModel": "gemini-3.8-flash",
+  "reviewModel": "gemini-3.1-pro-preview",
+  "reasoning": "auto",
+  "data": "repository demo samples and drafts only",
+  "instrumentation": "Capture SDK generation input, raw response, timing, and errors. Reject unapproved models. No production files modified."
+}

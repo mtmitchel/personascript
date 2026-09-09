@@ -1,0 +1,23 @@
+[
+  {
+    "file": "README.md",
+    "hunk": 0,
+    "count": 0,
+    "old": "- **Concept recognition**: Disciplinary concepts (such as information hierarchy, user comprehension, informed choice, product value, and conversion) help the model recognize and articulate thinking already present in drafts without forcing jargon or fabricating unperformed work.\n- **Product reference knowledge**: Product notes supply factual background for interpreting product names, feature relationships, and historical periods. Product discrepancies are flagged as observations in the advisory review rather than silently altering source facts.\n- **Topic single-ownership**: Topic content has single ownership; disabling or deleting a topic removes its prompt contribution without term leakage. Empty topic lists are preserved.\n- **Scope controls**: The page-level active switch controls all knowledge on the Domain page; individual topic and product toggles choose included entries.\n\nThe original draft starts empty. Use **Load sample** for the example, or **Clear** to empty only the draft input. Existing custom domain settings are retained; loading the UX Portfolio preset applies the broader concept examples and keeps product references.\n\n",
+    "nearest": "- **Concept recognition**: Disciplinary concepts (such as information hierarchy, user comprehension, informed choice, product value, and conversion) help the model recognize and articulate thinking already present in drafts without forcing jargon or fabricating unperformed work.\n- **Product reference knowledge**: Product notes supply factual background for interpreting product names, feature relationships, and historical periods. Product discrepancies are flagged as observations in the advisory review rather than silently altering source facts.\n- **Topic single-ownership**: Topic content has single ownership; disabling or deleting a topic removes its prompt contribution without term leakage. Empty topic lists are preserved.\n- **Scope controls**: The page-level active switch controls all knowledge on the Domain page; individual topic and product toggles choose included entries.\n\nThe original draft starts empty. Use **Load sample** for the example, or **Clear** to empty only the draft input. Existing custom domain settings are retained; loading the UX Portfolio preset applies the broader concept examples and keeps product references.\n"
+  },
+  {
+    "file": "src/components/DomainView.tsx",
+    "hunk": 5,
+    "count": 0,
+    "old": "    });\n  };\n\n  // Load preset\n  const handleApplyPreset = (preset: typeof UX_PORTFOLIO_PRESET) => {\n    const configured = presetToDomainExpertise(preset, localExpertise.productKnowledge);\n    setLocalExpertise(configured);\n    updateDomainExpertise(configured);\n    if (configured.customNotes) {\n      setGuidelinesText(configured.customNotes);\n    }\n    flashSaved();\n  const handleGuidelinesChange = (val: string) => {\n",
+    "nearest": "    });\n  };\n\n  // Load preset\n  const handleApplyPreset = (preset: typeof UX_PORTFOLIO_PRESET) => {\n    const configured = presetToDomainExpertise(preset, localExpertise.productKnowledge);\n    setLocalExpertise(configured);\n    updateDomainExpertise(configured);\n    if (configured.customNotes) {\n      setGuidelinesText(configured.customNotes);\n    }\n    flashSaved();\n  };\n"
+  },
+  {
+    "file": "src/components/DomainView.tsx",
+    "hunk": 9,
+    "count": 0,
+    "old": "        )}\n\n          {/* Topics Grid */}\n          <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\n          {(localExpertise.topics || []).map((topic) => {\n            const isExpanded = expandedTopicIds.has(topic.id);\n            const termInputVal = topicTermInputs[topic.id] || '';\n\n",
+    "nearest": "        )}\n\n        {/* Topics Grid */}\n        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\n          {(localExpertise.topics || []).map((topic) => {\n            const isExpanded = expandedTopicIds.has(topic.id);\n            const termInputVal = topicTermInputs[topic.id] || '';\n\n"
+  }
+]

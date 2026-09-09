@@ -1,0 +1,26 @@
+{
+  "cwd": "/home/mason/Projects/persona script",
+  "argv": [
+    "agy",
+    "--model",
+    "gemini-3.8-flash-medium",
+    "--effort",
+    "medium",
+    "--mode",
+    "plan",
+    "--output-format",
+    "stream-json",
+    "--print-timeout",
+    "30m",
+    "--log-file",
+    "/home/mason/Projects/persona script/evaluation-artifacts/project-brief-2026-09-09/gemini-implementation/provider.log",
+    "--print",
+    "<exact prompt.txt bytes>"
+  ],
+  "provider": "Antigravity CLI",
+  "model": "gemini-3.8-flash-medium",
+  "effort": "medium",
+  "sandbox": "native default; no bypass",
+  "prompt_sha256": "b3f5c0673b9d754e38ac8da975d948508c4299d29ed5699287116218491970f3",
+  "startedAt": 1788941673.9459522
+}

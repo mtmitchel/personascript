@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"summary\":\"Malformed fixture\",\"findings\":[{\"category\":\"voice\",\"severity\":\"warning\",\"detail\":{\"invalid\":true}}],\"voiceObservations\":[{\"invalid\":true}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  },
+  "modelVersion": "mocked-qa-no-provider-call"
+}

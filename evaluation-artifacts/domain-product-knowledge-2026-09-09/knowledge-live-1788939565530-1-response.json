@@ -1,0 +1,48 @@
+{
+  "sdkHttpResponse": {
+    "headers": {
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "content-encoding": "gzip",
+      "content-type": "application/json; charset=UTF-8",
+      "date": "Wed, 09 Sep 2026 07:39:36 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "server-timing": "gfet4t7; dur=10739",
+      "transfer-encoding": "chunked",
+      "vary": "Origin, X-Origin, Referer",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "SAMEORIGIN",
+      "x-gemini-service-tier": "standard",
+      "x-xss-protection": "0"
+    }
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "In 2024, our upload dialog led with pricing and buried the supported file size at the bottom. I changed the hierarchy: I moved the file limit above the price and grouped the next actions beside it, keeping the option to cancel intact.\n\nAt the time, Atlas Translate accepted files up to 12 MB. I kept that limit visible before people had to decide whether to upgrade.\n\nThis was an editorial call. We did not run a usability study, nor did we measure its effect on conversion.",
+            "thoughtSignature": "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"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "modelVersion": "gemini-3.8-flash",
+  "responseId": "LQ2hasLCLdaIxN8P0L2WmAU",
+  "usageMetadata": {
+    "promptTokenCount": 2154,
+    "candidatesTokenCount": 105,
+    "totalTokenCount": 3078,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 2154
+      }
+    ],
+    "thoughtsTokenCount": 819,
+    "serviceTier": "standard"
+  }
+}

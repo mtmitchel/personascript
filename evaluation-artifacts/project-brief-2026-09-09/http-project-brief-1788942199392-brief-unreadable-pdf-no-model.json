@@ -1,0 +1,15 @@
+{
+  "input": {
+    "fileData": "JVBERi0xLjQKJSVFT0Y=",
+    "fileType": "pdf",
+    "fileName": "qa-empty.pdf",
+    "localOnly": true
+  },
+  "response": {
+    "error": "Could not extract usable text from this PDF locally. Please paste the text instead."
+  },
+  "name": "brief-unreadable-pdf-no-model",
+  "status": 400,
+  "passed": true,
+  "providerRequests": []
+}

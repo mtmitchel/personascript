@@ -1,0 +1,6 @@
+{
+  "cwd": "/home/mason/Projects/persona script",
+  "command": "DISABLE_HMR=true PORT=3104 ./node_modules/.bin/tsx evaluation-artifacts/domain-product-knowledge-2026-09-09/mocked-server.ts",
+  "provider": "none; generation SDK replaced by deterministic fixture in this process only",
+  "data": "repository demo data"
+}

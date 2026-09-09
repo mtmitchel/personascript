@@ -1,0 +1,22 @@
+{
+  "cwd": "/home/mason/Projects/persona script",
+  "argv": [
+    "agy",
+    "--model",
+    "gemini-3.8-flash-medium",
+    "--effort",
+    "medium",
+    "--mode",
+    "plan",
+    "--output-format",
+    "stream-json",
+    "--print-timeout",
+    "15m",
+    "--log-file",
+    "/home/mason/Projects/persona script/evaluation-artifacts/domain-product-knowledge-2026-09-09/clear-draft-delegate/provider.log",
+    "--print",
+    "<exact prompt.txt bytes>"
+  ],
+  "prompt_sha256": "f5cf91323a98fc76bb4a7bde9acd67c2e6d2d8ae5e7006f70d2162ebfc300ff4",
+  "sandbox": "native default; no bypass"
+}

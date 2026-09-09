@@ -1,0 +1,158 @@
+[
+  {
+    "name": "rewrite-with-brief",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199465-1-request.json",
+      "mock-1788942199468-2-request.json"
+    ]
+  },
+  {
+    "name": "refine-with-brief",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199489-3-request.json",
+      "mock-1788942199490-4-request.json"
+    ]
+  },
+  {
+    "name": "selection-with-brief",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199498-5-request.json",
+      "mock-1788942199499-6-request.json"
+    ]
+  },
+  {
+    "name": "rewrite-draft-object",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "rewrite-draft-array",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "rewrite-draft-number",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "rewrite-draft-too-long",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "quick-refine-object",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "quick-refine-array",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "quick-refine-number",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "quick-refine-too-long",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "edit-selection-object",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "edit-selection-array",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "edit-selection-number",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "edit-selection-too-long",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "optional-absent",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199609-7-request.json",
+      "mock-1788942199610-8-request.json"
+    ]
+  },
+  {
+    "name": "optional-empty",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199622-9-request.json",
+      "mock-1788942199624-10-request.json"
+    ]
+  },
+  {
+    "name": "optional-null",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199633-11-request.json",
+      "mock-1788942199635-12-request.json"
+    ]
+  },
+  {
+    "name": "brief-at-limit",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199645-13-request.json",
+      "mock-1788942199648-14-request.json"
+    ]
+  },
+  {
+    "name": "review-failure-keeps-draft",
+    "status": 200,
+    "passed": true,
+    "providerRequests": [
+      "mock-1788942199660-15-request.json",
+      "mock-1788942199660-16-request.json"
+    ]
+  },
+  {
+    "name": "brief-local-text-extraction",
+    "status": 200,
+    "passed": true,
+    "providerRequests": []
+  },
+  {
+    "name": "brief-unreadable-pdf-no-model",
+    "status": 400,
+    "passed": true,
+    "providerRequests": []
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "MAX_TOKENS",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"summary\":\"Mocked QA review: check the findings and the draft before use.\",\"findings\":[{\"category\":\"voice\",\"severity\":\"info\",\"detail\":\"This is a deterministic UI fixture, not a real voice-quality assessment.\",\"evidence\":\"Our documentation could work better.\"}],\"voiceObservations\":[\"Mocked observation: shorter paragraphs and restrained phrasing.\"]}"
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  },
+  "modelVersion": "mocked-qa-no-provider-call"
+}

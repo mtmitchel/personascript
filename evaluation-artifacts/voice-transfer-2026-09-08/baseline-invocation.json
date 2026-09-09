@@ -1,0 +1,10 @@
+{
+  "cwd": "/home/mason/Projects/persona script",
+  "command": "PORT=3101 ./node_modules/.bin/tsx evaluation-artifacts/voice-transfer-2026-09-08/baseline-server.ts",
+  "baselineCommit": "03718834781c6281d7722201cf71a8b2436dd449",
+  "provider": "Gemini API through original app handler",
+  "writingModel": "gemini-3.8-flash",
+  "reasoning": "auto",
+  "data": "repository demo samples and draft only",
+  "instrumentation": "Persist outbound SDK request and response. Pin requested model; disable fallback for evaluation. Production source is not edited."
+}

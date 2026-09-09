@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "result": {
+    "topics": [
+      {
+        "id": "topic-1788942840769-1-vg65s",
+        "name": "Content Design",
+        "category": "discipline",
+        "description": "Content design involves strategically planning, writing, and structuring text and narrative to guide users through digital experiences. It focuses on delivering the right information at the right time in a clear, concise, and accessible manner.",
+        "keyTerminology": [
+          "Information architecture",
+          "Microcopy",
+          "Voice and tone",
+          "User journey mapping",
+          "Readability",
+          "Plain language",
+          "Content strategy",
+          "Progressive disclosure",
+          "Accessibility guidelines",
+          "Cognitive load"
+        ],
+        "conventions": [
+          "Prioritize user needs over organizational jargon.",
+          "Ensure consistency in voice and tone across all touchpoints.",
+          "Use progressive disclosure to prevent overwhelming the user with information.",
+          "Test content with real users to ensure comprehension and clarity."
+        ],
+        "enabled": true
+      }
+    ]
+  }
+}

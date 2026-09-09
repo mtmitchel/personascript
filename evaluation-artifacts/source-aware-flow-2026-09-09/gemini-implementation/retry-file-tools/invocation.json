@@ -1,0 +1,27 @@
+{
+  "cwd": "/home/mason/Projects/persona script",
+  "argv": [
+    "agy",
+    "--model",
+    "gemini-3.8-flash-medium",
+    "--effort",
+    "medium",
+    "--mode",
+    "plan",
+    "--output-format",
+    "stream-json",
+    "--print-timeout",
+    "30m",
+    "--log-file",
+    "/home/mason/Projects/persona script/evaluation-artifacts/source-aware-flow-2026-09-09/gemini-implementation/retry-file-tools/provider.log",
+    "--print",
+    "<exact prompt.txt bytes>"
+  ],
+  "provider": "Antigravity CLI",
+  "model": "gemini-3.8-flash-medium",
+  "effort": "medium",
+  "sandbox": "native default; no bypass",
+  "prompt_sha256": "01da4ab7b6e5c1979f875f104f65e90bc8128f280dd976fb5b7be2aab7340385",
+  "startedAt": 1788943559.8822722,
+  "reason": "Initial provider run returned no patch after its shell file-read command was denied. This run uses dedicated file-reading tools only."
+}

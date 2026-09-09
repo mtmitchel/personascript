@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "In 2024, I rewrote the Northstar upgrade prompts with a product manager and designer. I put the usage-limit explanation before the plan comparison and gave each button a specific next step."
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-source-aware-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

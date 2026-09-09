@@ -1,0 +1,87 @@
+[
+  {
+    "name": "valid",
+    "status": 200,
+    "data": {
+      "topics": [
+        {
+          "id": "topic-1788940468504-1-t7jrb",
+          "name": "QA broad content design",
+          "category": "discipline",
+          "description": "General principles for clear information and useful decisions.",
+          "keyTerminology": [
+            "information hierarchy",
+            "user comprehension",
+            "informed choice"
+          ],
+          "conventions": [
+            "Explain a concept when the draft demonstrates it."
+          ],
+          "enabled": true
+        },
+        {
+          "id": "topic-1788940468504-2-8zznz",
+          "name": "QA product value",
+          "category": "intersecting",
+          "description": "How people understand the value and cost of a product.",
+          "keyTerminology": [
+            "product value",
+            "pricing clarity",
+            "conversion"
+          ],
+          "conventions": [],
+          "enabled": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty",
+    "status": 400,
+    "data": {
+      "error": "Please provide at least one field or discipline to generate domain knowledge."
+    }
+  },
+  {
+    "name": "private",
+    "status": 400,
+    "data": {
+      "error": "Private user content and unsupported fields must not be included in domain knowledge generation."
+    }
+  },
+  {
+    "name": "MALFORMED",
+    "status": 500,
+    "data": {
+      "error": "The model returned malformed domain topic 1. Existing knowledge has not been replaced."
+    }
+  },
+  {
+    "name": "EMPTY",
+    "status": 500,
+    "data": {
+      "error": "The model generated no domain topics. Please try again with different fields."
+    }
+  },
+  {
+    "name": "TRUNCATED",
+    "status": 500,
+    "data": {
+      "error": "The model stopped before returning complete domain knowledge. Please try again."
+    }
+  },
+  {
+    "name": "ERROR",
+    "status": 500,
+    "data": {
+      "error": "Mock domain generation failure."
+    }
+  },
+  {
+    "name": "blocked",
+    "status": 500,
+    "data": {
+      "error": "The model stopped before returning complete domain knowledge. Please try again."
+    }
+  }
+]

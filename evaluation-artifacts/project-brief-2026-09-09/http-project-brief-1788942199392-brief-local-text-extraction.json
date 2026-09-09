@@ -1,0 +1,18 @@
+{
+  "input": {
+    "fileData": "UFJPSkVDVF9CUklFRl9CRUdJTi4gRmljdGlvbmFsIFFBIGZhY3RzOiB0aGUgTm9ydGhzdGFyIHByb2dyYW0gaW5jcmVhc2VkIHBhaWQgY29udmVyc2lvbiBieSA5JS4gVGVhbSByZXN1bHQsIG5vdCBhbiBpc29sYXRlZCBjb3B5IGVmZmVjdC4gUFJPSkVDVF9CUklFRl9FTkQu",
+    "fileType": "txt",
+    "fileName": "qa.txt",
+    "localOnly": true
+  },
+  "response": {
+    "text": "PROJECT_BRIEF_BEGIN. Fictional QA facts: the Northstar program increased paid conversion by 9%. Team result, not an isolated copy effect. PROJECT_BRIEF_END.",
+    "wordCount": 20,
+    "charCount": 156,
+    "fileName": "qa.txt"
+  },
+  "name": "brief-local-text-extraction",
+  "status": 200,
+  "passed": true,
+  "providerRequests": []
+}

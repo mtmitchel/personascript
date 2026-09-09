@@ -1,0 +1,144 @@
+[
+  {
+    "name": "enabled-rewrite",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180814-1-request.json",
+      "mock-1788939180818-2-request.json"
+    ]
+  },
+  {
+    "name": "enabled-refine",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180845-3-request.json",
+      "mock-1788939180847-4-request.json"
+    ]
+  },
+  {
+    "name": "enabled-selection",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180855-5-request.json",
+      "mock-1788939180857-6-request.json"
+    ]
+  },
+  {
+    "name": "master-off",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180865-7-request.json",
+      "mock-1788939180867-8-request.json"
+    ]
+  },
+  {
+    "name": "profile-fallback",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180876-9-request.json",
+      "mock-1788939180878-10-request.json"
+    ]
+  },
+  {
+    "name": "invalid-products-not-array",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-not-array-profile",
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n200 !== 400\n",
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180899-11-request.json",
+      "mock-1788939180901-12-request.json"
+    ]
+  },
+  {
+    "name": "invalid-products-null-entry",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-null-entry-profile",
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n500 !== 400\n",
+    "status": 500,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-name",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-name-profile",
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n200 !== 400\n",
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180939-13-request.json",
+      "mock-1788939180941-14-request.json"
+    ]
+  },
+  {
+    "name": "invalid-products-bad-notes",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-notes-profile",
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n200 !== 400\n",
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180954-15-request.json",
+      "mock-1788939180955-16-request.json"
+    ]
+  },
+  {
+    "name": "invalid-products-bad-enabled",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-enabled-profile",
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n200 !== 400\n",
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180967-17-request.json",
+      "mock-1788939180968-18-request.json"
+    ]
+  },
+  {
+    "name": "invalid-products-quick-refine",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-edit-selection",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "synthesis-preserves-products",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939180983-19-request.json"
+    ]
+  }
+]

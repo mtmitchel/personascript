@@ -1,0 +1,48 @@
+{
+  "sdkHttpResponse": {
+    "headers": {
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "content-encoding": "gzip",
+      "content-type": "application/json; charset=UTF-8",
+      "date": "Tue, 08 Sep 2026 21:00:39 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "server-timing": "gfet4t7; dur=5248",
+      "transfer-encoding": "chunked",
+      "vary": "Origin, X-Origin, Referer",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "SAMEORIGIN",
+      "x-gemini-service-tier": "standard",
+      "x-xss-protection": "0"
+    }
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\n  \"rewrittenText\": \"Subject: Clear Notes, Better Work\\n\\nMost teams treat documentation like an administrative chore—a dry obligation shoved into the margins of an afternoon. It shows. When knowledge stays locked behind private conversations and scattered notes, people spend half their working day guessing. We mistake frantic searching for momentum.\\n\\nIt isn't.\\n\\nWe need a single workshop for our records, not half a dozen forgotten drawers. When notes are scribbled in haste and left unanchored, critical insights dissolve into thin air. Work should not depend on tribal memory or lucky guesses. A clear, shared record spares everyone the friction of reinventing what has already been solved.\\n\\nSet aside thirty minutes every Friday to clear the bench and update your project logs. Don't look at modern writing tools as magic engines of speed; look at them as chisels. Sharpen the record so the next person can build without stumbling.\",\n  \"changesExplanation\": \"The draft was completely stripped of passive corporate throat-clearing ('In today's fast-paced corporate environment', 'it has been observed by several stakeholders') and reconstituted into direct, tactile language. Hollow terms like 'strategic optimization', 'synergistic alignment', and 'collaborative bandwidth' were demolished and replaced with metaphors rooted in manual craftsmanship, carpentry, and physical labor.\\n\\nThe syntactic cadence was re-engineered to reflect the author's signature burstiness. Expansive observations exploring the frustration of scattered knowledge are paired directly with isolated declarative tripwires ('It isn't.') to halt momentum and command attention. The final paragraph transforms vague administrative requests into an explicit, rhythmic imperative.\",\n  \"stylisticAudit\": {\n    \"cadenceChanges\": \"Shattered the uniform 25-word bureaucratic sentence structure. Introduced varied rhythmic pacing, alternating between layered 20-word clauses and deliberate three-to-six word punches.\",\n    \"structuralTweaks\": \"Extracted the author's signature single-line rhetorical punch ('It isn't.') as an independent structural anchor between diagnosis and resolution, and transformed the passive concluding plea into an imperative call to craft.\",\n    \"vocabularySubstitutions\": [\n      {\n        \"from\": \"strategic optimization of our internal documentation workflows\",\n        \"to\": \"clear notes, better work / single workshop for our records\",\n        \"reason\": \"Replaces abstract consulting jargon with concrete, physical terminology.\"\n      },\n      {\n        \"from\": \"departmental silos and collaborative bandwidth\",\n        \"to\": \"forgotten drawers and private conversations\",\n        \"reason\": \"Anchors abstract organizational boundaries in tangible material spaces.\"\n      },\n      {\n        \"from\": \"leveraging modern collaborative tools to increase velocity\",\n        \"to\": \"chisels to sharpen the record\",\n        \"reason\": \"Substitutes corporate tech-speak with tactile craft metaphors.\"\n      }\n    ],\n    \"voiceAlignmentScore\": 96\n  },\n  \"styleSimilarity\": {\n    \"overallPercentage\": 95,\n    \"explanation\": \"The rewrite fully matches the profile's craftsman ethos, replacing MBA buzzwords with physical, grounded analogies and high-variance sentence rhythms. Tone settings remain grounded (65) and direct (91) with balanced conviction.\",\n    \"breakdown\": {\n      \"cadenceMatch\": 96,\n      \"vocabularyFidelity\": 97,\n      \"toneConsistency\": 94,\n      \"domainConformance\": 93\n    },\n    \"strengths\": [\n      \"Ruthless elimination of corporate throat-clearing and bureaucratic hedging.\",\n      \"Effective deployment of the author's signature staccato punch paragraph ('It isn't.').\",\n      \"Seamless integration of tactile, material metaphors (workshop, drawers, chisels).\"\n    ],\n    \"deviationsNote\": \"Maintained brief paragraphing and practical subject framing to honor the workplace communication context without slipping into corporate jargon.\"\n  }\n}",
+            "thoughtSignature": "EsEKCr4KARFNMg9BmwWZImEYADBsJk8FRYUFoBfUiKT7gxfIwPqpaFlHx9tPiLCb/cO7QNzexQqmJSCYfUWfE4BIp0dXVORIVt0IgYveGb++D1ZmfR1I3vv6ZjEwCsF3+s7KcirVKGEQOrZOsnUZu2AlM33dncShNda01pjoAV17MGgQpBuFAjjawrmLUekj/2mcmpcjUxqqD5NXmYIdoSlba88lMYmIj7CaR3y708zbckdKewSg32KKoTiF902hwwNAqNULUqiKq4VjhQu5LJtyAARaGXOQQwIyZCFpNW0gdVIdFEuHyp7qbmp19tzY/ygvADlSwn6eI6h6JD9WYa4wqDwC72OxiT969nlD95Y+sTPenI+idEZWomZebW93oJ4+P2c2AlHypcWaJ5tp2bSXyaBl1BOZmY110kS+shfUlA+s4hLBiM9wlk0VoTtswxXMMBgNLvSBsYl+f2CX/h9Kf97nK+ulWhdRN4U+FK3ZoChWFqZLk1cbSWiNP3c/wlZJH05IGnu7tV1vAMPdQ2I4e4TKw5iY+tWUytgr6SP+d9BP/5nXDQslJHmkd7b5Dt+OqdmHbfdmka4he5naqaWKrlhN6IyFfSsvA7h75G3KWXaJbYZcotPomkuGOQB1oLwPg/Y4oy0Fllld2MUQcSVIlAdHRKWGSJWg+1QENCCXCME1XGPtnHX3V6P2WAKk9mT+5olrGOSSZAiRTqBD5cTMwZVr6E2qpDNTTzfO76MTg55aJD/sZTkNixgUHT5/8gWwCx42FLSuyXxmEOvwKZu+VPaL0bj725Q8tHkI4Vc3Tub1rGlM2vCyWS/R+5WxTBVtN8dBfXBLGRbKJKC4PVAxcHCE5SYEft2Dj03HBcXdqKrx7lGqO6o2RMApxQQFY+oMvIcsn2KvHPavV1I2kuSbb2z+GjVVfZ4M2LoTYVhXOzn9aKiYYFA0ZUaxPYE2qXiFoq3h5tCqdAgVE3994TLWJPfbOGDf2Rb5yd0Ug0LRkw2zKZIiVRZwdEOt/PKbk9s252vMIXwjkPnX75W+Ycx5cbdX3pPZ9Li4arGK34ZOOxnXK8MYzvlnFGte04M9ikcnfF+2BG0e38J8fztYfhOgAxSlWiWbbWu+IW41h/BtbHzIZwRd9XyN7QdJRNooijl2rY5r+t65+QORi8nJQXzJ0dl3utmceJB9qFupaKMPsT2xW4YmvGa8jLxrvy0WUoSCVUzQemXA/Ph2ymRozMLJ+PFHrixFSRl9HGRj5Y+j0y11S6Sb4iMHbAUsUf1DjmV4QTZMV1AliPlHyIjo7s7ilSTlev8l9tXHbYgdIlUoR8LYvAJVZKaw0bvBIyKlLmlKFoJLA+/gOOZeLhii7nunrNKDKCJHC+3pnbBwXCwrew+l6gPczfXntLoEVjj7alHp6+eu8stnyryu7mj31tiuAFbpy4fUlVHzyeQgocA/mR65kv6hGC+O1jtvg2I+RVfQjk1r0bnX0rNRU0OrI4rur6PFoEiAPDYUesIKYSJkZbTrX6LvLmY1iPD5ssnsCjYzvo8kVJUZYRhIlojXzfe0lD6AU3uxcxBC+XpddijQlSutLmRvjkH8K75pOcKIQlt1eSV95v9AxHnH9EuIVFihL8DqP0WsrDU7Jvsw1Or+MNWntCV1MaWn4nquEHZu8B7QyH/nrzAWXJMDqGx9GRpNLbF7CuhwGLWdRotOd1LkBBZXfiVDYBK0u30uEo2ToliDkpGNnNHTxg7cRYOqE76BVJzJeyfBtcqxVYmmEHflvv+V1vhkebRXBW6BzvwzeNOHPA=="
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "modelVersion": "gemini-3.8-flash",
+  "responseId": "cXegap3XNMjskdUPlev16QM",
+  "usageMetadata": {
+    "promptTokenCount": 2312,
+    "candidatesTokenCount": 849,
+    "totalTokenCount": 3429,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 2312
+      }
+    ],
+    "thoughtsTokenCount": 268,
+    "serviceTier": "standard"
+  }
+}

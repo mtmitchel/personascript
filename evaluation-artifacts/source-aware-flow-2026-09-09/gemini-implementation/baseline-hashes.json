@@ -1,0 +1,16 @@
+{
+  "src/App.tsx": "3f8fd73617d51444360fbf857a2c632feb882cd0957b59a05914c4878d216088",
+  "src/components/Header.tsx": "d6af6a65bf99629cbbb660eab2a89d84cf1bca4113931897502e7b5a47642247",
+  "src/components/ProfileView.tsx": "f4655795589738a204b33152579dd62e2d1958618c040a34bd1203128a7117c4",
+  "src/components/StudioView.tsx": "b71d59cedf487cf981b47afc52387a5655c57094f978c51ab721ec862a8834c5",
+  "src/components/DomainView.tsx": "6c653cd2f858b13bcc04ed06beaef7f74bcaca3da06543f5d41ed694b2e954f9",
+  "src/context/WritingAssistantContext.tsx": "1b3440f652c11819d5c1971b6089c4f4cc183cb42bb7f65db2e1650b946363c6",
+  "src/types.ts": "c826dede24f94395ec66622a547c0f56f64ac81ae71b1ddb6d29fe74d437e2c1",
+  "src/domainGeneration.ts": "58c6c98f9eb6498674a08a0d00514aaf2f61260fb6b696202646798fb416e277",
+  "src/writingPipeline.ts": "6c742b96896980c6b1493eacea3467da5006ac95ae13a34b6fb2d5580b925397",
+  "server.ts": "0222f51b5da9062336452d33e304ede1cc8304b765f4a849c259927097042ec4",
+  "README.md": "5c9ed0fbdbb05f482647a075770671a540640b403d134f4996bb2611d89190cc",
+  "tests/domainGeneration.test.ts": "c8e5a0497ac6f480ca65c4ae8728b10058d239c8427ac70f25f27b2897b6f204",
+  "tests/writingPipeline.test.ts": "8bf6f0ac816327e05bf6febcc92bc20560c3a05aad4771b179c13e3777476c3d",
+  "tests/projectBrief.test.ts": "db27f16e779652cd353494d111ac911d8985734679b81b859bf57b391e5efeea"
+}

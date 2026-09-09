@@ -1,0 +1,12 @@
+ M README.md
+ M package.json
+ M server.ts
+ M src/components/RewriteFeedbackManager.tsx
+ M src/components/StudioView.tsx
+ M src/components/ToneSlidersControl.tsx
+ M src/context/WritingAssistantContext.tsx
+ M src/types.ts
+ M tsconfig.json
+?? evaluation-artifacts/
+?? src/writingPipeline.ts
+?? tests/

@@ -1,0 +1,290 @@
+
+> react-example@0.0.0 test
+> node --import tsx --test tests/*.test.ts
+
+TAP version 13
+# Subtest: validateDomainGenerationRequest accepts valid field and disciplines
+ok 1 - validateDomainGenerationRequest accepts valid field and disciplines
+  ---
+  duration_ms: 2.354647
+  type: 'test'
+  ...
+# Subtest: validateDomainGenerationRequest rejects empty field and disciplines
+ok 2 - validateDomainGenerationRequest rejects empty field and disciplines
+  ---
+  duration_ms: 0.766432
+  type: 'test'
+  ...
+# Subtest: validateDomainGenerationRequest rejects unrelated private inputs
+ok 3 - validateDomainGenerationRequest rejects unrelated private inputs
+  ---
+  duration_ms: 0.457502
+  type: 'test'
+  ...
+# Subtest: validateDomainGenerationRequest rejects invalid model choices
+ok 4 - validateDomainGenerationRequest rejects invalid model choices
+  ---
+  duration_ms: 0.234511
+  type: 'test'
+  ...
+# Subtest: buildDomainGenerationPrompt delimits context with boundaries and excludes private data
+ok 5 - buildDomainGenerationPrompt delimits context with boundaries and excludes private data
+  ---
+  duration_ms: 0.760192
+  type: 'test'
+  ...
+# Subtest: validateGeneratedDomainKnowledge parses valid output and generates local stable IDs
+ok 6 - validateGeneratedDomainKnowledge parses valid output and generates local stable IDs
+  ---
+  duration_ms: 0.947159
+  type: 'test'
+  ...
+# Subtest: validateGeneratedDomainKnowledge rejects blocked or truncated responses
+ok 7 - validateGeneratedDomainKnowledge rejects blocked or truncated responses
+  ---
+  duration_ms: 0.757526
+  type: 'test'
+  ...
+# Subtest: merging generated topics preserves existing product knowledge and audience context
+ok 8 - merging generated topics preserves existing product knowledge and audience context
+  ---
+  duration_ms: 0.77083
+  type: 'test'
+  ...
+# Subtest: malformed topic anywhere rejects the whole result instead of partially replacing saved topics
+ok 9 - malformed topic anywhere rejects the whole result instead of partially replacing saved topics
+  ---
+  duration_ms: 0.967476
+  type: 'test'
+  ...
+# Subtest: request rejects oversized context and unsupported properties without silently truncating
+ok 10 - request rejects oversized context and unsupported properties without silently truncating
+  ---
+  duration_ms: 0.724962
+  type: 'test'
+  ...
+# Subtest: single-card generation validates its target independently of broader field settings
+ok 11 - single-card generation validates its target independently of broader field settings
+  ---
+  duration_ms: 0.635245
+  type: 'test'
+  ...
+# Subtest: single-card prompt requests only the named card and escapes its data boundary
+ok 12 - single-card prompt requests only the named card and escapes its data boundary
+  ---
+  duration_ms: 0.221515
+  type: 'test'
+  ...
+# Subtest: validates source-aware generation inputs and limits without silent truncation
+ok 13 - validates source-aware generation inputs and limits without silent truncation
+  ---
+  duration_ms: 18.749146
+  type: 'test'
+  ...
+# Subtest: buildDomainGenerationPrompt respects source on/off boundary
+ok 14 - buildDomainGenerationPrompt respects source on/off boundary
+  ---
+  duration_ms: 0.298416
+  type: 'test'
+  ...
+# Subtest: validateGeneratedDomainKnowledge parses conceptAnnotations and rejects malformed statuses
+ok 15 - validateGeneratedDomainKnowledge parses conceptAnnotations and rejects malformed statuses
+  ---
+  duration_ms: 0.662905
+  type: 'test'
+  ...
+# Subtest: source-only brief generation preserves full permitted source text
+ok 16 - source-only brief generation preserves full permitted source text
+  ---
+  duration_ms: 1.551083
+  type: 'test'
+  ...
+# Subtest: source-aware output requires one explained annotation per concept and rejects false provenance
+ok 17 - source-aware output requires one explained annotation per concept and rejects false provenance
+  ---
+  duration_ms: 0.743404
+  type: 'test'
+  ...
+# Subtest: annotation maps safely retain a concept named __proto__
+ok 18 - annotation maps safely retain a concept named __proto__
+  ---
+  duration_ms: 0.165294
+  type: 'test'
+  ...
+# Subtest: optional and empty brief backwards compatibility
+ok 19 - optional and empty brief backwards compatibility
+  ---
+  duration_ms: 4.495998
+  type: 'test'
+  ...
+# Subtest: validates project brief type and rejects oversized inputs
+ok 20 - validates project brief type and rejects oversized inputs
+  ---
+  duration_ms: 23.969642
+  type: 'test'
+  ...
+# Subtest: complete context is present in every prompt path and review
+ok 21 - complete context is present in every prompt path and review
+  ---
+  duration_ms: 0.850789
+  type: 'test'
+  ...
+# Subtest: brief is delimited as reference data with explicit instruction boundaries
+ok 22 - brief is delimited as reference data with explicit instruction boundaries
+  ---
+  duration_ms: 0.402419
+  type: 'test'
+  ...
+# Subtest: brief-supported additions pass local checks while explicit preservation remains intact
+ok 23 - brief-supported additions pass local checks while explicit preservation remains intact
+  ---
+  duration_ms: 1.156722
+  type: 'test'
+  ...
+# Subtest: forwards every enabled raw sample without excerpts or truncation
+ok 24 - forwards every enabled raw sample without excerpts or truncation
+  ---
+  duration_ms: 2.894831
+  type: 'test'
+  ...
+# Subtest: migrates canned preservation labels into flags and retains arbitrary locks
+ok 25 - migrates canned preservation labels into flags and retains arbitrary locks
+  ---
+  duration_ms: 1.143411
+  type: 'test'
+  ...
+# Subtest: rejects empty and oversized corpora without silently truncating
+ok 26 - rejects empty and oversized corpora without silently truncating
+  ---
+  duration_ms: 25.663094
+  type: 'test'
+  ...
+# Subtest: normalizes legacy domain aggregates: removes topic mirrors, preserves genuine global entries and is idempotent
+ok 27 - normalizes legacy domain aggregates: removes topic mirrors, preserves genuine global entries and is idempotent
+  ---
+  duration_ms: 2.442954
+  type: 'test'
+  ...
+# Subtest: preserves intentionally empty topics list and does not repopulate
+ok 28 - preserves intentionally empty topics list and does not repopulate
+  ---
+  duration_ms: 0.580601
+  type: 'test'
+  ...
+# Subtest: formats active products and excludes inactive or empty products
+ok 29 - formats active products and excludes inactive or empty products
+  ---
+  duration_ms: 0.573331
+  type: 'test'
+  ...
+# Subtest: toggling or removing a topic removes its prompt contribution without term leakage
+ok 30 - toggling or removing a topic removes its prompt contribution without term leakage
+  ---
+  duration_ms: 0.819741
+  type: 'test'
+  ...
+# Subtest: normalizeDomainExpertise preserves existing product entries
+ok 31 - normalizeDomainExpertise preserves existing product entries
+  ---
+  duration_ms: 0.189155
+  type: 'test'
+  ...
+# Subtest: all writing and review prompt builders consistently receive domain topics and product references
+ok 32 - all writing and review prompt builders consistently receive domain topics and product references
+  ---
+  duration_ms: 1.449407
+  type: 'test'
+  ...
+# Subtest: rejects malformed productKnowledge in domainExpertise input with validation error
+ok 33 - rejects malformed productKnowledge in domainExpertise input with validation error
+  ---
+  duration_ms: 2.744116
+  type: 'test'
+  ...
+# Subtest: excludes stale generated guidance while retaining explicit directives
+ok 34 - excludes stale generated guidance while retaining explicit directives
+  ---
+  duration_ms: 0.345069
+  type: 'test'
+  ...
+# Subtest: applies tone sliders only when explicitly enabled
+ok 35 - applies tone sliders only when explicitly enabled
+  ---
+  duration_ms: 0.332758
+  type: 'test'
+  ...
+# Subtest: local exact checks flag missing and unexpected protected tokens
+ok 36 - local exact checks flag missing and unexpected protected tokens
+  ---
+  duration_ms: 1.571133
+  type: 'test'
+  ...
+# Subtest: refinement and selection prompts compare complete text and preserve exact range
+ok 37 - refinement and selection prompts compare complete text and preserve exact range
+  ---
+  duration_ms: 0.499825
+  type: 'test'
+  ...
+# Subtest: structure-off prompts do not restore section-order preservation through intensity
+ok 38 - structure-off prompts do not restore section-order preservation through intensity
+  ---
+  duration_ms: 0.323609
+  type: 'test'
+  ...
+# Subtest: review prompt requests structured observations without a self-score
+ok 39 - review prompt requests structured observations without a self-score
+  ---
+  duration_ms: 0.397904
+  type: 'test'
+  ...
+# Subtest: rejects blocked or truncated writing responses
+ok 40 - rejects blocked or truncated writing responses
+  ---
+  duration_ms: 0.59891
+  type: 'test'
+  ...
+# Subtest: rejects malformed or truncated review responses
+ok 41 - rejects malformed or truncated review responses
+  ---
+  duration_ms: 0.659247
+  type: 'test'
+  ...
+# Subtest: removing a legacy topic after normalization cannot leave mirrored terms behind
+ok 42 - removing a legacy topic after normalization cannot leave mirrored terms behind
+  ---
+  duration_ms: 0.329703
+  type: 'test'
+  ...
+# Subtest: product notes remain separately delimited reference data and preserve dates
+ok 43 - product notes remain separately delimited reference data and preserve dates
+  ---
+  duration_ms: 0.557305
+  type: 'test'
+  ...
+# Subtest: domainBlock distinguishes supported from adjacent concepts with advisory boundary
+ok 44 - domainBlock distinguishes supported from adjacent concepts with advisory boundary
+  ---
+  duration_ms: 0.664979
+  type: 'test'
+  ...
+# Subtest: normalizeDomainExpertise prunes orphaned concept annotations when terms are removed
+ok 45 - normalizeDomainExpertise prunes orphaned concept annotations when terms are removed
+  ---
+  duration_ms: 0.310676
+  type: 'test'
+  ...
+# Subtest: normalization aligns case-varied annotation keys to canonical concepts without restoring removed terms
+ok 46 - normalization aligns case-varied annotation keys to canonical concepts without restoring removed terms
+  ---
+  duration_ms: 0.266022
+  type: 'test'
+  ...
+1..46
+# tests 46
+# suites 0
+# pass 46
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 573.119694

@@ -1,0 +1,20 @@
+{
+  "input": {
+    "field": "Content Design",
+    "disciplines": [
+      "UX Copywriting"
+    ],
+    "draft": "  In 2024, I rewrote the Northstar upgrade prompts with a product manager and designer. I moved the usage-limit explanation before the plan comparison. SOURCE_DRAFT_SENTINEL\n",
+    "projectBrief": "  The source documents information ordering and clearer actions. The team did not conduct usability testing or controlled experiments. SOURCE_BRIEF_SENTINEL\n",
+    "model": "gemini-3.1-pro-preview",
+    "reasoningLevel": "auto",
+    "productKnowledge": "private fixture"
+  },
+  "response": {
+    "error": "Private user content and unsupported fields must not be included in domain knowledge generation."
+  },
+  "name": "reject-productKnowledge",
+  "status": 400,
+  "passed": true,
+  "providerRequests": []
+}

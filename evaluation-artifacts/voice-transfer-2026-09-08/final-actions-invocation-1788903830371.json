@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "file": "server.ts",
+      "artifact": "final-actions-1788903830371-server.ts.source.txt",
+      "sha256": "1941880470af75b7e8e0163bdba406b61e08cf4f3947867c1dc4e9b92e27a41d"
+    },
+    {
+      "file": "src/writingPipeline.ts",
+      "artifact": "final-actions-1788903830371-src-writingPipeline.ts.source.txt",
+      "sha256": "0d6b1168b9498ab7df6104a7562ea10b6df1d4707b0d38feaefe34c22fbd4484"
+    }
+  ],
+  "cwd": "/home/mason/Projects/persona script",
+  "command": "DISABLE_HMR=true QA_RUN_LABEL=final-actions PORT=3102 ./node_modules/.bin/tsx evaluation-artifacts/voice-transfer-2026-09-08/recorded-server.ts",
+  "provider": "Gemini API through production application handlers",
+  "writingModel": "gemini-3.8-flash",
+  "reviewModel": "gemini-3.1-pro-preview",
+  "reasoning": "auto",
+  "data": "repository demo samples and drafts only",
+  "instrumentation": "Capture SDK generation input, raw response, timing, and errors. Reject unapproved models. No production files modified."
+}

@@ -1,0 +1,48 @@
+An implementation plan and the exact unified diff for this change are detailed below.
+
+### Summary of Changes
+1. **[WritingAssistantContext.tsx](file:///home/mason/Projects/persona%20script/src/context/WritingAssistantContext.tsx)**:
+   - Initialized `draftText` to `''` instead of `SAMPLE_DRAFT_TO_REWRITE`.
+   - Updated `resetAllData` to reset `draftText` to `''`.
+   - Preserved `loadSampleDraft` explicit functionality setting `SAMPLE_DRAFT_TO_REWRITE`.
+2. **[StudioView.tsx](file:///home/mason/Projects/persona%20script/src/components/StudioView.tsx)**:
+   - Added an accessible `Clear` button (`id="btn-clear-draft"`) alongside `Load sample` and `Upload` separated by a bullet.
+   - Clears only `draftText` via `setDraftText('')`, leaving `rewriteResult` and `rewriteHistory` intact.
+   - Disabled when `!draftText.trim() || isRewriting`.
+   - Maintained the existing concise textarea placeholder (`"Paste or write your raw draft here..."`).
+
+```diff
+--- a/src/context/WritingAssistantContext.tsx
++++ b/src/context/WritingAssistantContext.tsx
+@@ -233,5 +233,5 @@
+   );
+ 
+   const [activeTab, setActiveTab] = useState<NavigationTab>('studio');
+-  const [draftText, setDraftText] = useState<string>(SAMPLE_DRAFT_TO_REWRITE);
++  const [draftText, setDraftText] = useState<string>('');
+   const [rewriteIntensity, setRewriteIntensity] = useState<RewriteIntensity>('faithful');
+@@ -827,5 +827,5 @@
+     }
+     setToneAdjustments(DEFAULT_TONE_ADJUSTMENTS);
+     setModelSettings(DEFAULT_MODEL_SETTINGS);
+-    setDraftText(SAMPLE_DRAFT_TO_REWRITE);
++    setDraftText('');
+     setRewriteResult(null);
+--- a/src/components/StudioView.tsx
++++ b/src/components/StudioView.tsx
+@@ -302,4 +302,14 @@
+                   <UploadCloud className="w-3 h-3" />
+                   <span>Upload</span>
+                 </button>
++                <span className="text-neutral-300">•</span>
++                <button
++                  type="button"
++                  id="btn-clear-draft"
++                  onClick={() => setDraftText('')}
++                  disabled={!draftText.trim() || isRewriting}
++                  className="text-[11px] text-neutral-500 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
++                >
++                  Clear
++                </button>
+                 <input
+```

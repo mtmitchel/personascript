@@ -1,0 +1,43 @@
+{
+  "input": {
+    "field": "Content Design"
+  },
+  "response": {
+    "topics": [
+      {
+        "id": "topic-1788944388213-1-m7epl",
+        "name": "Content Design",
+        "category": "discipline",
+        "description": "General principles of Content Design.",
+        "keyTerminology": [
+          "Information hierarchy",
+          "Accessibility"
+        ],
+        "conventions": [
+          "Explain the reasoning behind documented decisions without inventing research."
+        ],
+        "enabled": true
+      },
+      {
+        "id": "topic-1788944388213-2-higmv",
+        "name": "Decision Making",
+        "category": "intersecting",
+        "description": "General principles of Decision Making.",
+        "keyTerminology": [
+          "Information hierarchy",
+          "Accessibility"
+        ],
+        "conventions": [
+          "Explain the reasoning behind documented decisions without inventing research."
+        ],
+        "enabled": true
+      }
+    ]
+  },
+  "name": "generic-off",
+  "status": 200,
+  "passed": true,
+  "providerRequests": [
+    "mock-1788944388213-6-request.json"
+  ]
+}

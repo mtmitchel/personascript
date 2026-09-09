@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "I put the usage-limit explanation first."
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-source-aware-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

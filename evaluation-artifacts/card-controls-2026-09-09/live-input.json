@@ -1,0 +1,12 @@
+{
+  "field": "UX",
+  "disciplines": [
+    "Content Design"
+  ],
+  "targetTopic": {
+    "name": "Content Design",
+    "category": "discipline"
+  },
+  "model": "gemini-3.1-pro-preview",
+  "reasoningLevel": "auto"
+}

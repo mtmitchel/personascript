@@ -1,0 +1,127 @@
+[
+  {
+    "name": "enabled-rewrite",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939340765-1-request.json",
+      "mock-1788939340767-2-request.json"
+    ]
+  },
+  {
+    "name": "enabled-refine",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939340794-3-request.json",
+      "mock-1788939340795-4-request.json"
+    ]
+  },
+  {
+    "name": "enabled-selection",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939340805-5-request.json",
+      "mock-1788939340806-6-request.json"
+    ]
+  },
+  {
+    "name": "master-off",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939340816-7-request.json",
+      "mock-1788939340817-8-request.json"
+    ]
+  },
+  {
+    "name": "profile-fallback",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939340828-9-request.json",
+      "mock-1788939340830-10-request.json"
+    ]
+  },
+  {
+    "name": "invalid-products-not-array",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-not-array-profile",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-null-entry",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-null-entry-profile",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-name",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-name-profile",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-notes",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-notes-profile",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-enabled",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-bad-enabled-profile",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-quick-refine",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "invalid-products-edit-selection",
+    "passed": true,
+    "status": 400,
+    "providerRequests": []
+  },
+  {
+    "name": "synthesis-preserves-products",
+    "passed": true,
+    "status": 200,
+    "providerRequests": [
+      "mock-1788939340905-11-request.json"
+    ]
+  }
+]

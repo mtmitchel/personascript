@@ -1,0 +1,10 @@
+{
+  "prompt.txt": "9efb66113e4bb9790bcae904c5af5cd8c64f48bf3f452a265455fcb18c9ae31e",
+  "invocation.json": "f3a588ad7c5ff260001ed6bf28056f118ecf39a4973f55a4ae80672ac52aa140",
+  "stdout.ndjson": "99f88d407800d19a8db2428c6cf045f71c38eba84bb88feeac17db20ac892f05",
+  "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "provider.log": "c2e09a7892d9eec1fcac1202bbbf1a35c8096be18da777a862b061d7e2a89dcb",
+  "status.json": "31b97246f5c5d4e4f84dbe49328f3cbe1fcfaa860c6701785f060469f6c7540a",
+  "response.md": "949c86c1f02d1698c48c73c58795f0dae0faf923697b4bd3dd7adc50fe20e972",
+  "implementation.patch": "d3ac1ce2742ba4471009a88e438994ea45d4e1e806dd107429a2228ccfc410a6"
+}

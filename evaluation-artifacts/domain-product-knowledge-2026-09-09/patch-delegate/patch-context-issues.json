@@ -1,0 +1,44 @@
+[
+  {
+    "file": "README.md",
+    "hunk": 0,
+    "count": 0,
+    "old": "\nRun the focused deterministic checks with `npm test`. Run `npm run lint` for the TypeScript check and `npm run build` for the production bundle.\n\n",
+    "nearest": "\nRun the focused deterministic checks with `npm test`. Run `npm run lint` for the TypeScript check and `npm run build` for the production bundle.\n"
+  },
+  {
+    "file": "server.ts",
+    "hunk": 4,
+    "count": 0,
+    "old": "    validatePreservationInput(preservationSettings);\n    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });\n    const corpus = validateSamplesInput(samples);\n    const activeDomain = domainExpertise || profile?.domainExpertise;\n    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);\n    const selectedModel = model || 'gemini-3.8-flash';\n    const prompt = buildQuickRefinePrompt({\n",
+    "nearest": "    validatePreservationInput(preservationSettings);\n    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });\n    const corpus = validateSamplesInput(samples);\n    const activeDomain = normalizeDomainExpertise(domainExpertise || profile.domainExpertise);\n    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);\n    const selectedModel = model || 'gemini-3.8-flash';\n    const response = await generateContentWithRetry({\n"
+  },
+  {
+    "file": "server.ts",
+    "hunk": 5,
+    "count": 0,
+    "old": "    validatePreservationInput(preservationSettings);\n    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });\n    const corpus = validateSamplesInput(samples);\n    const activeDomain = domainExpertise || profile?.domainExpertise;\n    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);\n    const range = validateSelectionRangeInput(selectionRange, currentTextString, selectedTextString);\n    const selectedModel = model || 'gemini-3.8-flash';\n",
+    "nearest": "    validatePreservationInput(preservationSettings);\n    validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });\n    const corpus = validateSamplesInput(samples);\n    const activeDomain = normalizeDomainExpertise(domainExpertise || profile.domainExpertise);\n    const normalizedPreservation = normalizePreservationSettings(preservationSettings, preservationLocks);\n    const selectedModel = model || 'gemini-3.8-flash';\n    const response = await generateContentWithRetry({\n"
+  },
+  {
+    "file": "src/components/DomainView.tsx",
+    "hunk": 8,
+    "count": 2,
+    "old": "      };\n    });\n\n    recomputeAndSave({\n      ...localExpertise,\n      topics: updatedTopics,\n    });\n",
+    "nearest": "      };\n    });\n\n    recomputeAndSave({\n      ...localExpertise,\n      topics: updatedTopics,\n    });\n"
+  },
+  {
+    "file": "src/components/DomainView.tsx",
+    "hunk": 9,
+    "count": 2,
+    "old": "      };\n    });\n\n    recomputeAndSave({\n      ...localExpertise,\n      topics: updatedTopics,\n    });\n",
+    "nearest": "      };\n    });\n\n    recomputeAndSave({\n      ...localExpertise,\n      topics: updatedTopics,\n    });\n"
+  },
+  {
+    "file": "src/components/DomainView.tsx",
+    "hunk": 21,
+    "count": 0,
+    "old": "          placeholder={`e.g.\n\u2022 Focus on tangible product impact: user comprehension, cognitive load reduction, conversion uplift, and clear cross-functional collaboration.\n\u2022 Bridge visual UI design and user mental models using unambiguous, plain language.\n\u2022 When discussing monetization, frame paywalls around user value rather than arbitrary gates.\n\u2022 When discussing AI translation and localization, mention character expansion factors and cultural nuances.\n\u2022 When discussing AI writing assistance, highlight human-in-the-loop agency and unobtrusive suggestion affordances.`}\n",
+    "nearest": "          placeholder={`e.g.\n\u2022 Focus on tangible product impact: user comprehension, cognitive load reduction, conversion uplift, and clear cross-functional collaboration.\n\u2022 Bridge visual UI design and user mental models using unambiguous, plain language.\n\u2022 When discussing monetization, frame paywalls around user value delivered rather than arbitrary gates.\n\u2022 When discussing AI translation and localization, mention character expansion factors and cultural nuances.\n\u2022 When discussing AI writing assistance, highlight human-in-the-loop agency and unobtrusive suggestion affordances.`}\n"
+  }
+]

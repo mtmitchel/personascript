@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"topics\":[{\"name\":\"Wrong category\",\"category\":\"intersecting\",\"description\":\"Refreshed overview of Wrong category\",\"keyTerminology\":[\"information hierarchy\",\"comprehension\"],\"conventions\":[\"Explain concepts through concrete decisions.\"]}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-card-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

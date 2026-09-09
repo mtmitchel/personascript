@@ -1,0 +1,2194 @@
+An implementation plan artifact has been created at [`plan_domain_knowledge_generation.md`](file:///home/mason/.gemini/antigravity-cli/brain/5fe11d5e-8c27-4706-9146-da4547524b8f/plan_domain_knowledge_generation.md).
+
+Below is the complete unified diff against the current repository in `/home/mason/Projects/persona script`.
+
+### Complete Unified Diff
+
+```diff
+diff --git a/README.md b/README.md
+index f1c2ec3..a8eb829 100644
+--- a/README.md
++++ b/README.md
+@@ -31,8 +31,8 @@ The Domain view configures disciplinary concepts and product reference knowledge
+ - **Concept recognition**: Disciplinary concepts (such as information hierarchy, user comprehension, informed choice, product value, and conversion) help the model recognize and articulate thinking already present in drafts without forcing jargon or fabricating unperformed work.
+ - **Product reference knowledge**: Product notes supply factual background for interpreting product names, feature relationships, and historical periods. Product discrepancies are flagged as observations in the advisory review rather than silently altering source facts.
+ - **Topic single-ownership**: Topic content has single ownership; disabling or deleting a topic removes its prompt contribution without term leakage. Empty topic lists are preserved.
+-- **Scope controls**: The page-level active switch controls all knowledge on the Domain page; individual topic and product toggles choose included entries.
++- **API generation and broad coverage**: Disciplinary topics and concepts are populated dynamically via `/api/generate-domain-knowledge` from configured core disciplines and audience context, rather than static presets. Use **Generate domain knowledge** when empty, **Regenerate** to replace only the topics section, or **Clear** to empty topics while preserving product notes, audience context, and custom domain guidance.
++- **Scope controls**: The page-level active switch controls all knowledge on the Domain page; individual topic and product toggles choose included entries.
+ 
+-The original draft starts empty. Use **Load sample** for the example, or **Clear** to empty only the draft input. Existing custom domain settings are retained; loading the UX Portfolio preset applies the broader concept examples and keeps product references.
++The original draft starts empty. Use **Load sample** for the example, or **Clear** to empty only the draft input. Existing custom domain settings, audience context, and product references are retained across sessions.
+ 
+diff --git a/server.ts b/server.ts
+index c6fb8b4..c8a6b18 100644
+--- a/server.ts
++++ b/server.ts
+@@ -24,6 +24,12 @@ import {
+   type RawWritingSample,
+   type SelectionRange,
+ } from './src/writingPipeline';
++import {
++  buildDomainGenerationPrompt,
++  DOMAIN_GENERATION_SCHEMA,
++  validateDomainGenerationRequest,
++  validateGeneratedDomainKnowledge,
++} from './src/domainGeneration';
+ 
+ dotenv.config();
+ 
+@@ -1111,6 +1117,33 @@ async function executeReviewStage(params: {
+   }
+ }
+ 
++app.post('/api/generate-domain-knowledge', async (req: Request, res: Response) => {
++  try {
++    const validatedInput = validateDomainGenerationRequest(req.body);
++    const prompt = buildDomainGenerationPrompt({
++      field: validatedInput.field,
++      disciplines: validatedInput.disciplines,
++      existingTopics: validatedInput.existingTopics,
++    });
++
++    const response = await generateContentWithRetry({
++      contents: prompt,
++      preferredModel: validatedInput.model,
++      reasoningLevel: validatedInput.reasoningLevel,
++      endpoint: 'generate-domain-knowledge',
++      allowFallback: false,
++      config: {
++        responseMimeType: 'application/json',
++        responseSchema: DOMAIN_GENERATION_SCHEMA,
++      },
++    });
++
++    const topics = validateGeneratedDomainKnowledge(response.text, response as any);
++    return res.json({ topics });
++  } catch (error: any) {
++    console.error('Error generating domain knowledge:', error);
++    return res.status(statusForError(error)).json({
++      error: error.message || 'Failed to generate domain knowledge',
++    });
++  }
++});
++
+ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
+   try {
+     const operationStart = Date.now();
+diff --git a/src/components/DomainView.tsx b/src/components/DomainView.tsx
+index ca1d4ae..f87ab2e 100644
+--- a/src/components/DomainView.tsx
++++ b/src/components/DomainView.tsx
+@@ -21,8 +21,10 @@ import {
+   ChevronDown,
+   ChevronUp,
+   Package,
++  RefreshCw,
++  Trash2,
++  AlertCircle,
+ } from 'lucide-react';
+-import { UX_PORTFOLIO_PRESET, SYSTEMS_ENGINEERING_PRESET, presetToDomainExpertise } from '../data/domainPresets';
+ import { normalizeDomainExpertise } from '../writingPipeline';
+ 
+ export const DomainView: React.FC = () => {
+@@ -30,6 +32,7 @@ export const DomainView: React.FC = () => {
+     domainExpertise,
+     updateDomainExpertise,
+     setActiveTab,
++    modelSettings,
+   } = useWritingAssistant();
+ 
+   const [localExpertise, setLocalExpertise] = useState<DomainExpertise>(() => {
+@@ -38,6 +41,8 @@ export const DomainView: React.FC = () => {
+ 
+   const [newDisciplineInput, setNewDisciplineInput] = useState('');
+   const [savedFeedback, setSavedFeedback] = useState(false);
++  const [isGenerating, setIsGenerating] = useState(false);
++  const [generationError, setGenerationError] = useState<string | null>(null);
+ 
+   // Quick state for adding a new topic
+   const [isAddingTopic, setIsAddingTopic] = useState(false);
+@@ -272,9 +277,17 @@ export const DomainView: React.FC = () => {
+   };
+ 
+   // Product reference knowledge management
++  const createLocalProductId = () => {
++    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
++      return `product-${crypto.randomUUID()}`;
++    }
++    return `product-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
++  };
++
+   const handleAddProduct = () => {
++    const newId = createLocalProductId();
+     const newProduct: ProductReference = {
+-      id: `product-${crypto.randomUUID()}`,
++      id: newId,
+       name: '',
+       notes: '',
+       enabled: true,
+@@ -283,6 +296,12 @@ export const DomainView: React.FC = () => {
+       ...localExpertise,
+       productKnowledge: [...(localExpertise.productKnowledge || []), newProduct],
+     });
++    setTimeout(() => {
++      const input = document.getElementById(`product-name-${newId}`);
++      if (input) {
++        input.focus();
++      }
++    }, 50);
+   };
+ 
+   const handleUpdateProduct = (id: string, updates: Partial<ProductReference>) => {
+@@ -303,15 +322,60 @@ export const DomainView: React.FC = () => {
+     });
+   };
+ 
+-  // Load preset
+-  const handleApplyPreset = (preset: typeof UX_PORTFOLIO_PRESET) => {
+-    const configured = presetToDomainExpertise(preset, localExpertise.productKnowledge);
+-    setLocalExpertise(configured);
+-    updateDomainExpertise(configured);
+-    if (configured.customNotes) {
+-      setGuidelinesText(configured.customNotes);
++  const handleGenerateKnowledge = async () => {
++    if (isGenerating) return;
++    setIsGenerating(true);
++    setGenerationError(null);
++
++    try {
++      const existingTopicNames = (localExpertise.topics || [])
++        .map((t) => t.name)
++        .filter(Boolean);
++
++      const res = await fetch('/api/generate-domain-knowledge', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++          field: localExpertise.field || (localExpertise.disciplines || []).join(' & '),
++          disciplines: localExpertise.disciplines || [],
++          existingTopics: existingTopicNames,
++          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
++          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
++        }),
++      });
++
++      if (!res.ok) {
++        const errData = await res.json().catch(() => ({}));
++        throw new Error(errData.error || 'Failed to generate domain knowledge');
++      }
++
++      const { topics: newTopics } = await res.json();
++      if (!Array.isArray(newTopics) || newTopics.length === 0) {
++        throw new Error('No domain topics returned by the server.');
++      }
++
++      setLocalExpertise((prev) => {
++        const updated: DomainExpertise = {
++          ...prev,
++          topics: newTopics,
++          keyTerminology: [],
++          conventions: [],
++        };
++        const normalized = normalizeDomainExpertise(updated);
++        updateDomainExpertise(normalized);
++        return normalized;
++      });
++      flashSaved();
++    } catch (err: any) {
++      console.error('Domain generation failed:', err);
++      setGenerationError(err.message || 'Failed to generate domain knowledge');
++    } finally {
++      setIsGenerating(false);
+     }
+-    flashSaved();
++  };
++
++  const handleClearTopics = () => {
++    if (isGenerating) return;
++    setGenerationError(null);
++    const updated: DomainExpertise = {
++      ...localExpertise,
++      topics: [],
++      keyTerminology: [],
++      conventions: [],
++    };
++    saveExpertise(updated);
++  };
++
+   const handleGuidelinesChange = (val: string) => {
+@@ -340,7 +404,8 @@ export const DomainView: React.FC = () => {
+     return <Layers className="w-3.5 h-3.5 text-neutral-600" />;
+   };
+ 
+-  const activeTopicCount = (localExpertise.topics || []).filter((t) => t.enabled).length;
++  const topicsList = localExpertise.topics || [];
++  const hasTopics = topicsList.length > 0;
++  const activeTopicCount = topicsList.filter((t) => t.enabled).length;
+   const activeProductCount = (localExpertise.productKnowledge || []).filter((p) => p.enabled).length;
+ 
+   return (
+@@ -382,17 +447,6 @@ export const DomainView: React.FC = () => {
+             </span>
+           )}
+ 
+-          <button
+-            id="btn-apply-ux-preset"
+-            type="button"
+-            onClick={() => handleApplyPreset(UX_PORTFOLIO_PRESET)}
+-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition"
+-            title="Reset to default UX Portfolio configuration"
+-          >
+-            <RotateCcw className="w-3 h-3 text-neutral-500" />
+-            <span>Load UX Portfolio Preset</span>
+-          </button>
+-
+           <button
+             id="btn-domain-to-studio"
+             type="button"
+@@ -550,19 +604,65 @@ export const DomainView: React.FC = () => {
+       {/* Intersecting Fields & Topics Cards */}
+       <div className="space-y-4">
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+           <div>
+-            <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
+-              <Sparkles className="w-4 h-4 text-neutral-800" />
+-              <span>Intersecting Fields, Disciplines & Topics</span>
+-            </h2>
++            <div className="flex items-center gap-2 flex-wrap">
++              <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
++                <Sparkles className="w-4 h-4 text-neutral-800" />
++                <span>Intersecting Fields, Disciplines & Topics</span>
++              </h2>
++              <span className="text-[11px] font-mono text-neutral-400">
++                Model: {modelSettings.analysisModel || 'gemini-3.1-pro-preview'}
++              </span>
++            </div>
+             <p className="text-xs text-neutral-500 mt-0.5">
+               Choose the fields the model should draw on. Concepts are examples to recognize when relevant, not a list of words to include.
+             </p>
++            {hasTopics && (
++              <p className="text-[11px] text-neutral-400 mt-0.5">
++                Regenerating replaces only the topics and concepts below using your configured fields.
++              </p>
++            )}
+           </div>
+ 
+-          <button
+-            type="button"
+-            id="btn-open-add-topic"
+-            onClick={() => setIsAddingTopic(!isAddingTopic)}
+-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs self-start"
+-          >
+-            <Plus className="w-3.5 h-3.5 text-neutral-600" />
+-            <span>Add field or topic</span>
+-          </button>
++          <div className="flex items-center gap-2 self-start flex-wrap">
++            {hasTopics && (
++              <>
++                <button
++                  type="button"
++                  id="btn-regenerate-topics"
++                  disabled={isGenerating}
++                  onClick={handleGenerateKnowledge}
++                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
++                  title="Regenerate topics and concepts from your configured fields (replaces this section)"
++                >
++                  <RefreshCw className={`w-3.5 h-3.5 text-neutral-500 ${isGenerating ? 'animate-spin' : ''}`} />
++                  <span>{isGenerating ? 'Regenerating...' : 'Regenerate'}</span>
++                </button>
++
++                <button
++                  type="button"
++                  id="btn-clear-topics"
++                  disabled={isGenerating}
++                  onClick={handleClearTopics}
++                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
++                  title="Clear all topics and concept examples from this section"
++                >
++                  <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
++                  <span>Clear</span>
++                </button>
++              </>
++            )}
++
++            <button
++              type="button"
++              id="btn-open-add-topic"
++              disabled={isGenerating}
++              onClick={() => setIsAddingTopic(!isAddingTopic)}
++              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs disabled:opacity-50"
++            >
++              <Plus className="w-3.5 h-3.5 text-neutral-600" />
++              <span>Add field or topic</span>
++            </button>
++          </div>
+         </div>
+ 
++        {generationError && (
++          <div
++            id="domain-generation-error"
++            className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between animate-in fade-in"
++          >
++            <div className="flex items-center gap-2">
++              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
++              <span>{generationError}</span>
++            </div>
++            <button
++              type="button"
++              onClick={() => setGenerationError(null)}
++              className="text-rose-500 hover:text-rose-700 p-1 rounded"
++              title="Dismiss error"
++            >
++              <X className="w-3.5 h-3.5" />
++            </button>
++          </div>
++        )}
++
+         {/* Add New Topic Form */}
+         {isAddingTopic && (
+           <form
+@@ -677,6 +777,26 @@ export const DomainView: React.FC = () => {
+         )}
+ 
++        {!hasTopics ? (
++          <div className="p-8 rounded-xl bg-neutral-50/70 border border-dashed border-neutral-300 text-center space-y-3">
++            <Sparkles className="w-6 h-6 text-neutral-400 mx-auto" />
++            <div className="space-y-1">
++              <h3 className="text-xs font-semibold text-neutral-800">
++                No domain topics generated yet
++              </h3>
++              <p className="text-[11px] text-neutral-500 max-w-md mx-auto leading-relaxed">
++                Generate broad domain disciplines, intersecting topics, and concept examples based on your configured core disciplines above. You can also add topics manually.
++              </p>
++            </div>
++            <button
++              type="button"
++              id="btn-generate-topics-empty"
++              disabled={isGenerating}
++              onClick={handleGenerateKnowledge}
++              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition shadow-xs disabled:opacity-50"
++            >
++              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
++              <span>{isGenerating ? 'Generating knowledge...' : 'Generate domain knowledge'}</span>
++            </button>
++          </div>
++        ) : (
+           {/* Topics Grid */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-          {(localExpertise.topics || []).map((topic) => {
++          {topicsList.map((topic) => {
+             const isExpanded = expandedTopicIds.has(topic.id);
+             const termInputVal = topicTermInputs[topic.id] || '';
+ 
+@@ -860,6 +980,7 @@ export const DomainView: React.FC = () => {
+             );
+           })}
+         </div>
++        )}
+       </div>
+ 
+       {/* Product Knowledge Reference Section */}
+diff --git a/src/context/WritingAssistantContext.tsx b/src/context/WritingAssistantContext.tsx
+index a959141..be79b76 100644
+--- a/src/context/WritingAssistantContext.tsx
++++ b/src/context/WritingAssistantContext.tsx
+@@ -64,3 +64,3 @@ interface WritingAssistantContextType {
+   // Domain Expertise
+   domainExpertise: DomainExpertise;
+   setDomainExpertise: React.Dispatch<React.SetStateAction<DomainExpertise>>;
+-  updateDomainExpertise: (expertise: DomainExpertise) => void;
++  updateDomainExpertise: (expertise: DomainExpertise | ((prev: DomainExpertise) => DomainExpertise)) => void;
+@@ -359,9 +359,15 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
+-  const updateDomainExpertise = (newExpertise: DomainExpertise) => {
+-    const normalized = normalizeDomainExpertise(newExpertise);
+-    setDomainExpertise(normalized);
+-    setActiveProfile((prev) => ({
+-      ...prev,
+-      domainExpertise: normalized,
+-      updatedAt: new Date().toISOString(),
+-    }));
++  const updateDomainExpertise = (
++    newExpertise: DomainExpertise | ((prev: DomainExpertise) => DomainExpertise)
++  ) => {
++    setActiveProfile((prevProfile) => {
++      const baseExpertise = prevProfile.domainExpertise || domainExpertise;
++      const resolved = typeof newExpertise === 'function' ? newExpertise(baseExpertise) : newExpertise;
++      const normalized = normalizeDomainExpertise(resolved);
++      setDomainExpertise(normalized);
++      return {
++        ...prevProfile,
++        domainExpertise: normalized,
++        updatedAt: new Date().toISOString(),
++      };
++    });
+   };
+diff --git a/src/data/defaultSamples.ts b/src/data/defaultSamples.ts
+index c6d2745..77918a2 100644
+--- a/src/data/defaultSamples.ts
++++ b/src/data/defaultSamples.ts
+@@ -1,3 +1,2 @@
+ import { WritingSample, StyleProfile } from '../types';
+-import { UX_PORTFOLIO_PRESET, presetToDomainExpertise } from './domainPresets';
+ 
+@@ -220,5 +219,13 @@ export const DEFAULT_PROFILE: StyleProfile = {
+   customDirectives: 'Maintain strong authorial conviction. Never apologize for having an opinion. Always keep the reader leaning in.',
+   domainExpertise: {
+-    ...presetToDomainExpertise(UX_PORTFOLIO_PRESET),
+     enabled: false,
++    field: 'UX Copywriting & Content Design',
++    disciplines: ['UX Copywriting', 'Content Design'],
++    topics: [],
++    keyTerminology: [],
++    conventions: [],
++    audienceContext: 'Design directors, VP of Product, design leads, hiring managers, and cross-functional product partners evaluating portfolio case studies.',
++    customNotes: 'Use domain knowledge to recognize thinking already demonstrated in the draft. Name or explain a concept when it makes the reasoning clearer, alongside the concrete decision or example. Keep the language accessible. Do not invent actions, intentions, evidence, or outcomes.',
++    productKnowledge: [],
+   }
+ };
+diff --git a/src/data/domainPresets.ts b/src/data/domainPresets.ts
+deleted file mode 100644
+index 36d501d..0000000
+--- a/src/data/domainPresets.ts
++++ /dev/null
+@@ -1,152 +0,0 @@
+-import { DomainTopic, DomainExpertise, ProductReference } from '../types';
+-
+-export interface DomainPreset {
+-  id: string;
+-  name: string;
+-  field: string;
+-  disciplines: string[];
+-  audienceContext: string;
+-  customNotes: string;
+-  topics: DomainTopic[];
+-}
+-
+-export const UX_PORTFOLIO_PRESET: DomainPreset = {
+-  id: 'ux-portfolio-case-study',
+-  name: 'UX Copywriting & Content Design (with Monetization, AI Translation & AI Writing)',
+-  field: 'UX Copywriting & Content Design',
+-  disciplines: ['UX Copywriting', 'Content Design'],
+-  audienceContext: 'Design directors, VP of Product, design leads, hiring managers, and cross-functional product partners evaluating portfolio case studies.',
+-  customNotes: 'Use domain knowledge to recognize thinking already demonstrated in the draft. Name or explain a concept when it makes the reasoning clearer, alongside the concrete decision or example. Keep the language accessible. Do not invent actions, intentions, evidence, or outcomes.',
+-  topics: [
+-    {
+-      id: 'topic-content-design',
+-      name: 'UX Copywriting & Content Design',
+-      category: 'discipline',
+-      description: 'How content helps people understand information, find what they need, and make decisions.',
+-      enabled: true,
+-      keyTerminology: [
+-        'information hierarchy',
+-        'user comprehension',
+-        'navigation & findability',
+-        'informed choice',
+-        'consistency & accessibility',
+-      ],
+-      conventions: [
+-        'Connect relevant concepts to the content decisions described in the draft.',
+-      ],
+-    },
+-    {
+-      id: 'topic-monetization',
+-      name: 'Monetization & Conversion UX',
+-      category: 'intersecting',
+-      description: 'How people understand product value and choose between free and paid access, including plans and billing frequency.',
+-      enabled: true,
+-      keyTerminology: [
+-        'product value',
+-        'free & paid access',
+-        'pricing clarity',
+-        'conversion',
+-        'retention',
+-      ],
+-      conventions: [
+-        'Explain commercial reasoning through the user needs and choices shown in the draft.',
+-      ],
+-    },
+-    {
+-      id: 'topic-ai-translation',
+-      name: 'AI Translation & Localization',
+-      category: 'intersecting',
+-      description: 'How meaning, terminology, and context carry across languages and localized experiences.',
+-      enabled: true,
+-      keyTerminology: [
+-        'meaning across languages',
+-        'terminology consistency',
+-        'cultural context',
+-        'localization',
+-        'translation quality',
+-      ],
+-      conventions: [
+-        'Use translation concepts where they help explain the work; distinguish product capabilities from localization practices.',
+-      ],
+-    },
+-    {
+-      id: 'topic-ai-writing-assistance',
+-      name: 'AI Writing Assistance',
+-      category: 'intersecting',
+-      description: 'How writing tools help authors improve their work while retaining control over meaning and expression.',
+-      enabled: true,
+-      keyTerminology: [
+-        'author control',
+-        'writing quality',
+-        'voice & tone',
+-        'trust & transparency',
+-        'interaction feedback',
+-      ],
+-      conventions: [
+-        'Connect writing-assistance concepts to the interactions actually described.',
+-      ],
+-    },
+-  ],
+-};
+-
+-export const SYSTEMS_ENGINEERING_PRESET: DomainPreset = {
+-  id: 'systems-engineering',
+-  name: 'Distributed Systems & Software Engineering',
+-  field: 'Software Engineering & Distributed Systems',
+-  disciplines: ['Distributed Systems', 'Software Engineering'],
+-  audienceContext: 'Senior engineers, product architects, and technology leaders who value intellectual honesty and technical precision.',
+-  customNotes: 'Balance rigorous engineering concepts with evocative, tactile craftsmanship.',
+-  topics: [
+-    {
+-      id: 'topic-core-distributed-systems',
+-      name: 'Distributed Systems Core',
+-      category: 'discipline',
+-      description: 'Consensus, latency, idempotency, failure domains, and operational observability.',
+-      enabled: true,
+-      keyTerminology: [
+-        'latency',
+-        'p99 / tail performance',
+-        'idempotency',
+-        'blast radius',
+-        'distributed consensus',
+-        'observability',
+-        'API contracts',
+-        'friction points',
+-      ],
+-      conventions: [
+-        'Distinguish core architectural mechanisms from superficial symptoms',
+-        'Quantify performance trade-offs rather than using qualitative hype',
+-        'Avoid vague corporate buzzwords; describe concrete system states',
+-        'Acknowledge failure modes and operational boundaries explicitly',
+-      ],
+-    },
+-  ],
+-};
+-
+-export const DOMAIN_PRESETS: DomainPreset[] = [
+-  UX_PORTFOLIO_PRESET,
+-  SYSTEMS_ENGINEERING_PRESET,
+-];
+-
+-// Helper to convert a DomainPreset to a DomainExpertise object
+-export function presetToDomainExpertise(
+-  preset: DomainPreset,
+-  existingProductKnowledge?: ProductReference[]
+-): DomainExpertise {
+-  return {
+-    enabled: true,
+-    field: preset.field,
+-    disciplines: [...preset.disciplines],
+-    topics: preset.topics.map((t) => ({
+-      ...t,
+-      keyTerminology: [...t.keyTerminology],
+-      conventions: [...t.conventions],
+-    })),
+-    keyTerminology: [],
+-    conventions: [],
+-    audienceContext: preset.audienceContext,
+-    customNotes: preset.customNotes,
+-    productKnowledge: existingProductKnowledge ? [...existingProductKnowledge] : [],
+-  };
+-}
+diff --git a/src/domainGeneration.ts b/src/domainGeneration.ts
+new file mode 100644
+index 0000000..c57bf30
+--- /dev/null
++++ b/src/domainGeneration.ts
+@@ -0,0 +1,192 @@
++import { Type } from '@google/genai';
++import { DomainTopic, GeminiModelChoice, ReasoningLevelChoice } from './types';
++import { ValidationError } from './writingPipeline';
++
++const SUPPORTED_MODELS: GeminiModelChoice[] = [
++  'gemini-3.8-flash',
++  'gemini-3.7-flash',
++  'gemini-3.6-flash',
++  'gemini-3.1-pro-preview',
++];
++
++const SUPPORTED_REASONING_LEVELS: ReasoningLevelChoice[] = [
++  'auto',
++  'minimal',
++  'low',
++  'high',
++];
++
++export interface ValidatedDomainGenerationInput {
++  field: string;
++  disciplines: string[];
++  existingTopics: string[];
++  model: GeminiModelChoice;
++  reasoningLevel: ReasoningLevelChoice;
++}
++
++export function validateDomainGenerationRequest(body: unknown): ValidatedDomainGenerationInput {
++  if (!body || typeof body !== 'object' || Array.isArray(body)) {
++    throw new ValidationError('Request body must be an object.');
++  }
++
++  const record = body as Record<string, unknown>;
++
++  if (
++    'draft' in record ||
++    'samples' in record ||
++    'productKnowledge' in record ||
++    'customNotes' in record ||
++    'notes' in record
++  ) {
++    throw new ValidationError(
++      'Private user content, drafts, samples, product notes, or custom guidance must not be included in domain knowledge generation.'
++    );
++  }
++
++  let field = '';
++  if (record.field !== undefined && record.field !== null) {
++    if (typeof record.field !== 'string') {
++      throw new ValidationError('field must be a string.');
++    }
++    field = record.field.trim().slice(0, 500);
++  }
++
++  const disciplines: string[] = [];
++  if (record.disciplines !== undefined && record.disciplines !== null) {
++    if (!Array.isArray(record.disciplines)) {
++      throw new ValidationError('disciplines must be an array of strings.');
++    }
++    for (const [idx, item] of record.disciplines.entries()) {
++      if (typeof item !== 'string') {
++        throw new ValidationError(`disciplines[${idx}] must be a string.`);
++      }
++      const trimmed = item.trim().slice(0, 200);
++      if (trimmed) disciplines.push(trimmed);
++    }
++  }
++
++  const existingTopics: string[] = [];
++  if (record.existingTopics !== undefined && record.existingTopics !== null) {
++    if (!Array.isArray(record.existingTopics)) {
++      throw new ValidationError('existingTopics must be an array of topic names.');
++    }
++    for (const [idx, item] of record.existingTopics.entries()) {
++      if (typeof item !== 'string') {
++        throw new ValidationError(`existingTopics[${idx}] must be a string.`);
++      }
++      const trimmed = item.trim().slice(0, 200);
++      if (trimmed) existingTopics.push(trimmed);
++    }
++  }
++
++  if (!field && disciplines.length === 0) {
++    throw new ValidationError('Please provide at least one field or discipline to generate domain knowledge.');
++  }
++
++  let model: GeminiModelChoice = 'gemini-3.1-pro-preview';
++  if (record.model !== undefined && record.model !== null) {
++    if (typeof record.model !== 'string' || !SUPPORTED_MODELS.includes(record.model as GeminiModelChoice)) {
++      throw new ValidationError('model choice is invalid.');
++    }
++    model = record.model as GeminiModelChoice;
++  }
++
++  let reasoningLevel: ReasoningLevelChoice = 'auto';
++  if (record.reasoningLevel !== undefined && record.reasoningLevel !== null) {
++    if (typeof record.reasoningLevel !== 'string' || !SUPPORTED_REASONING_LEVELS.includes(record.reasoningLevel as ReasoningLevelChoice)) {
++      throw new ValidationError('reasoningLevel is invalid.');
++    }
++    reasoningLevel = record.reasoningLevel as ReasoningLevelChoice;
++  }
++
++  return {
++    field,
++    disciplines,
++    existingTopics,
++    model,
++    reasoningLevel,
++  };
++}
++
++export function buildDomainGenerationPrompt(params: {
++  field: string;
++  disciplines: string[];
++  existingTopics?: string[];
++}): string {
++  const sanitize = (str: string) => str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
++
++  const fieldTag = params.field ? `  <primary-field>${sanitize(params.field)}</primary-field>` : '';
++  const disciplinesTag = params.disciplines.length
++    ? `  <disciplines>\n${params.disciplines.map((d) => `    <discipline>${sanitize(d)}</discipline>`).join('\n')}\n  </disciplines>`
++    : '';
++  const existingTopicsTag = params.existingTopics && params.existingTopics.length
++    ? `  <existing-topic-coverage>\n${params.existingTopics.map((t) => `    <topic-name>${sanitize(t)}</topic-name>`).join('\n')}\n  </existing-topic-coverage>`
++    : '';
++
++  return `You are an expert domain knowledge and taxonomy specialist. Based on the domain context delimited below, generate a comprehensive set of broad domain disciplines and intersecting topics that a professional writer, editor, or reviewer would draw upon in this space.
++
++<domain-context>
++${[fieldTag, disciplinesTag, existingTopicsTag].filter(Boolean).join('\n')}
++</domain-context>
++
++TAXONOMY & CONCEPT GENERATION INSTRUCTIONS:
++1. Cover both core field disciplines and relevant intersecting topics (e.g. cross-cutting disciplines, related technologies, user psychology, commercial/conversion realities, and product considerations).
++2. For each topic:
++   - "name": Concise, professional title for the discipline or topic.
++   - "category": Either "discipline" for core disciplinary foundations or "intersecting" for cross-cutting / adjacent domains.
++   - "description": Brief 1-2 sentence overview of what this domain area encompasses and why it matters.
++   - "keyTerminology": A representative collection of general concept examples, mental models, patterns, and principles characteristic of the topic. These are conceptual examples to recognize when relevant—NOT a mandatory vocabulary checklist.
++   - "conventions": Optional 1-3 general interpretive guidelines or conventions for applying concepts in this topic thoughtfully without forcing jargon.
++
++CRITICAL CONSTRAINTS:
++- General conceptual principles only. Do NOT include case-specific numbers, specific company metrics, product claims, mandatory keyword formulas, prose templates, or narrow implementation inventories.
++- If existing topic names are provided in the context above, ensure that coverage is maintained and deepened while refreshing the conceptual examples.
++- Return only the structured JSON response defined by the schema.`;
++}
++
++export const DOMAIN_GENERATION_SCHEMA = {
++  type: Type.OBJECT,
++  properties: {
++    topics: {
++      type: Type.ARRAY,
++      description: 'List of broad domain disciplines and intersecting topics.',
++      items: {
++        type: Type.OBJECT,
++        properties: {
++          name: {
++            type: Type.STRING,
++            description: 'Name of the discipline or intersecting topic.',
++          },
++          category: {
++            type: Type.STRING,
++            description: 'Category: "discipline" or "intersecting".',
++          },
++          description: {
++            type: Type.STRING,
++            description: 'Brief 1-2 sentence description of what this domain area encompasses.',
++          },
++          keyTerminology: {
++            type: Type.ARRAY,
++            description: 'General concept examples, mental models, and principles characteristic of this topic.',
++            items: {
++              type: Type.STRING,
++            },
++          },
++          conventions: {
++            type: Type.ARRAY,
++            description: 'Optional general interpretive guidelines or conventions.',
++            items: {
++              type: Type.STRING,
++            },
++          },
++        },
++        required: ['name', 'keyTerminology'],
++      },
++    },
++  },
++  required: ['topics'],
++};
++
++export function validateGeneratedDomainKnowledge(
++  rawJsonText: string | undefined | null,
++  rawResponse?: {
++    candidates?: Array<{ finishReason?: string }>;
++    promptFeedback?: { blockReason?: string };
++  }
++): DomainTopic[] {
++  if (rawResponse?.promptFeedback?.blockReason) {
++    throw new ValidationError(`The model blocked this request: ${rawResponse.promptFeedback.blockReason}`);
++  }
++
++  const finishReason = rawResponse?.candidates?.[0]?.finishReason;
++  if (finishReason === 'MAX_TOKENS') {
++    throw new ValidationError('The model stopped before returning complete domain knowledge. Please try again.');
++  }
++
++  if (!rawJsonText || typeof rawJsonText !== 'string' || !rawJsonText.trim()) {
++    throw new ValidationError('The model returned an empty response.');
++  }
++
++  let parsed: any;
++  try {
++    parsed = JSON.parse(rawJsonText);
++  } catch {
++    throw new ValidationError('The model returned malformed domain knowledge data.');
++  }
++
++  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.topics)) {
++    throw new ValidationError('The model response did not contain a valid topics array.');
++  }
++
++  if (parsed.topics.length === 0) {
++    throw new ValidationError('The model generated no domain topics. Please try again with different fields.');
++  }
++
++  const validatedTopics: DomainTopic[] = [];
++  const now = Date.now();
++
++  for (let i = 0; i < parsed.topics.length; i++) {
++    const raw = parsed.topics[i];
++    if (!raw || typeof raw !== 'object') continue;
++    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
++    if (!name) continue;
++
++    const category: 'discipline' | 'intersecting' = raw.category === 'discipline' ? 'discipline' : 'intersecting';
++    const description = typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : undefined;
++
++    const terms: string[] = Array.isArray(raw.keyTerminology)
++      ? raw.keyTerminology
++          .filter((t: unknown) => typeof t === 'string' && (t as string).trim())
++          .map((t: string) => (t as string).trim())
++      : [];
++
++    const conventions: string[] = Array.isArray(raw.conventions)
++      ? raw.conventions
++          .filter((c: unknown) => typeof c === 'string' && (c as string).trim())
++          .map((c: string) => (c as string).trim())
++      : [];
++
++    validatedTopics.push({
++      id: `topic-${now}-${i + 1}-${Math.random().toString(36).slice(2, 7)}`,
++      name,
++      category,
++      description,
++      keyTerminology: terms,
++      conventions,
++      enabled: true,
++    });
++  }
++
++  if (validatedTopics.length === 0) {
++    throw new ValidationError('No valid domain topics could be extracted from the model response.');
++  }
++
++  return validatedTopics;
++}
+diff --git a/src/types.ts b/src/types.ts
+index b8ea85a..cbf88f3 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -304,3 +304,14 @@ export interface PortfolioDiscoveryResult {
+   agentSummary: string;
+ }
++
++export interface GenerateDomainKnowledgeRequest {
++  field?: string;
++  disciplines?: string[];
++  existingTopics?: string[];
++  model?: GeminiModelChoice;
++  reasoningLevel?: ReasoningLevelChoice;
++}
++
++export interface GenerateDomainKnowledgeResponse {
++  topics: DomainTopic[];
++}
+diff --git a/tests/domainGeneration.test.ts b/tests/domainGeneration.test.ts
+new file mode 100644
+index 0000000..f98642e
+--- /dev/null
++++ b/tests/domainGeneration.test.ts
+@@ -0,0 +1,148 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import {
++  validateDomainGenerationRequest,
++  buildDomainGenerationPrompt,
++  validateGeneratedDomainKnowledge,
++} from '../src/domainGeneration';
++import { normalizeDomainExpertise } from '../src/writingPipeline';
++
++test('validateDomainGenerationRequest accepts valid field and disciplines', () => {
++  const input = {
++    field: 'UX Copywriting & Content Design',
++    disciplines: ['UX Copywriting', 'Content Design'],
++    existingTopics: ['Monetization UX'],
++    model: 'gemini-3.1-pro-preview',
++    reasoningLevel: 'auto',
++  };
++
++  const validated = validateDomainGenerationRequest(input);
++  assert.equal(validated.field, 'UX Copywriting & Content Design');
++  assert.deepEqual(validated.disciplines, ['UX Copywriting', 'Content Design']);
++  assert.deepEqual(validated.existingTopics, ['Monetization UX']);
++  assert.equal(validated.model, 'gemini-3.1-pro-preview');
++  assert.equal(validated.reasoningLevel, 'auto');
++});
++
++test('validateDomainGenerationRequest rejects empty field and disciplines', () => {
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: '', disciplines: [] }),
++    /provide at least one field or discipline/i
++  );
++});
++
++test('validateDomainGenerationRequest rejects requests containing private user data or drafts', () => {
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', draft: 'Sensitive text' }),
++    /private user content/i
++  );
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', samples: [{ id: '1', content: 'x' }] }),
++    /private user content/i
++  );
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', productKnowledge: [{ id: 'p', name: 'Atlas' }] }),
++    /private user content/i
++  );
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', customNotes: 'Do not share' }),
++    /private user content/i
++  );
++});
++
++test('validateDomainGenerationRequest rejects invalid model choices', () => {
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', model: 'unsupported-model-v1' }),
++    /model choice is invalid/i
++  );
++});
++
++test('buildDomainGenerationPrompt delimits context with boundaries and excludes private data', () => {
++  const prompt = buildDomainGenerationPrompt({
++    field: 'Distributed Systems',
++    disciplines: ['Distributed Systems', 'Observability'],
++    existingTopics: ['Consensus Protocols'],
++  });
++
++  assert.match(prompt, /<domain-context>/);
++  assert.match(prompt, /<primary-field>Distributed Systems<\/primary-field>/);
++  assert.match(prompt, /<discipline>Observability<\/discipline>/);
++  assert.match(prompt, /<topic-name>Consensus Protocols<\/topic-name>/);
++  assert.match(prompt, /General conceptual principles only/i);
++  assert.match(prompt, /Do NOT include case-specific numbers/i);
++  assert.doesNotMatch(prompt, /draft|writing-sample|product-reference/i);
++});
++
++test('validateGeneratedDomainKnowledge parses valid output and generates local stable IDs', () => {
++  const rawJson = JSON.stringify({
++    topics: [
++      {
++        name: 'Information Architecture',
++        category: 'discipline',
++        description: 'Structural design of shared information spaces.',
++        keyTerminology: ['hierarchy', 'taxonomy', 'wayfinding'],
++        conventions: ['Map structures before writing content'],
++      },
++      {
++        name: 'Conversion UX',
++        category: 'intersecting',
++        description: 'Designing clear decision moments.',
++        keyTerminology: ['value proposition', 'friction reduction'],
++      },
++    ],
++  });
++
++  const topics = validateGeneratedDomainKnowledge(rawJson);
++  assert.equal(topics.length, 2);
++  assert.equal(topics[0].name, 'Information Architecture');
++  assert.equal(topics[0].category, 'discipline');
++  assert.ok(topics[0].id.startsWith('topic-'));
++  assert.equal(topics[0].enabled, true);
++  assert.deepEqual(topics[0].keyTerminology, ['hierarchy', 'taxonomy', 'wayfinding']);
++  assert.deepEqual(topics[0].conventions, ['Map structures before writing content']);
++  assert.equal(topics[1].name, 'Conversion UX');
++  assert.equal(topics[1].category, 'intersecting');
++});
++
++test('validateGeneratedDomainKnowledge rejects blocked or truncated responses', () => {
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('{"topics":[]}', { promptFeedback: { blockReason: 'SAFETY' } }),
++    /blocked this request/i
++  );
++
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('{"topics":[{"name": "Incomplete"', { candidates: [{ finishReason: 'MAX_TOKENS' }] }),
++    /stopped before returning complete domain knowledge/i
++  );
++
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('{"topics":[]}'),
++    /generated no domain topics/i
++  );
++
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('not json'),
++    /malformed domain knowledge data/i
++  );
++});
++
++test('merging generated topics preserves existing product knowledge and audience context', () => {
++  const initial = normalizeDomainExpertise({
++    enabled: true,
++    field: 'UX Copywriting',
++    disciplines: ['UX Copywriting'],
++    topics: [{ id: 'old-1', name: 'Old Topic', keyTerminology: ['old-term'], conventions: [], enabled: true }],
++    keyTerminology: ['old-term'],
++    conventions: [],
++    audienceContext: 'Staff Designers',
++    customNotes: 'Keep voice warm.',
++    productKnowledge: [{ id: 'prod-1', name: 'Existing Product', notes: 'v1 features', enabled: true }],
++  });
++
++  const newTopics = validateGeneratedDomainKnowledge(JSON.stringify({
++    topics: [{ name: 'New Topic', keyTerminology: ['new-term'], conventions: [] }],
++  }));
++
++  const updated = normalizeDomainExpertise({
++    ...initial,
++    topics: newTopics,
++    keyTerminology: [],
++    conventions: [],
++  });
++
++  assert.equal(updated.topics.length, 1);
++  assert.equal(updated.topics[0].name, 'New Topic');
++  assert.deepEqual(updated.productKnowledge, initial.productKnowledge);
++  assert.equal(updated.audienceContext, 'Staff Designers');
++  assert.equal(updated.customNotes, 'Keep voice warm.');
++  assert.deepEqual(updated.keyTerminology, []);
++});
+diff --git a/tests/writingPipeline.test.ts b/tests/writingPipeline.test.ts
+index c6b4b45..c88bc61 100644
+--- a/tests/writingPipeline.test.ts
++++ b/tests/writingPipeline.test.ts
+@@ -17,5 +17,4 @@ import {
+   validateGeneratedProse,
+   validateWritingCorpus,
+ } from '../src/writingPipeline';
+-import { UX_PORTFOLIO_PRESET, presetToDomainExpertise } from '../src/data/domainPresets';
+ 
+@@ -248,12 +247,19 @@ test('toggling or removing a topic removes its prompt contribution without term
+   assert.doesNotMatch(removedPrompt, /term-b1/);
+ });
+ 
+-test('presetToDomainExpertise preserves existing product entries', () => {
++test('normalizeDomainExpertise preserves existing product entries', () => {
+   const existingProducts = [
+     { id: 'p-saved', name: 'Existing Product', notes: 'Saved notes from user', enabled: true },
+   ];
+-  const expertise = presetToDomainExpertise(UX_PORTFOLIO_PRESET, existingProducts);
++  const expertise = normalizeDomainExpertise({
++    enabled: true,
++    field: 'UX Copywriting & Content Design',
++    disciplines: ['UX Copywriting'],
++    topics: [],
++    keyTerminology: [],
++    conventions: [],
++    audienceContext: 'Audience',
++    productKnowledge: existingProducts,
++  });
+   assert.equal(expertise.productKnowledge?.length, 1);
+   assert.equal(expertise.productKnowledge?.[0].name, 'Existing Product');
+   assert.equal(expertise.keyTerminology.length, 0); // single-owner: topic terms not aggregated into global
+ });
+```
+
+### Verification Guidance
+- **Run automated checks**: `npm test` runs both `tests/writingPipeline.test.ts` and `tests/domainGeneration.test.ts`. Run `npm run lint` to verify type checking.
+- **Desktop UI verification**: Open the Domain view; verify empty state prompts broad knowledge generation without static presets; verify Generate populates disciplines and topics; verify Regenerate replaces only the topics section; verify Clear empties topics while preserving product knowledge and audience context; verify "Add product" creates an entry with focused input.
+The walkthrough artifact has been created at [`walkthrough.md`](file:///home/mason/.gemini/antigravity-cli/brain/5fe11d5e-8c27-4706-9146-da4547524b8f/walkthrough.md).
+
+In accordance with execution limits (read-only inspection, no shell commands, file edits, or browser automation), below is the complete unified diff ready for root application and QA.
+
+### Complete Applicable Unified Diff
+
+```diff
+diff --git a/README.md b/README.md
+index f1c2ec3..a8eb829 100644
+--- a/README.md
++++ b/README.md
+@@ -31,8 +31,8 @@ The Domain view configures disciplinary concepts and product reference knowledge
+ - **Concept recognition**: Disciplinary concepts (such as information hierarchy, user comprehension, informed choice, product value, and conversion) help the model recognize and articulate thinking already present in drafts without forcing jargon or fabricating unperformed work.
+ - **Product reference knowledge**: Product notes supply factual background for interpreting product names, feature relationships, and historical periods. Product discrepancies are flagged as observations in the advisory review rather than silently altering source facts.
+ - **Topic single-ownership**: Topic content has single ownership; disabling or deleting a topic removes its prompt contribution without term leakage. Empty topic lists are preserved.
+-- **Scope controls**: The page-level active switch controls all knowledge on the Domain page; individual topic and product toggles choose included entries.
++- **API generation and broad coverage**: Disciplinary topics and concepts are populated dynamically via `/api/generate-domain-knowledge` from configured core disciplines and audience context, rather than static presets. Use **Generate domain knowledge** when empty, **Regenerate** to replace only the topics section, or **Clear** to empty topics while preserving product notes, audience context, and custom domain guidance.
++- **Scope controls**: The page-level active switch controls all knowledge on the Domain page; individual topic and product toggles choose included entries.
+ 
+-The original draft starts empty. Use **Load sample** for the example, or **Clear** to empty only the draft input. Existing custom domain settings are retained; loading the UX Portfolio preset applies the broader concept examples and keeps product references.
++The original draft starts empty. Use **Load sample** for the example, or **Clear** to empty only the draft input. Existing custom domain settings, audience context, and product references are retained across sessions.
+ 
+diff --git a/server.ts b/server.ts
+index c6fb8b4..c8a6b18 100644
+--- a/server.ts
++++ b/server.ts
+@@ -24,6 +24,12 @@ import {
+   type RawWritingSample,
+   type SelectionRange,
+ } from './src/writingPipeline';
++import {
++  buildDomainGenerationPrompt,
++  DOMAIN_GENERATION_SCHEMA,
++  validateDomainGenerationRequest,
++  validateGeneratedDomainKnowledge,
++} from './src/domainGeneration';
+ 
+ dotenv.config();
+ 
+@@ -1111,6 +1117,33 @@ async function executeReviewStage(params: {
+   }
+ }
+ 
++app.post('/api/generate-domain-knowledge', async (req: Request, res: Response) => {
++  try {
++    const validatedInput = validateDomainGenerationRequest(req.body);
++    const prompt = buildDomainGenerationPrompt({
++      field: validatedInput.field,
++      disciplines: validatedInput.disciplines,
++      existingTopics: validatedInput.existingTopics,
++    });
++
++    const response = await generateContentWithRetry({
++      contents: prompt,
++      preferredModel: validatedInput.model,
++      reasoningLevel: validatedInput.reasoningLevel,
++      endpoint: 'generate-domain-knowledge',
++      allowFallback: false,
++      config: {
++        responseMimeType: 'application/json',
++        responseSchema: DOMAIN_GENERATION_SCHEMA,
++      },
++    });
++
++    const topics = validateGeneratedDomainKnowledge(response.text, response as any);
++    return res.json({ topics });
++  } catch (error: any) {
++    console.error('Error generating domain knowledge:', error);
++    return res.status(statusForError(error)).json({
++      error: error.message || 'Failed to generate domain knowledge',
++    });
++  }
++});
++
+ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
+   try {
+     const operationStart = Date.now();
+diff --git a/src/components/DomainView.tsx b/src/components/DomainView.tsx
+index ca1d4ae..f87ab2e 100644
+--- a/src/components/DomainView.tsx
++++ b/src/components/DomainView.tsx
+@@ -21,8 +21,10 @@ import {
+   ChevronDown,
+   ChevronUp,
+   Package,
++  RefreshCw,
++  Trash2,
++  AlertCircle,
+ } from 'lucide-react';
+-import { UX_PORTFOLIO_PRESET, SYSTEMS_ENGINEERING_PRESET, presetToDomainExpertise } from '../data/domainPresets';
+ import { normalizeDomainExpertise } from '../writingPipeline';
+ 
+ export const DomainView: React.FC = () => {
+@@ -30,6 +32,7 @@ export const DomainView: React.FC = () => {
+     domainExpertise,
+     updateDomainExpertise,
+     setActiveTab,
++    modelSettings,
+   } = useWritingAssistant();
+ 
+   const [localExpertise, setLocalExpertise] = useState<DomainExpertise>(() => {
+@@ -38,6 +41,8 @@ export const DomainView: React.FC = () => {
+ 
+   const [newDisciplineInput, setNewDisciplineInput] = useState('');
+   const [savedFeedback, setSavedFeedback] = useState(false);
++  const [isGenerating, setIsGenerating] = useState(false);
++  const [generationError, setGenerationError] = useState<string | null>(null);
+ 
+   // Quick state for adding a new topic
+   const [isAddingTopic, setIsAddingTopic] = useState(false);
+@@ -272,9 +277,17 @@ export const DomainView: React.FC = () => {
+   };
+ 
+   // Product reference knowledge management
++  const createLocalProductId = () => {
++    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
++      return `product-${crypto.randomUUID()}`;
++    }
++    return `product-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
++  };
++
+   const handleAddProduct = () => {
++    const newId = createLocalProductId();
+     const newProduct: ProductReference = {
+-      id: `product-${crypto.randomUUID()}`,
++      id: newId,
+       name: '',
+       notes: '',
+       enabled: true,
+@@ -283,6 +296,12 @@ export const DomainView: React.FC = () => {
+       ...localExpertise,
+       productKnowledge: [...(localExpertise.productKnowledge || []), newProduct],
+     });
++    setTimeout(() => {
++      const input = document.getElementById(`product-name-${newId}`);
++      if (input) {
++        input.focus();
++      }
++    }, 50);
+   };
+ 
+   const handleUpdateProduct = (id: string, updates: Partial<ProductReference>) => {
+@@ -303,15 +322,60 @@ export const DomainView: React.FC = () => {
+     });
+   };
+ 
+-  // Load preset
+-  const handleApplyPreset = (preset: typeof UX_PORTFOLIO_PRESET) => {
+-    const configured = presetToDomainExpertise(preset, localExpertise.productKnowledge);
+-    setLocalExpertise(configured);
+-    updateDomainExpertise(configured);
+-    if (configured.customNotes) {
+-      setGuidelinesText(configured.customNotes);
++  const handleGenerateKnowledge = async () => {
++    if (isGenerating) return;
++    setIsGenerating(true);
++    setGenerationError(null);
++
++    try {
++      const existingTopicNames = (localExpertise.topics || [])
++        .map((t) => t.name)
++        .filter(Boolean);
++
++      const res = await fetch('/api/generate-domain-knowledge', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++          field: localExpertise.field || (localExpertise.disciplines || []).join(' & '),
++          disciplines: localExpertise.disciplines || [],
++          existingTopics: existingTopicNames,
++          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
++          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
++        }),
++      });
++
++      if (!res.ok) {
++        const errData = await res.json().catch(() => ({}));
++        throw new Error(errData.error || 'Failed to generate domain knowledge');
++      }
++
++      const { topics: newTopics } = await res.json();
++      if (!Array.isArray(newTopics) || newTopics.length === 0) {
++        throw new Error('No domain topics returned by the server.');
++      }
++
++      setLocalExpertise((prev) => {
++        const updated: DomainExpertise = {
++          ...prev,
++          topics: newTopics,
++          keyTerminology: [],
++          conventions: [],
++        };
++        const normalized = normalizeDomainExpertise(updated);
++        updateDomainExpertise(normalized);
++        return normalized;
++      });
++      flashSaved();
++    } catch (err: any) {
++      console.error('Domain generation failed:', err);
++      setGenerationError(err.message || 'Failed to generate domain knowledge');
++    } finally {
++      setIsGenerating(false);
+     }
+-    flashSaved();
++  };
++
++  const handleClearTopics = () => {
++    if (isGenerating) return;
++    setGenerationError(null);
++    const updated: DomainExpertise = {
++      ...localExpertise,
++      topics: [],
++      keyTerminology: [],
++      conventions: [],
++    };
++    saveExpertise(updated);
++  };
++
+   const handleGuidelinesChange = (val: string) => {
+@@ -340,7 +404,8 @@ export const DomainView: React.FC = () => {
+     return <Layers className="w-3.5 h-3.5 text-neutral-600" />;
+   };
+ 
+-  const activeTopicCount = (localExpertise.topics || []).filter((t) => t.enabled).length;
++  const topicsList = localExpertise.topics || [];
++  const hasTopics = topicsList.length > 0;
++  const activeTopicCount = topicsList.filter((t) => t.enabled).length;
+   const activeProductCount = (localExpertise.productKnowledge || []).filter((p) => p.enabled).length;
+ 
+   return (
+@@ -382,17 +447,6 @@ export const DomainView: React.FC = () => {
+             </span>
+           )}
+ 
+-          <button
+-            id="btn-apply-ux-preset"
+-            type="button"
+-            onClick={() => handleApplyPreset(UX_PORTFOLIO_PRESET)}
+-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition"
+-            title="Reset to default UX Portfolio configuration"
+-          >
+-            <RotateCcw className="w-3 h-3 text-neutral-500" />
+-            <span>Load UX Portfolio Preset</span>
+-          </button>
+-
+           <button
+             id="btn-domain-to-studio"
+             type="button"
+@@ -550,19 +604,65 @@ export const DomainView: React.FC = () => {
+       {/* Intersecting Fields & Topics Cards */}
+       <div className="space-y-4">
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+           <div>
+-            <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
+-              <Sparkles className="w-4 h-4 text-neutral-800" />
+-              <span>Intersecting Fields, Disciplines & Topics</span>
+-            </h2>
++            <div className="flex items-center gap-2 flex-wrap">
++              <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
++                <Sparkles className="w-4 h-4 text-neutral-800" />
++                <span>Intersecting Fields, Disciplines & Topics</span>
++              </h2>
++              <span className="text-[11px] font-mono text-neutral-400">
++                Model: {modelSettings.analysisModel || 'gemini-3.1-pro-preview'}
++              </span>
++            </div>
+             <p className="text-xs text-neutral-500 mt-0.5">
+               Choose the fields the model should draw on. Concepts are examples to recognize when relevant, not a list of words to include.
+             </p>
++            {hasTopics && (
++              <p className="text-[11px] text-neutral-400 mt-0.5">
++                Regenerating replaces only the topics and concepts below using your configured fields.
++              </p>
++            )}
+           </div>
+ 
+-          <button
+-            type="button"
+-            id="btn-open-add-topic"
+-            onClick={() => setIsAddingTopic(!isAddingTopic)}
+-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs self-start"
+-          >
+-            <Plus className="w-3.5 h-3.5 text-neutral-600" />
+-            <span>Add field or topic</span>
+-          </button>
++          <div className="flex items-center gap-2 self-start flex-wrap">
++            {hasTopics && (
++              <>
++                <button
++                  type="button"
++                  id="btn-regenerate-topics"
++                  disabled={isGenerating}
++                  onClick={handleGenerateKnowledge}
++                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
++                  title="Regenerate topics and concepts from your configured fields (replaces this section)"
++                >
++                  <RefreshCw className={`w-3.5 h-3.5 text-neutral-500 ${isGenerating ? 'animate-spin' : ''}`} />
++                  <span>{isGenerating ? 'Regenerating...' : 'Regenerate'}</span>
++                </button>
++
++                <button
++                  type="button"
++                  id="btn-clear-topics"
++                  disabled={isGenerating}
++                  onClick={handleClearTopics}
++                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
++                  title="Clear all topics and concept examples from this section"
++                >
++                  <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
++                  <span>Clear</span>
++                </button>
++              </>
++            )}
++
++            <button
++              type="button"
++              id="btn-open-add-topic"
++              disabled={isGenerating}
++              onClick={() => setIsAddingTopic(!isAddingTopic)}
++              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs disabled:opacity-50"
++            >
++              <Plus className="w-3.5 h-3.5 text-neutral-600" />
++              <span>Add field or topic</span>
++            </button>
++          </div>
+         </div>
+ 
++        {generationError && (
++          <div
++            id="domain-generation-error"
++            className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between animate-in fade-in"
++          >
++            <div className="flex items-center gap-2">
++              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
++              <span>{generationError}</span>
++            </div>
++            <button
++              type="button"
++              onClick={() => setGenerationError(null)}
++              className="text-rose-500 hover:text-rose-700 p-1 rounded"
++              title="Dismiss error"
++            >
++              <X className="w-3.5 h-3.5" />
++            </button>
++          </div>
++        )}
++
+         {/* Add New Topic Form */}
+         {isAddingTopic && (
+           <form
+@@ -677,6 +777,26 @@ export const DomainView: React.FC = () => {
+         )}
+ 
++        {!hasTopics ? (
++          <div className="p-8 rounded-xl bg-neutral-50/70 border border-dashed border-neutral-300 text-center space-y-3">
++            <Sparkles className="w-6 h-6 text-neutral-400 mx-auto" />
++            <div className="space-y-1">
++              <h3 className="text-xs font-semibold text-neutral-800">
++                No domain topics generated yet
++              </h3>
++              <p className="text-[11px] text-neutral-500 max-w-md mx-auto leading-relaxed">
++                Generate broad domain disciplines, intersecting topics, and concept examples based on your configured core disciplines above. You can also add topics manually.
++              </p>
++            </div>
++            <button
++              type="button"
++              id="btn-generate-topics-empty"
++              disabled={isGenerating}
++              onClick={handleGenerateKnowledge}
++              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition shadow-xs disabled:opacity-50"
++            >
++              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
++              <span>{isGenerating ? 'Generating knowledge...' : 'Generate domain knowledge'}</span>
++            </button>
++          </div>
++        ) : (
+           {/* Topics Grid */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-          {(localExpertise.topics || []).map((topic) => {
++          {topicsList.map((topic) => {
+             const isExpanded = expandedTopicIds.has(topic.id);
+             const termInputVal = topicTermInputs[topic.id] || '';
+ 
+@@ -860,6 +980,7 @@ export const DomainView: React.FC = () => {
+             );
+           })}
+         </div>
++        )}
+       </div>
+ 
+       {/* Product Knowledge Reference Section */}
+diff --git a/src/context/WritingAssistantContext.tsx b/src/context/WritingAssistantContext.tsx
+index a959141..be79b76 100644
+--- a/src/context/WritingAssistantContext.tsx
++++ b/src/context/WritingAssistantContext.tsx
+@@ -64,3 +64,3 @@ interface WritingAssistantContextType {
+   // Domain Expertise
+   domainExpertise: DomainExpertise;
+   setDomainExpertise: React.Dispatch<React.SetStateAction<DomainExpertise>>;
+-  updateDomainExpertise: (expertise: DomainExpertise) => void;
++  updateDomainExpertise: (expertise: DomainExpertise | ((prev: DomainExpertise) => DomainExpertise)) => void;
+@@ -359,9 +359,15 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
+-  const updateDomainExpertise = (newExpertise: DomainExpertise) => {
+-    const normalized = normalizeDomainExpertise(newExpertise);
+-    setDomainExpertise(normalized);
+-    setActiveProfile((prev) => ({
+-      ...prev,
+-      domainExpertise: normalized,
+-      updatedAt: new Date().toISOString(),
+-    }));
++  const updateDomainExpertise = (
++    newExpertise: DomainExpertise | ((prev: DomainExpertise) => DomainExpertise)
++  ) => {
++    setActiveProfile((prevProfile) => {
++      const baseExpertise = prevProfile.domainExpertise || domainExpertise;
++      const resolved = typeof newExpertise === 'function' ? newExpertise(baseExpertise) : newExpertise;
++      const normalized = normalizeDomainExpertise(resolved);
++      setDomainExpertise(normalized);
++      return {
++        ...prevProfile,
++        domainExpertise: normalized,
++        updatedAt: new Date().toISOString(),
++      };
++    });
+   };
+diff --git a/src/data/defaultSamples.ts b/src/data/defaultSamples.ts
+index c6d2745..77918a2 100644
+--- a/src/data/defaultSamples.ts
++++ b/src/data/defaultSamples.ts
+@@ -1,3 +1,2 @@
+ import { WritingSample, StyleProfile } from '../types';
+-import { UX_PORTFOLIO_PRESET, presetToDomainExpertise } from './domainPresets';
+ 
+@@ -220,5 +219,13 @@ export const DEFAULT_PROFILE: StyleProfile = {
+   customDirectives: 'Maintain strong authorial conviction. Never apologize for having an opinion. Always keep the reader leaning in.',
+   domainExpertise: {
+-    ...presetToDomainExpertise(UX_PORTFOLIO_PRESET),
+     enabled: false,
++    field: 'UX Copywriting & Content Design',
++    disciplines: ['UX Copywriting', 'Content Design'],
++    topics: [],
++    keyTerminology: [],
++    conventions: [],
++    audienceContext: 'Design directors, VP of Product, design leads, hiring managers, and cross-functional product partners evaluating portfolio case studies.',
++    customNotes: 'Use domain knowledge to recognize thinking already demonstrated in the draft. Name or explain a concept when it makes the reasoning clearer, alongside the concrete decision or example. Keep the language accessible. Do not invent actions, intentions, evidence, or outcomes.',
++    productKnowledge: [],
+   }
+ };
+diff --git a/src/data/domainPresets.ts b/src/data/domainPresets.ts
+deleted file mode 100644
+index 36d501d..0000000
+--- a/src/data/domainPresets.ts
++++ /dev/null
+@@ -1,152 +0,0 @@
+-import { DomainTopic, DomainExpertise, ProductReference } from '../types';
+-
+-export interface DomainPreset {
+-  id: string;
+-  name: string;
+-  field: string;
+-  disciplines: string[];
+-  audienceContext: string;
+-  customNotes: string;
+-  topics: DomainTopic[];
+-}
+-
+-export const UX_PORTFOLIO_PRESET: DomainPreset = {
+-  id: 'ux-portfolio-case-study',
+-  name: 'UX Copywriting & Content Design (with Monetization, AI Translation & AI Writing)',
+-  field: 'UX Copywriting & Content Design',
+-  disciplines: ['UX Copywriting', 'Content Design'],
+-  audienceContext: 'Design directors, VP of Product, design leads, hiring managers, and cross-functional product partners evaluating portfolio case studies.',
+-  customNotes: 'Use domain knowledge to recognize thinking already demonstrated in the draft. Name or explain a concept when it makes the reasoning clearer, alongside the concrete decision or example. Keep the language accessible. Do not invent actions, intentions, evidence, or outcomes.',
+-  topics: [
+-    {
+-      id: 'topic-content-design',
+-      name: 'UX Copywriting & Content Design',
+-      category: 'discipline',
+-      description: 'How content helps people understand information, find what they need, and make decisions.',
+-      enabled: true,
+-      keyTerminology: [
+-        'information hierarchy',
+-        'user comprehension',
+-        'navigation & findability',
+-        'informed choice',
+-        'consistency & accessibility',
+-      ],
+-      conventions: [
+-        'Connect relevant concepts to the content decisions described in the draft.',
+-      ],
+-    },
+-    {
+-      id: 'topic-monetization',
+-      name: 'Monetization & Conversion UX',
+-      category: 'intersecting',
+-      description: 'How people understand product value and choose between free and paid access, including plans and billing frequency.',
+-      enabled: true,
+-      keyTerminology: [
+-        'product value',
+-        'free & paid access',
+-        'pricing clarity',
+-        'conversion',
+-        'retention',
+-      ],
+-      conventions: [
+-        'Explain commercial reasoning through the user needs and choices shown in the draft.',
+-      ],
+-    },
+-    {
+-      id: 'topic-ai-translation',
+-      name: 'AI Translation & Localization',
+-      category: 'intersecting',
+-      description: 'How meaning, terminology, and context carry across languages and localized experiences.',
+-      enabled: true,
+-      keyTerminology: [
+-        'meaning across languages',
+-        'terminology consistency',
+-        'cultural context',
+-        'localization',
+-        'translation quality',
+-      ],
+-      conventions: [
+-        'Use translation concepts where they help explain the work; distinguish product capabilities from localization practices.',
+-      ],
+-    },
+-    {
+-      id: 'topic-ai-writing-assistance',
+-      name: 'AI Writing Assistance',
+-      category: 'intersecting',
+-      description: 'How writing tools help authors improve their work while retaining control over meaning and expression.',
+-      enabled: true,
+-      keyTerminology: [
+-        'author control',
+-        'writing quality',
+-        'voice & tone',
+-        'trust & transparency',
+-        'interaction feedback',
+-      ],
+-      conventions: [
+-        'Connect writing-assistance concepts to the interactions actually described.',
+-      ],
+-    },
+-  ],
+-};
+-
+-export const SYSTEMS_ENGINEERING_PRESET: DomainPreset = {
+-  id: 'systems-engineering',
+-  name: 'Distributed Systems & Software Engineering',
+-  field: 'Software Engineering & Distributed Systems',
+-  disciplines: ['Distributed Systems', 'Software Engineering'],
+-  audienceContext: 'Senior engineers, product architects, and technology leaders who value intellectual honesty and technical precision.',
+-  customNotes: 'Balance rigorous engineering concepts with evocative, tactile craftsmanship.',
+-  topics: [
+-    {
+-      id: 'topic-core-distributed-systems',
+-      name: 'Distributed Systems Core',
+-      category: 'discipline',
+-      description: 'Consensus, latency, idempotency, failure domains, and operational observability.',
+-      enabled: true,
+-      keyTerminology: [
+-        'latency',
+-        'p99 / tail performance',
+-        'idempotency',
+-        'blast radius',
+-        'distributed consensus',
+-        'observability',
+-        'API contracts',
+-        'friction points',
+-      ],
+-      conventions: [
+-        'Distinguish core architectural mechanisms from superficial symptoms',
+-        'Quantify performance trade-offs rather than using qualitative hype',
+-        'Avoid vague corporate buzzwords; describe concrete system states',
+-        'Acknowledge failure modes and operational boundaries explicitly',
+-      ],
+-    },
+-  ],
+-};
+-
+-export const DOMAIN_PRESETS: DomainPreset[] = [
+-  UX_PORTFOLIO_PRESET,
+-  SYSTEMS_ENGINEERING_PRESET,
+-];
+-
+-// Helper to convert a DomainPreset to a DomainExpertise object
+-export function presetToDomainExpertise(
+-  preset: DomainPreset,
+-  existingProductKnowledge?: ProductReference[]
+-): DomainExpertise {
+-  return {
+-    enabled: true,
+-    field: preset.field,
+-    disciplines: [...preset.disciplines],
+-    topics: preset.topics.map((t) => ({
+-      ...t,
+-      keyTerminology: [...t.keyTerminology],
+-      conventions: [...t.conventions],
+-    })),
+-    keyTerminology: [],
+-    conventions: [],
+-    audienceContext: preset.audienceContext,
+-    customNotes: preset.customNotes,
+-    productKnowledge: existingProductKnowledge ? [...existingProductKnowledge] : [],
+-  };
+-}
+diff --git a/src/domainGeneration.ts b/src/domainGeneration.ts
+new file mode 100644
+index 0000000..c57bf30
+--- /dev/null
++++ b/src/domainGeneration.ts
+@@ -0,0 +1,192 @@
++import { Type } from '@google/genai';
++import { DomainTopic, GeminiModelChoice, ReasoningLevelChoice } from './types';
++import { ValidationError } from './writingPipeline';
++
++const SUPPORTED_MODELS: GeminiModelChoice[] = [
++  'gemini-3.8-flash',
++  'gemini-3.7-flash',
++  'gemini-3.6-flash',
++  'gemini-3.1-pro-preview',
++];
++
++const SUPPORTED_REASONING_LEVELS: ReasoningLevelChoice[] = [
++  'auto',
++  'minimal',
++  'low',
++  'high',
++];
++
++export interface ValidatedDomainGenerationInput {
++  field: string;
++  disciplines: string[];
++  existingTopics: string[];
++  model: GeminiModelChoice;
++  reasoningLevel: ReasoningLevelChoice;
++}
++
++export function validateDomainGenerationRequest(body: unknown): ValidatedDomainGenerationInput {
++  if (!body || typeof body !== 'object' || Array.isArray(body)) {
++    throw new ValidationError('Request body must be an object.');
++  }
++
++  const record = body as Record<string, unknown>;
++
++  if (
++    'draft' in record ||
++    'samples' in record ||
++    'productKnowledge' in record ||
++    'customNotes' in record ||
++    'notes' in record
++  ) {
++    throw new ValidationError(
++      'Private user content, drafts, samples, product notes, or custom guidance must not be included in domain knowledge generation.'
++    );
++  }
++
++  let field = '';
++  if (record.field !== undefined && record.field !== null) {
++    if (typeof record.field !== 'string') {
++      throw new ValidationError('field must be a string.');
++    }
++    field = record.field.trim().slice(0, 500);
++  }
++
++  const disciplines: string[] = [];
++  if (record.disciplines !== undefined && record.disciplines !== null) {
++    if (!Array.isArray(record.disciplines)) {
++      throw new ValidationError('disciplines must be an array of strings.');
++    }
++    for (const [idx, item] of record.disciplines.entries()) {
++      if (typeof item !== 'string') {
++        throw new ValidationError(`disciplines[${idx}] must be a string.`);
++      }
++      const trimmed = item.trim().slice(0, 200);
++      if (trimmed) disciplines.push(trimmed);
++    }
++  }
++
++  const existingTopics: string[] = [];
++  if (record.existingTopics !== undefined && record.existingTopics !== null) {
++    if (!Array.isArray(record.existingTopics)) {
++      throw new ValidationError('existingTopics must be an array of topic names.');
++    }
++    for (const [idx, item] of record.existingTopics.entries()) {
++      if (typeof item !== 'string') {
++        throw new ValidationError(`existingTopics[${idx}] must be a string.`);
++      }
++      const trimmed = item.trim().slice(0, 200);
++      if (trimmed) existingTopics.push(trimmed);
++    }
++  }
++
++  if (!field && disciplines.length === 0) {
++    throw new ValidationError('Please provide at least one field or discipline to generate domain knowledge.');
++  }
++
++  let model: GeminiModelChoice = 'gemini-3.1-pro-preview';
++  if (record.model !== undefined && record.model !== null) {
++    if (typeof record.model !== 'string' || !SUPPORTED_MODELS.includes(record.model as GeminiModelChoice)) {
++      throw new ValidationError('model choice is invalid.');
++    }
++    model = record.model as GeminiModelChoice;
++  }
++
++  let reasoningLevel: ReasoningLevelChoice = 'auto';
++  if (record.reasoningLevel !== undefined && record.reasoningLevel !== null) {
++    if (typeof record.reasoningLevel !== 'string' || !SUPPORTED_REASONING_LEVELS.includes(record.reasoningLevel as ReasoningLevelChoice)) {
++      throw new ValidationError('reasoningLevel is invalid.');
++    }
++    reasoningLevel = record.reasoningLevel as ReasoningLevelChoice;
++  }
++
++  return {
++    field,
++    disciplines,
++    existingTopics,
++    model,
++    reasoningLevel,
++  };
++}
++
++export function buildDomainGenerationPrompt(params: {
++  field: string;
++  disciplines: string[];
++  existingTopics?: string[];
++}): string {
++  const sanitize = (str: string) => str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
++
++  const fieldTag = params.field ? `  <primary-field>${sanitize(params.field)}</primary-field>` : '';
++  const disciplinesTag = params.disciplines.length
++    ? `  <disciplines>\n${params.disciplines.map((d) => `    <discipline>${sanitize(d)}</discipline>`).join('\n')}\n  </disciplines>`
++    : '';
++  const existingTopicsTag = params.existingTopics && params.existingTopics.length
++    ? `  <existing-topic-coverage>\n${params.existingTopics.map((t) => `    <topic-name>${sanitize(t)}</topic-name>`).join('\n')}\n  </existing-topic-coverage>`
++    : '';
++
++  return `You are an expert domain knowledge and taxonomy specialist. Based on the domain context delimited below, generate a comprehensive set of broad domain disciplines and intersecting topics that a professional writer, editor, or reviewer would draw upon in this space.
++
++<domain-context>
++${[fieldTag, disciplinesTag, existingTopicsTag].filter(Boolean).join('\n')}
++</domain-context>
++
++TAXONOMY & CONCEPT GENERATION INSTRUCTIONS:
++1. Cover both core field disciplines and relevant intersecting topics (e.g. cross-cutting disciplines, related technologies, user psychology, commercial/conversion realities, and product considerations).
++2. For each topic:
++   - "name": Concise, professional title for the discipline or topic.
++   - "category": Either "discipline" for core disciplinary foundations or "intersecting" for cross-cutting / adjacent domains.
++   - "description": Brief 1-2 sentence overview of what this domain area encompasses and why it matters.
++   - "keyTerminology": A representative collection of general concept examples, mental models, patterns, and principles characteristic of the topic. These are conceptual examples to recognize when relevant—NOT a mandatory vocabulary checklist.
++   - "conventions": Optional 1-3 general interpretive guidelines or conventions for applying concepts in this topic thoughtfully without forcing jargon.
++
++CRITICAL CONSTRAINTS:
++- General conceptual principles only. Do NOT include case-specific numbers, specific company metrics, product claims, mandatory keyword formulas, prose templates, or narrow implementation inventories.
++- If existing topic names are provided in the context above, ensure that coverage is maintained and deepened while refreshing the conceptual examples.
++- Return only the structured JSON response defined by the schema.`;
++}
++
++export const DOMAIN_GENERATION_SCHEMA = {
++  type: Type.OBJECT,
++  properties: {
++    topics: {
++      type: Type.ARRAY,
++      description: 'List of broad domain disciplines and intersecting topics.',
++      items: {
++        type: Type.OBJECT,
++        properties: {
++          name: {
++            type: Type.STRING,
++            description: 'Name of the discipline or intersecting topic.',
++          },
++          category: {
++            type: Type.STRING,
++            description: 'Category: "discipline" or "intersecting".',
++          },
++          description: {
++            type: Type.STRING,
++            description: 'Brief 1-2 sentence description of what this domain area encompasses.',
++          },
++          keyTerminology: {
++            type: Type.ARRAY,
++            description: 'General concept examples, mental models, and principles characteristic of this topic.',
++            items: {
++              type: Type.STRING,
++            },
++          },
++          conventions: {
++            type: Type.ARRAY,
++            description: 'Optional general interpretive guidelines or conventions.',
++            items: {
++              type: Type.STRING,
++            },
++          },
++        },
++        required: ['name', 'keyTerminology'],
++      },
++    },
++  },
++  required: ['topics'],
++};
++
++export function validateGeneratedDomainKnowledge(
++  rawJsonText: string | undefined | null,
++  rawResponse?: {
++    candidates?: Array<{ finishReason?: string }>;
++    promptFeedback?: { blockReason?: string };
++  }
++): DomainTopic[] {
++  if (rawResponse?.promptFeedback?.blockReason) {
++    throw new ValidationError(`The model blocked this request: ${rawResponse.promptFeedback.blockReason}`);
++  }
++
++  const finishReason = rawResponse?.candidates?.[0]?.finishReason;
++  if (finishReason === 'MAX_TOKENS') {
++    throw new ValidationError('The model stopped before returning complete domain knowledge. Please try again.');
++  }
++
++  if (!rawJsonText || typeof rawJsonText !== 'string' || !rawJsonText.trim()) {
++    throw new ValidationError('The model returned an empty response.');
++  }
++
++  let parsed: any;
++  try {
++    parsed = JSON.parse(rawJsonText);
++  } catch {
++    throw new ValidationError('The model returned malformed domain knowledge data.');
++  }
++
++  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.topics)) {
++    throw new ValidationError('The model response did not contain a valid topics array.');
++  }
++
++  if (parsed.topics.length === 0) {
++    throw new ValidationError('The model generated no domain topics. Please try again with different fields.');
++  }
++
++  const validatedTopics: DomainTopic[] = [];
++  const now = Date.now();
++
++  for (let i = 0; i < parsed.topics.length; i++) {
++    const raw = parsed.topics[i];
++    if (!raw || typeof raw !== 'object') continue;
++    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
++    if (!name) continue;
++
++    const category: 'discipline' | 'intersecting' = raw.category === 'discipline' ? 'discipline' : 'intersecting';
++    const description = typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : undefined;
++
++    const terms: string[] = Array.isArray(raw.keyTerminology)
++      ? raw.keyTerminology
++          .filter((t: unknown) => typeof t === 'string' && (t as string).trim())
++          .map((t: string) => (t as string).trim())
++      : [];
++
++    const conventions: string[] = Array.isArray(raw.conventions)
++      ? raw.conventions
++          .filter((c: unknown) => typeof c === 'string' && (c as string).trim())
++          .map((c: string) => (c as string).trim())
++      : [];
++
++    validatedTopics.push({
++      id: `topic-${now}-${i + 1}-${Math.random().toString(36).slice(2, 7)}`,
++      name,
++      category,
++      description,
++      keyTerminology: terms,
++      conventions,
++      enabled: true,
++    });
++  }
++
++  if (validatedTopics.length === 0) {
++    throw new ValidationError('No valid domain topics could be extracted from the model response.');
++  }
++
++  return validatedTopics;
++}
+diff --git a/src/types.ts b/src/types.ts
+index b8ea85a..cbf88f3 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -304,3 +304,14 @@ export interface PortfolioDiscoveryResult {
+   agentSummary: string;
+ }
++
++export interface GenerateDomainKnowledgeRequest {
++  field?: string;
++  disciplines?: string[];
++  existingTopics?: string[];
++  model?: GeminiModelChoice;
++  reasoningLevel?: ReasoningLevelChoice;
++}
++
++export interface GenerateDomainKnowledgeResponse {
++  topics: DomainTopic[];
++}
+diff --git a/tests/domainGeneration.test.ts b/tests/domainGeneration.test.ts
+new file mode 100644
+index 0000000..f98642e
+--- /dev/null
++++ b/tests/domainGeneration.test.ts
+@@ -0,0 +1,148 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import {
++  validateDomainGenerationRequest,
++  buildDomainGenerationPrompt,
++  validateGeneratedDomainKnowledge,
++} from '../src/domainGeneration';
++import { normalizeDomainExpertise } from '../src/writingPipeline';
++
++test('validateDomainGenerationRequest accepts valid field and disciplines', () => {
++  const input = {
++    field: 'UX Copywriting & Content Design',
++    disciplines: ['UX Copywriting', 'Content Design'],
++    existingTopics: ['Monetization UX'],
++    model: 'gemini-3.1-pro-preview',
++    reasoningLevel: 'auto',
++  };
++
++  const validated = validateDomainGenerationRequest(input);
++  assert.equal(validated.field, 'UX Copywriting & Content Design');
++  assert.deepEqual(validated.disciplines, ['UX Copywriting', 'Content Design']);
++  assert.deepEqual(validated.existingTopics, ['Monetization UX']);
++  assert.equal(validated.model, 'gemini-3.1-pro-preview');
++  assert.equal(validated.reasoningLevel, 'auto');
++});
++
++test('validateDomainGenerationRequest rejects empty field and disciplines', () => {
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: '', disciplines: [] }),
++    /provide at least one field or discipline/i
++  );
++});
++
++test('validateDomainGenerationRequest rejects requests containing private user data or drafts', () => {
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', draft: 'Sensitive text' }),
++    /private user content/i
++  );
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', samples: [{ id: '1', content: 'x' }] }),
++    /private user content/i
++  );
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', productKnowledge: [{ id: 'p', name: 'Atlas' }] }),
++    /private user content/i
++  );
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', customNotes: 'Do not share' }),
++    /private user content/i
++  );
++});
++
++test('validateDomainGenerationRequest rejects invalid model choices', () => {
++  assert.throws(
++    () => validateDomainGenerationRequest({ field: 'UX', model: 'unsupported-model-v1' }),
++    /model choice is invalid/i
++  );
++});
++
++test('buildDomainGenerationPrompt delimits context with boundaries and excludes private data', () => {
++  const prompt = buildDomainGenerationPrompt({
++    field: 'Distributed Systems',
++    disciplines: ['Distributed Systems', 'Observability'],
++    existingTopics: ['Consensus Protocols'],
++  });
++
++  assert.match(prompt, /<domain-context>/);
++  assert.match(prompt, /<primary-field>Distributed Systems<\/primary-field>/);
++  assert.match(prompt, /<discipline>Observability<\/discipline>/);
++  assert.match(prompt, /<topic-name>Consensus Protocols<\/topic-name>/);
++  assert.match(prompt, /General conceptual principles only/i);
++  assert.match(prompt, /Do NOT include case-specific numbers/i);
++  assert.doesNotMatch(prompt, /draft|writing-sample|product-reference/i);
++});
++
++test('validateGeneratedDomainKnowledge parses valid output and generates local stable IDs', () => {
++  const rawJson = JSON.stringify({
++    topics: [
++      {
++        name: 'Information Architecture',
++        category: 'discipline',
++        description: 'Structural design of shared information spaces.',
++        keyTerminology: ['hierarchy', 'taxonomy', 'wayfinding'],
++        conventions: ['Map structures before writing content'],
++      },
++      {
++        name: 'Conversion UX',
++        category: 'intersecting',
++        description: 'Designing clear decision moments.',
++        keyTerminology: ['value proposition', 'friction reduction'],
++      },
++    ],
++  });
++
++  const topics = validateGeneratedDomainKnowledge(rawJson);
++  assert.equal(topics.length, 2);
++  assert.equal(topics[0].name, 'Information Architecture');
++  assert.equal(topics[0].category, 'discipline');
++  assert.ok(topics[0].id.startsWith('topic-'));
++  assert.equal(topics[0].enabled, true);
++  assert.deepEqual(topics[0].keyTerminology, ['hierarchy', 'taxonomy', 'wayfinding']);
++  assert.deepEqual(topics[0].conventions, ['Map structures before writing content']);
++  assert.equal(topics[1].name, 'Conversion UX');
++  assert.equal(topics[1].category, 'intersecting');
++});
++
++test('validateGeneratedDomainKnowledge rejects blocked or truncated responses', () => {
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('{"topics":[]}', { promptFeedback: { blockReason: 'SAFETY' } }),
++    /blocked this request/i
++  );
++
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('{"topics":[{"name": "Incomplete"', { candidates: [{ finishReason: 'MAX_TOKENS' }] }),
++    /stopped before returning complete domain knowledge/i
++  );
++
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('{"topics":[]}'),
++    /generated no domain topics/i
++  );
++
++  assert.throws(
++    () => validateGeneratedDomainKnowledge('not json'),
++    /malformed domain knowledge data/i
++  );
++});
++
++test('merging generated topics preserves existing product knowledge and audience context', () => {
++  const initial = normalizeDomainExpertise({
++    enabled: true,
++    field: 'UX Copywriting',
++    disciplines: ['UX Copywriting'],
++    topics: [{ id: 'old-1', name: 'Old Topic', keyTerminology: ['old-term'], conventions: [], enabled: true }],
++    keyTerminology: ['old-term'],
++    conventions: [],
++    audienceContext: 'Staff Designers',
++    customNotes: 'Keep voice warm.',
++    productKnowledge: [{ id: 'prod-1', name: 'Existing Product', notes: 'v1 features', enabled: true }],
++  });
++
++  const newTopics = validateGeneratedDomainKnowledge(JSON.stringify({
++    topics: [{ name: 'New Topic', keyTerminology: ['new-term'], conventions: [] }],
++  }));
++
++  const updated = normalizeDomainExpertise({
++    ...initial,
++    topics: newTopics,
++    keyTerminology: [],
++    conventions: [],
++  });
++
++  assert.equal(updated.topics.length, 1);
++  assert.equal(updated.topics[0].name, 'New Topic');
++  assert.deepEqual(updated.productKnowledge, initial.productKnowledge);
++  assert.equal(updated.audienceContext, 'Staff Designers');
++  assert.equal(updated.customNotes, 'Keep voice warm.');
++  assert.deepEqual(updated.keyTerminology, []);
++});
+diff --git a/tests/writingPipeline.test.ts b/tests/writingPipeline.test.ts
+index c6b4b45..c88bc61 100644
+--- a/tests/writingPipeline.test.ts
++++ b/tests/writingPipeline.test.ts
+@@ -17,5 +17,4 @@ import {
+   validateGeneratedProse,
+   validateWritingCorpus,
+ } from '../src/writingPipeline';
+-import { UX_PORTFOLIO_PRESET, presetToDomainExpertise } from '../src/data/domainPresets';
+ 
+@@ -248,12 +247,19 @@ test('toggling or removing a topic removes its prompt contribution without term
+   assert.doesNotMatch(removedPrompt, /term-b1/);
+ });
+ 
+-test('presetToDomainExpertise preserves existing product entries', () => {
++test('normalizeDomainExpertise preserves existing product entries', () => {
+   const existingProducts = [
+     { id: 'p-saved', name: 'Existing Product', notes: 'Saved notes from user', enabled: true },
+   ];
+-  const expertise = presetToDomainExpertise(UX_PORTFOLIO_PRESET, existingProducts);
++  const expertise = normalizeDomainExpertise({
++    enabled: true,
++    field: 'UX Copywriting & Content Design',
++    disciplines: ['UX Copywriting'],
++    topics: [],
++    keyTerminology: [],
++    conventions: [],
++    audienceContext: 'Audience',
++    productKnowledge: existingProducts,
++  });
+   assert.equal(expertise.productKnowledge?.length, 1);
+   assert.equal(expertise.productKnowledge?.[0].name, 'Existing Product');
+   assert.equal(expertise.keyTerminology.length, 0); // single-owner: topic terms not aggregated into global
+ });
+```

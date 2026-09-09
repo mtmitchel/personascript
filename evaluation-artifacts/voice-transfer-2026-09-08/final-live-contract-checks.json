@@ -1,0 +1,59 @@
+{
+  "selectionSurroundingsExact": true,
+  "requests": [
+    {
+      "file": "final-actions-1788903873113-1-request.json",
+      "model": "gemini-3.8-flash",
+      "stage": "writing",
+      "completeCorpus": true,
+      "originalSourceIncluded": true,
+      "systemInstruction": true,
+      "generatedNumericTargetsAbsent": true
+    },
+    {
+      "file": "final-actions-1788903873142-2-request.json",
+      "model": "gemini-3.8-flash",
+      "stage": "writing",
+      "completeCorpus": true,
+      "originalSourceIncluded": true,
+      "systemInstruction": true,
+      "generatedNumericTargetsAbsent": true
+    },
+    {
+      "file": "final-actions-1788903879030-3-request.json",
+      "model": "gemini-3.1-pro-preview",
+      "stage": "review",
+      "completeCorpus": true,
+      "originalSourceIncluded": true,
+      "systemInstruction": true,
+      "generatedNumericTargetsAbsent": true
+    },
+    {
+      "file": "final-actions-1788903882914-4-request.json",
+      "model": "gemini-3.1-pro-preview",
+      "stage": "review",
+      "completeCorpus": true,
+      "originalSourceIncluded": true,
+      "systemInstruction": true,
+      "generatedNumericTargetsAbsent": true
+    },
+    {
+      "file": "final-actions-1788903997868-5-request.json",
+      "model": "gemini-3.8-flash",
+      "stage": "writing",
+      "completeCorpus": true,
+      "originalSourceIncluded": true,
+      "systemInstruction": true,
+      "generatedNumericTargetsAbsent": true
+    },
+    {
+      "file": "final-actions-1788904006237-6-request.json",
+      "model": "gemini-3.1-pro-preview",
+      "stage": "review",
+      "completeCorpus": true,
+      "originalSourceIncluded": true,
+      "systemInstruction": true,
+      "generatedNumericTargetsAbsent": true
+    }
+  ]
+}

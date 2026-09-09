@@ -1,0 +1,27 @@
+{
+  "sources": [
+    {
+      "file": "server.ts",
+      "artifact": "source-aware-live-1788944426838-server.ts.source.txt",
+      "sha256": "45e6a14be879845f0562554d4f753066f08aa41bb47ee4ca8faf49367b84a6a9"
+    },
+    {
+      "file": "src/writingPipeline.ts",
+      "artifact": "source-aware-live-1788944426838-src-writingPipeline.ts.source.txt",
+      "sha256": "bf8c8a7a8d88e3c6ea9fac07fac4a52f7370d50ca010565bcbaa886da5741e34"
+    },
+    {
+      "file": "src/domainGeneration.ts",
+      "artifact": "source-aware-live-1788944426838-src-domainGeneration.ts.source.txt",
+      "sha256": "d4e9dccd258ce3acf0fcec1815e710f2bceedcc59949f9ecb04b13706f83fecf"
+    }
+  ],
+  "cwd": "/home/mason/Projects/persona script",
+  "command": "DISABLE_HMR=true QA_RUN_LABEL=source-aware-live PORT=3111 ./node_modules/.bin/tsx evaluation-artifacts/source-aware-flow-2026-09-09/recorded-server.ts",
+  "provider": "Gemini API through production application handlers",
+  "writingModel": "gemini-3.8-flash",
+  "reviewModel": "gemini-3.1-pro-preview",
+  "reasoning": "auto",
+  "data": "Fictional Northstar prompt project; generated concept cards; repository demo voice samples only",
+  "instrumentation": "Capture SDK generation input, raw response, timing, and errors. Reject unapproved models. No production files modified."
+}

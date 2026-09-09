@@ -1,0 +1,32 @@
+{
+  "change": "Per-card Clear and Regenerate under Intersecting Fields, Disciplines & Topics; existing section actions explicitly labelled all.",
+  "checks": {
+    "unit_tests": "37 passed, 0 failed",
+    "typescript": "npm run lint passed",
+    "build": "npm run build passed",
+    "diff": "git diff --check passed",
+    "api": "7 deterministic HTTP cases passed, including wrong name/category/count rejection and private/invalid target validation",
+    "live": "One Content Design card returned via gemini-3.1-pro-preview with auto reasoning, HTTP 200"
+  },
+  "desktop": [
+    "1280x800 supported browser viewport: two-column layout and visible card controls",
+    "Clear removed only selected description, concepts and conventions; name, category and disabled state remained",
+    "Regenerate populated selected cleared card and preserved disabled state and stable ID",
+    "Clearing a different card while generation was pending remained cleared after completion",
+    "Wrong-target response showed inline card error and kept content",
+    "Navigating away cancelled the pending request; returning did not apply stale result"
+  ],
+  "cleanup": "Temporary QA tab closed, viewport reset, mock and recording servers stopped; preview 3102 remains stopped.",
+  "limits": [
+    "Live trial verifies a single response and does not guarantee future generated content quality.",
+    "No mobile QA per user scope."
+  ],
+  "source_sha256": {
+    "src/components/DomainView.tsx": "6c653cd2f858b13bcc04ed06beaef7f74bcaca3da06543f5d41ed694b2e954f9",
+    "src/domainGeneration.ts": "58c6c98f9eb6498674a08a0d00514aaf2f61260fb6b696202646798fb416e277",
+    "server.ts": "0222f51b5da9062336452d33e304ede1cc8304b765f4a849c259927097042ec4",
+    "src/types.ts": "c826dede24f94395ec66622a547c0f56f64ac81ae71b1ddb6d29fe74d437e2c1",
+    "tests/domainGeneration.test.ts": "c8e5a0497ac6f480ca65c4ae8728b10058d239c8427ac70f25f27b2897b6f204",
+    "README.md": "5c9ed0fbdbb05f482647a075770671a540640b403d134f4996bb2611d89190cc"
+  }
+}

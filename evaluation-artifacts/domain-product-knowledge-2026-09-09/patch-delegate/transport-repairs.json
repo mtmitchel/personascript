@@ -1,0 +1,6 @@
+[
+  "README: removed nonexistent trailing blank context line.",
+  "server hunk 4: applied exact changed statement; kept actual surrounding flow.",
+  "server hunk 5: applied exact changed statement; kept actual surrounding flow.",
+  "DomainView: corrected unchanged context to actual wording."
+]

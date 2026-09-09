@@ -1,0 +1,110 @@
+{
+  "model": "gemini-3.1-pro-preview",
+  "contents": "You are a master literary editor. You are tasked with synthesizing multiple writing analyses from the same author into a unified, qualitative \"Writing Style Profile\" (Voice Blueprint).\n\nSAMPLES DATA:\nSample 1: \"The Architecture of Unhurried Thought\"\nWord count: undefined\nSummary: N/A\nWord Choice: {}\nSentence Structure: {}\nRhythm & Cadence: {}\nVoice: {}\nTone: {}\nRules: \nSample Excerpt: \"Most people write to be done. You can see it in the frantic rhythm of the prose—clauses tumbling into one another like commuters shoving onto an outbound train.\n\nI prefer a different cadence.\n\nWhen I sit down at the desk in early morning, the quiet is physical. Before I write a single noun, I listen for the pulse of the room. Good sentences don't just convey information; they have weight, like river stones placed deliberately across a shallow creek. Some are flat and quick—stepping stones. Others require you to pause, balance for a second, and take in the chill of the water before moving forward.\n\nWe have traded depth for velocity. We churn out paragraphs loaded with passive constructions and throat-clearing preambles because we are terrified of silence. But the sharpest writers know that white space is punctuation. A three-word sentence after a rolling forty-word clause isn't an accident; it is an ambush. It grabs the collar of your mind and pulls you close.\n\nIf a paragraph doesn't surprise me by the time I reach the final period, I strike it through. Writing is not transcription. It is excavation....\"\n\n---\n\nSample 2: \"On Tools, Craft, and the Myth of Raw Speed\"\nWord count: undefined\nSummary: N/A\nWord Choice: {}\nSentence Structure: {}\nRhythm & Cadence: {}\nVoice: {}\nTone: {}\nRules: \nSample Excerpt: \"Every season brings a fresh crop of productivity panaceas—shiny software claiming to compress an afternoon's toil into four painless keystrokes. We adopt them eagerly, convinced that friction is an enemy to be exterminated.\n\nIt isn't.\n\nFriction is often where discernment happens. When a master woodworker selects a drawknife, they are not searching for the fastest path to turn timber into sawdust; they are courting resistance. The grain of the wood talks back. It forces a conversation between intent and material.\n\nSoftware that promises effortless output usually delivers thoughtless artifacts. If you never have to wrestle with an idea—if your thoughts bypass the muscular labor of drafting, pruning, and second-guessing—you don't end up with more insight; you just end up with faster mediocrity.\n\nReal craftsmanship is stubborn. It insists on taking the long way around because the long way is where the texture lives. Build things that remember human hands were on them....\"\n\nCURRENT USER-OWNED SETTINGS (preserve exactly; these are not generated style hints):\nCustom directives: Preserve this exact user rule.\nDomain expertise: {\"enabled\":true,\"field\":\"QA domain\",\"customNotes\":\"Keep domain notes.\"}\n\nSynthesize a comprehensive profile including:\n1. An evocative profile name (or use: \"Master Writing Voice\") and a 2-3 sentence overview description.\n2. Metrics (numbers 1-100): formality, avgSentenceLength (approx words per sentence), sentenceLengthVariance (1-100), lexicalSophistication (1-100), warmth (1-100), directness (1-100), activeVoiceRatio (1-100), metaphorDensity (1-100).\n3. Voice Manifesto: A vivid, second-person manifesto (e.g. \"You write with...\") describing how the author thinks, sounds, and sculpts language.\n4. Synthesized Guidelines:\n   - doList: 5-6 concrete things to always do when emulating this author\n   - dontList: 5-6 stylistic taboos / things to never do\n   - signatureHabits: 3-5 unique stylistic quirks or structural signatures\n   - vocabularyPreferences: 3-4 bullet points of favored words and avoided replacements\n   - pacingGuide: 2-3 sentences describing paragraph and sentence flow\n5. Custom Directives: Keep the current user-owned custom directives unchanged. Do not replace them with generated prose.\n6. Domain expertise: Do not replace or erase the current domain field, topics, terminology, conventions, audience context, or custom notes.",
+  "config": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "type": "OBJECT",
+      "properties": {
+        "name": {
+          "type": "STRING"
+        },
+        "description": {
+          "type": "STRING"
+        },
+        "metrics": {
+          "type": "OBJECT",
+          "properties": {
+            "formality": {
+              "type": "NUMBER"
+            },
+            "avgSentenceLength": {
+              "type": "NUMBER"
+            },
+            "sentenceLengthVariance": {
+              "type": "NUMBER"
+            },
+            "lexicalSophistication": {
+              "type": "NUMBER"
+            },
+            "warmth": {
+              "type": "NUMBER"
+            },
+            "directness": {
+              "type": "NUMBER"
+            },
+            "activeVoiceRatio": {
+              "type": "NUMBER"
+            },
+            "metaphorDensity": {
+              "type": "NUMBER"
+            }
+          },
+          "required": [
+            "formality",
+            "avgSentenceLength",
+            "sentenceLengthVariance",
+            "lexicalSophistication",
+            "warmth",
+            "directness",
+            "activeVoiceRatio",
+            "metaphorDensity"
+          ]
+        },
+        "voiceManifesto": {
+          "type": "STRING"
+        },
+        "synthesizedGuidelines": {
+          "type": "OBJECT",
+          "properties": {
+            "doList": {
+              "type": "ARRAY",
+              "items": {
+                "type": "STRING"
+              }
+            },
+            "dontList": {
+              "type": "ARRAY",
+              "items": {
+                "type": "STRING"
+              }
+            },
+            "signatureHabits": {
+              "type": "ARRAY",
+              "items": {
+                "type": "STRING"
+              }
+            },
+            "vocabularyPreferences": {
+              "type": "ARRAY",
+              "items": {
+                "type": "STRING"
+              }
+            },
+            "pacingGuide": {
+              "type": "STRING"
+            }
+          },
+          "required": [
+            "doList",
+            "dontList",
+            "signatureHabits",
+            "vocabularyPreferences",
+            "pacingGuide"
+          ]
+        },
+        "customDirectives": {
+          "type": "STRING"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "metrics",
+        "voiceManifesto",
+        "synthesizedGuidelines",
+        "customDirectives"
+      ]
+    }
+  }
+}

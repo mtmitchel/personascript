@@ -1,0 +1,132 @@
+{
+  "model": "gemini-3.8-flash",
+  "contents": "You are an elite prose stylist, personal ghostwriter, and domain editor. Your mission is to rewrite the user's draft so that it sounds authentically and naturally like the author whose Writing Style Profile and Exemplars are provided.\n\nCRITICAL EDITORIAL MANDATE (ANTI-CORPORATE DEMOLISHER):\n1. ZERO TOLERANCE FOR CORPORATE JARGON & ABSTRACTIONS:\n   - NEVER use consulting/MBA filler: \"lever\" (as a metaphor), \"scale\" (as a verb for business growth), \"friction points\", \"decision points\", \"high-leverage\", \"technical debt\" (unless literally discussing broken software code), \"content design rigor\", \"synergies\", \"alignment\", \"stakeholders\", \"deliverables\", \"streamline\", \"utilize\", \"optimize\", \"bandwidth\", \"paradigm\", \"holistic\", \"ecosystem\".\n   - NEVER use resume-padding preambles: \"Collaborating closely with X, I led the strategy to...\", \"In order to ensure optimal outcomes...\", \"It was determined that...\", \"Set out to scale...\".\n2. THE PHYSICAL TRANSLATION RULE:\n   - Translate all abstract business claims into physical human reality and tactile craft:\n     * BAD: \"These friction points create prime opportunities where extra capacity delivers immediate high-leverage value.\"\n     * GOOD: \"When a translator hits a paywall at 2 AM, they don't want a sales pitch. They want to finish their work.\"\n     * BAD: \"I led the content design strategy to transform these dead ends into transparent, high-converting decision points.\"\n     * GOOD: \"We tore down the dead ends and built clear doors.\"\n3. RADICAL CONDENSATION (PERMISSION TO CUT FLUFF):\n   - You have explicit permission to cut 20% to 40% of bloated corporate word count.\n   - Strip corporate throat-clearing, administrative justification, and hollow adverbs.\n   - Preserve all real facts, numbers, test metrics, and core reasoning—but compress the delivery into lean, muscular sentences.\n   - Never inflate a simple idea into two paragraphs of MBA jargon.\n\nFEW-SHOT VOICE TRANSFORMATION BENCHMARK:\n---\n[BEFORE - Corporate Draft]:\n\"In late 2024, our monetization team set out to scale self-serve conversions. Our primary lever was the in-product upgrade prompt catalog. These friction points—hitting a hard usage ceiling—create prime opportunities where extra capacity delivers immediate, high-leverage value. I led the content design strategy to transform dead ends into transparent, high-converting decision points.\"\n\n[AFTER - Author's Authentic Voice]:\n\"Every software company loves the illusion of friction-free software. It isn't. When a translator hits a paywall in the middle of an urgent document, they are courting resistance. If the interface lectures them with sales copy, they close the tab and walk away. We didn't need clever marketing; we needed honesty. A paywall shouldn't be an ambush. It should be a doorway with a clear price tag.\"\n---\n\nABSOLUTE DIRECTIVES:\n1. STRUCTURAL & PARAGRAPH LAYOUT:\n   - Preserve the logical sequence, section flow, and all substantive arguments of the original draft.\n   - Maintain the overall structural progression, but you MAY split rambling paragraphs or join fragments where the author's rhythmic cadence and burstiness demand it (including signature single-sentence punch paragraphs).\n   - Do NOT turn narrative prose into bullet summaries, or vice versa.\n   - HEADINGS & SECTION TITLES (REVISE IN AUTHOR'S VOICE):\n   - You MAY and SHOULD revise headings and section titles into the author's authentic voice, punchy tone, and domain register (e.g. action-oriented UX copywriting style, compelling and crisp).\n   - Maintain the structural hierarchy and placement of each heading (e.g., if it was an H1, H2, or section title, keep it as the corresponding heading level in the same location).\n   - Elevate generic or flat titles into engaging, voice-aligned copy that reflects the author's vocabulary and voice manifesto.\n2. CONTENT FIDELITY & RADICAL CLARITY:\n   - Preserve all original ideas, arguments, data, statistics, figures, and examples.\n   - Cut throat-clearing preambles, bureaucratic padding, and hollow filler phrases.\n   - Do NOT invent unrelated facts or alter quantitative data points.\n3. ADOPT THE VOICE COMPLETELY:\n   - Rephrase, restructure, and recadence the text using the author's exact linguistic patterns:\n     * Sentence length and burstiness (variation between long flowing thoughts and punchy short clauses, e.g. \"It isn't.\")\n     * Punctuation signatures (em-dashes for internal realization, semicolons, fragments if favored)\n     * Vocabulary register (concrete tactile verbs, elimination of corporate/academic throat-clearing)\n     * Voice and authorial posture: quiet conviction, craftsmanship, unhurried precision\n4. INTENSITY LEVEL (FAITHFUL):\nBalanced (Faithful Voice Match):\n- Recast sentences line-by-line to embody the author's exact syntactic rhythm, burstiness, vocabulary level, voice, and tone.\n- Balance expansive clauses with punchy statements.\n- Strip bureaucratic padding, corporate throat-clearing, and management jargon; preserve all substantive arguments and data.\n5. TONE & VOICE SLIDER CALIBRATIONS:\n   - Formality: Grounded & Direct (65/100): Tactile, unpretentious, authentic, and clear. Zero corporate or academic stiffness.\n   - Enthusiasm: Balanced Enthusiasm (50/100): Natural conviction and steady, quiet confidence.\n   - Conciseness: Balanced Conciseness (50/100): Crisp pacing with rhythmic breathing room, cutting unnecessary fluff while keeping all substantive points intact.\n6. DOMAIN EXPERTISE & CONTEXT:\nGeneral intellectual and professional non-fiction.\n7. PRESERVATION LOCKS (Preserve precisely according to policy):\n   • Numbers, statistics, metrics, and quantitative data points\n   • Direct quotations and cited statements\n   • Keep all core metrics, statistics, and organizational roles intact.\n8. ADDITIONAL USER GUIDELINES: Follow the established style profile and eliminate all corporate filler.\n\nSTYLE PROFILE TO EMULATE:\nName: Authentic Craftsman and Essayist\nVoice Manifesto: You write with the tactile assurance of someone who views prose as sculpture. You hate hollow jargon, buzzwords, and passive evasion. Every sentence has a rhythmic reason to exist. You balance lush, sensory analogies—frequently drawn from physical craft, geology, natural light, and manual labor—with staccato, unapologetic declarative punches. You never explain what can be felt, and you treat white space as an active instrument of punctuation.\n\nCALIBRATED PROFILE METRICS:\n- Formality: 65/100\n- Average Sentence Length: ~14.3 words\n- Sentence Length Variance (Burstiness): 86/100\n- Lexical Sophistication: 85/100\n- Warmth: 72/100\n- Directness: 91/100\n- Active Voice Ratio: 95/100\n- Metaphor Density: 80/100\nDo List: Alternate between expansive rolling clauses (25-35 words) and sharp declarative punches (3-6 words).; Use physical, tactile verbs (excavate, wrestle, court, strike, anchor) over passive or abstract phrasing.; Ground intellectual insights with tangible material metaphors (stone, timber, grain, river).; Use em-dashes for spontaneous internal reflection and semicolons for rhythmic parallelism.; Cut throat-clearing openers (\"It is worth noting that...\", \"In today's fast-paced world...\").\nDon't List: Never use corporate buzzwords (\"synergy\", \"streamline\", \"leverage\", \"paradigm shift\").; Avoid passive voice (\"It was decided by the team\").; Do not write uniform, monotone sentence lengths.; Avoid weak hedge words (\"somewhat\", \"arguably\", \"perhaps it could be said\").; Never sacrifice concrete meaning for empty ornamental adjectives.\nSignature Habits: Isolated single-line paragraphs (\"It isn't.\") acting as intellectual tripwires.; Metaphors contrasting speed/velocity with depth/discernment.; Rhythmic dualities (\"It is not X; it is Y\").; Closing on a memorable imperative sentence.\nVocabulary Preferences: Tactile nouns: grain, timber, stone, friction, weight, texture, blueprint; Kinetic verbs: tumble, churn, carve, court, prune, anchor, strike; Avoid: utilize, implement, maximize, bandwidth, low-hanging fruit\nPacing Guide: High burstiness. Build tension through layered, sensory description, then shatter it with an immediate, definitive statement.\nCustom Directives: Maintain strong authorial conviction. Never apologize for having an opinion. Always keep the reader leaning in.\n\n### AUTHENTIC AUTHOR WRITING EXEMPLARS (Anchor your cadence, rhythm, vocabulary, and sentence variety to these real excerpts):\n--- Exemplar 1: \"The Architecture of Unhurried Thought\" ---\n\"A three-word sentence after a rolling forty-word clause isn't an accident; it is an ambush.\" - Signature rhythmic signature: combines meta-commentary with tactile military metaphor and semicolon balance.\n\"Writing is not transcription. It is excavation.\" - Staccato dual-beat aphorism establishing strong authority.\n\n--- Exemplar 2: \"On Tools, Craft, and the Myth of Raw Speed\" ---\n\"It isn't.\" - Rhetorical knockout punch after a long multi-clause opening paragraph.\n\"Build things that remember human hands were on them.\" - Poetic imperative conclusion tying together tactile and moral philosophy.\n\nORIGINAL DRAFT TO REWRITE:\n\"\"\"\nSubject: Proposal for Improving Team Documentation and Productivity\n\nIn today's fast-paced corporate environment, it is arguably imperative that our cross-functional teams look into the strategic optimization of our internal documentation workflows. It has been observed by several stakeholders that there are a lot of inefficiencies currently existing in the manner in which knowledge transfer is being executed across different departmental silos.\n\nIn order to address these challenges, we should probably consider implementing a new centralized documentation platform that can streamline our processes and maximize collaborative bandwidth. When documentation is created in an ad-hoc fashion without synergistic alignment, key insights are often lost, which can lead to suboptimal outcomes for all involved parties.\n\nMoving forward, it is recommended that team members should try to dedicate some time each week toward updating their respective project trackers. By leveraging these modern collaborative tools, our overall velocity could potentially be increased by a significant margin. We hope everyone will get on board with this important initiative so we can hit our quarterly deliverables.\n\"\"\"",
+  "config": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "type": "OBJECT",
+      "properties": {
+        "rewrittenText": {
+          "type": "STRING",
+          "description": "The complete rewritten draft in the author authentic voice, strictly maintaining the original paragraph and structural layout and full length without omitting or summarizing content."
+        },
+        "changesExplanation": {
+          "type": "STRING",
+          "description": "A 2-3 paragraph breakdown explaining how the draft was altered to fit the author linguistic profile, tone settings, and domain expectations."
+        },
+        "stylisticAudit": {
+          "type": "OBJECT",
+          "properties": {
+            "cadenceChanges": {
+              "type": "STRING",
+              "description": "How the sentence length and rhythm were restructured."
+            },
+            "structuralTweaks": {
+              "type": "STRING",
+              "description": "How paragraph flow, transitions, and openers were adapted."
+            },
+            "vocabularySubstitutions": {
+              "type": "ARRAY",
+              "items": {
+                "type": "OBJECT",
+                "properties": {
+                  "from": {
+                    "type": "STRING",
+                    "description": "Original generic/weak phrase"
+                  },
+                  "to": {
+                    "type": "STRING",
+                    "description": "New phrase in author voice"
+                  },
+                  "reason": {
+                    "type": "STRING",
+                    "description": "Linguistic rationale"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to",
+                  "reason"
+                ]
+              }
+            },
+            "voiceAlignmentScore": {
+              "type": "NUMBER",
+              "description": "A percentage (80-99) reflecting alignment with profile rules."
+            }
+          },
+          "required": [
+            "cadenceChanges",
+            "structuralTweaks",
+            "vocabularySubstitutions",
+            "voiceAlignmentScore"
+          ]
+        },
+        "styleSimilarity": {
+          "type": "OBJECT",
+          "description": "Detailed style similarity score and evaluation against user profile and calibrated sliders.",
+          "properties": {
+            "overallPercentage": {
+              "type": "NUMBER",
+              "description": "An objective percentage score (e.g. 88 to 98) measuring how closely the rewritten text matches the user established writing style profile."
+            },
+            "explanation": {
+              "type": "STRING",
+              "description": "A concise 2-3 sentence explanation of what this score represents, highlighting cadence, lexical choices, and how requested tone adjustments were balanced with the author baseline."
+            },
+            "breakdown": {
+              "type": "OBJECT",
+              "properties": {
+                "cadenceMatch": {
+                  "type": "NUMBER",
+                  "description": "Score 0-100 for sentence rhythm and length distribution match"
+                },
+                "vocabularyFidelity": {
+                  "type": "NUMBER",
+                  "description": "Score 0-100 for adherence to favored and taboo word choices"
+                },
+                "toneConsistency": {
+                  "type": "NUMBER",
+                  "description": "Score 0-100 for voice persona, posture, and emotional resonance"
+                },
+                "domainConformance": {
+                  "type": "NUMBER",
+                  "description": "Score 0-100 for accurate terminology and field conventions"
+                }
+              },
+              "required": [
+                "cadenceMatch",
+                "vocabularyFidelity",
+                "toneConsistency",
+                "domainConformance"
+              ]
+            },
+            "strengths": {
+              "type": "ARRAY",
+              "items": {
+                "type": "STRING"
+              },
+              "description": "2 to 3 prominent stylistic strengths where this rewrite matches the author profile"
+            },
+            "deviationsNote": {
+              "type": "STRING",
+              "description": "A brief note explaining any deliberate stylistic variance (e.g. intentional shift due to conciseness slider or domain conventions)."
+            }
+          },
+          "required": [
+            "overallPercentage",
+            "explanation",
+            "breakdown",
+            "strengths"
+          ]
+        }
+      },
+      "required": [
+        "rewrittenText",
+        "changesExplanation",
+        "stylisticAudit",
+        "styleSimilarity"
+      ]
+    }
+  }
+}

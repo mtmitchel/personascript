@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "MAX_TOKENS",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"topics\":[{\"name\":\"QA broad content design\",\"description\":\"General principles for clear information and useful decisions.\",\"category\":\"discipline\",\"keyTerminology\":[\"information hierarchy\",\"user comprehension\",\"informed choice\"],\"conventions\":[\"Explain a concept when the draft demonstrates it.\"]},{\"name\":\"QA product value\",\"description\":\"How people understand the value and cost of a product.\",\"category\":\"intersecting\",\"keyTerminology\":[\"product value\",\"pricing clarity\",\"conversion\"],\"conventions\":[]}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  },
+  "modelVersion": "mocked-qa-no-provider-call"
+}

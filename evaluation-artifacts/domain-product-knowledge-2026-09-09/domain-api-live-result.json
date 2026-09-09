@@ -1,0 +1,154 @@
+{
+  "status": 200,
+  "topics": [
+    {
+      "id": "topic-1788940487999-1-s9p4y",
+      "name": "UX Copywriting",
+      "category": "discipline",
+      "description": "The craft of writing intuitive interface copy that guides users through a digital experience seamlessly and efficiently.",
+      "keyTerminology": [
+        "Microcopy",
+        "Error messages",
+        "Empty states",
+        "Call-to-action (CTA)",
+        "Progressive disclosure",
+        "Voice and tone",
+        "Onboarding flows",
+        "Tooltips",
+        "Confirmation messages"
+      ],
+      "conventions": [
+        "Prioritize clarity and usability over cleverness.",
+        "Use active voice and front-load important information."
+      ],
+      "enabled": true
+    },
+    {
+      "id": "topic-1788940487999-2-u4u24",
+      "name": "Content Design",
+      "category": "discipline",
+      "description": "The strategic process of using data and evidence to give users the information they need, exactly when they need it, in the most optimal format.",
+      "keyTerminology": [
+        "Information architecture",
+        "User needs",
+        "Content modeling",
+        "Readability",
+        "Journey mapping",
+        "Task completion",
+        "Content audits",
+        "Taxonomy",
+        "Wireframing"
+      ],
+      "conventions": [
+        "Design content as a structural component of the interface rather than an afterthought.",
+        "Use data and research to answer user questions exactly when they arise."
+      ],
+      "enabled": true
+    },
+    {
+      "id": "topic-1788940487999-3-eyo4o",
+      "name": "Monetization & Conversion UX",
+      "category": "intersecting",
+      "description": "The intersection of user experience and business goals, focusing on optimizing interfaces to encourage user action, purchases, subscriptions, or upgrades.",
+      "keyTerminology": [
+        "Friction points",
+        "Conversion rate optimization (CRO)",
+        "Persuasive design",
+        "Pricing tiers",
+        "Value proposition",
+        "Dark patterns",
+        "Scarcity",
+        "Social proof",
+        "Upselling flows"
+      ],
+      "conventions": [
+        "Balance business objectives with user trust and autonomy.",
+        "Highlight value clearly without resorting to deceptive or manipulative dark patterns."
+      ],
+      "enabled": true
+    },
+    {
+      "id": "topic-1788940487999-4-dw5u9",
+      "name": "AI Translation & Localization",
+      "category": "intersecting",
+      "description": "Adapting digital products for different languages and cultures, increasingly utilizing artificial intelligence to scale global accessibility.",
+      "keyTerminology": [
+        "Internationalization (i18n)",
+        "Localization (l10n)",
+        "Cultural nuances",
+        "Machine translation",
+        "Transcreation",
+        "String length constraints",
+        "Right-to-left (RTL) layout",
+        "Translation memory"
+      ],
+      "conventions": [
+        "Provide contextual clues and glossaries for automated or human translation.",
+        "Design interface components to accommodate text expansion or contraction across languages."
+      ],
+      "enabled": true
+    },
+    {
+      "id": "topic-1788940487999-5-eltda",
+      "name": "AI Writing Assistance",
+      "category": "intersecting",
+      "description": "The integration of large language models and artificial intelligence tools to augment the writing process, generate ideas, and scale content production.",
+      "keyTerminology": [
+        "Prompt engineering",
+        "Generative AI",
+        "Large Language Models (LLMs)",
+        "Automated content generation",
+        "Dynamic text replacement",
+        "Personalization algorithms",
+        "Human-in-the-loop (HITL)"
+      ],
+      "conventions": [
+        "Utilize AI as a drafting and ideation co-pilot, not a final arbiter of copy.",
+        "Always enforce a human review process to ensure empathy, contextual accuracy, and brand alignment."
+      ],
+      "enabled": true
+    },
+    {
+      "id": "topic-1788940487999-6-ee8rl",
+      "name": "User Psychology & Cognitive Load",
+      "category": "intersecting",
+      "description": "The study of how users perceive, process, and act on information, applied to minimize mental effort in digital interfaces.",
+      "keyTerminology": [
+        "Cognitive load",
+        "Hick's Law",
+        "Mental models",
+        "Paradox of choice",
+        "Recognition over recall",
+        "Gestalt principles",
+        "F-pattern scanning",
+        "Decision fatigue"
+      ],
+      "conventions": [
+        "Reduce cognitive friction by breaking complex tasks into smaller, manageable steps.",
+        "Leverage familiar interaction patterns to align with users' existing mental models."
+      ],
+      "enabled": true
+    },
+    {
+      "id": "topic-1788940487999-7-ug31q",
+      "name": "Accessibility & Inclusive Design",
+      "category": "intersecting",
+      "description": "The practice of ensuring digital copy and content structures are usable by everyone, regardless of physical ability, neurodiversity, or background.",
+      "keyTerminology": [
+        "WCAG guidelines",
+        "Screen readers",
+        "Alt text",
+        "Plain language",
+        "Neurodiversity",
+        "Cognitive accessibility",
+        "Semantic HTML",
+        "Color contrast"
+      ],
+      "conventions": [
+        "Write in plain, accessible language, aiming for a broad reading comprehension level.",
+        "Structure content with clear, descriptive headings to aid screen reader navigation."
+      ],
+      "enabled": true
+    }
+  ]
+}

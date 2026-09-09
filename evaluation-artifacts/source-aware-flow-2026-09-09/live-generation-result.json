@@ -1,0 +1,164 @@
+{
+  "status": 200,
+  "durationMs": 33075,
+  "data": {
+    "topics": [
+      {
+        "id": "topic-1788944471698-1-1toy2",
+        "name": "Content Design",
+        "category": "discipline",
+        "description": "The practice of designing content to meet user needs, focusing on the structure, clarity, and presentation of information within digital interfaces.",
+        "keyTerminology": [
+          "Information hierarchy",
+          "Frontloading",
+          "Progressive disclosure",
+          "User empathy",
+          "Readability"
+        ],
+        "conceptAnnotations": {
+          "Information hierarchy": {
+            "status": "supported",
+            "explanation": "The author restructured the content by placing the usage-limit explanation before the plan comparison."
+          },
+          "Frontloading": {
+            "status": "supported",
+            "explanation": "Key context about the usage limit was moved earlier in the prompt to inform the user immediately."
+          },
+          "Progressive disclosure": {
+            "status": "adjacent",
+            "explanation": "While content order was changed, there is no mention of hiding and revealing information progressively."
+          },
+          "User empathy": {
+            "status": "adjacent",
+            "explanation": "Identifying user needs is foundational, but the draft describes functional changes rather than empathy research."
+          },
+          "Readability": {
+            "status": "adjacent",
+            "explanation": "The focus was on structure and action, not explicitly on simplifying reading grade levels."
+          }
+        },
+        "conventions": [
+          "Focus on how information structure serves user goals rather than just grammatical correctness."
+        ],
+        "enabled": true
+      },
+      {
+        "id": "topic-1788944471698-2-vjsd6",
+        "name": "UX Copywriting",
+        "category": "discipline",
+        "description": "The craft of writing concise, actionable, and clear interface copy that guides users through digital experiences.",
+        "keyTerminology": [
+          "Call-to-action optimization",
+          "Action-oriented language",
+          "Microcopy",
+          "Voice and tone",
+          "Error prevention"
+        ],
+        "conceptAnnotations": {
+          "Call-to-action optimization": {
+            "status": "supported",
+            "explanation": "Vague button labels were replaced with specific next steps."
+          },
+          "Action-oriented language": {
+            "status": "supported",
+            "explanation": "The rewrite prioritized specific, actionable language for buttons."
+          },
+          "Microcopy": {
+            "status": "supported",
+            "explanation": "The work directly involved rewriting small, contextual bits of interface text like prompts and buttons."
+          },
+          "Voice and tone": {
+            "status": "adjacent",
+            "explanation": "The draft mentions clarity and specificity, but does not explicitly discuss adjusting the brand voice or emotional tone."
+          },
+          "Error prevention": {
+            "status": "adjacent",
+            "explanation": "While clear prompts help, the scenario centers on hitting a usage limit rather than preventing a system error."
+          }
+        },
+        "conventions": [
+          "Ensure labels and actions set clear expectations for the immediate next step."
+        ],
+        "enabled": true
+      },
+      {
+        "id": "topic-1788944471698-3-3bnmi",
+        "name": "Growth Design and Conversion",
+        "category": "intersecting",
+        "description": "The intersection of user experience design, product strategy, and marketing aimed at improving user acquisition, activation, and monetization.",
+        "keyTerminology": [
+          "Upgrade path",
+          "Friction reduction",
+          "Conversion rate",
+          "A/B testing",
+          "Value proposition"
+        ],
+        "conceptAnnotations": {
+          "Upgrade path": {
+            "status": "supported",
+            "explanation": "The project involved reviewing and rewriting upgrade prompts for users hitting product limits."
+          },
+          "Friction reduction": {
+            "status": "supported",
+            "explanation": "Clarifying next steps and information order removes cognitive friction for the user."
+          },
+          "Conversion rate": {
+            "status": "adjacent",
+            "explanation": "The project brief explicitly notes that no conversion result is attributed to this work."
+          },
+          "A/B testing": {
+            "status": "adjacent",
+            "explanation": "The brief explicitly states no controlled experiments were conducted for this rewrite."
+          },
+          "Value proposition": {
+            "status": "adjacent",
+            "explanation": "Although plan comparisons are mentioned, the specific work described focuses on usage limits and actions, not refining the value proposition itself."
+          }
+        },
+        "conventions": [
+          "Evaluate business goals alongside user needs, recognizing when metrics are absent or unmeasured."
+        ],
+        "enabled": true
+      },
+      {
+        "id": "topic-1788944471698-4-3mn35",
+        "name": "Product Collaboration",
+        "category": "intersecting",
+        "description": "The dynamics and methodologies of working across specialties to build and ship digital products.",
+        "keyTerminology": [
+          "Cross-functional collaboration",
+          "Stakeholder alignment",
+          "Usability testing",
+          "Agile methodology",
+          "Product requirements"
+        ],
+        "conceptAnnotations": {
+          "Cross-functional collaboration": {
+            "status": "supported",
+            "explanation": "The writer explicitly states they worked directly with a product manager and a designer."
+          },
+          "Stakeholder alignment": {
+            "status": "supported",
+            "explanation": "Achieving the rewrite alongside a PM and designer implies aligning on the solution and design execution."
+          },
+          "Usability testing": {
+            "status": "adjacent",
+            "explanation": "The project brief explicitly states the team did not conduct usability tests."
+          },
+          "Agile methodology": {
+            "status": "adjacent",
+            "explanation": "No specific project management frameworks, sprints, or cycles are mentioned in the text."
+          },
+          "Product requirements": {
+            "status": "adjacent",
+            "explanation": "While limits exist, the draft discusses the content execution rather than defining the initial engineering requirements."
+          }
+        },
+        "conventions": [
+          "Acknowledge the roles of product management and design in shaping content decisions."
+        ],
+        "enabled": true
+      }
+    ]
+  }
+}

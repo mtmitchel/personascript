@@ -1,0 +1,13 @@
+{
+  "input": {
+    "field": "UX",
+    "draft": []
+  },
+  "response": {
+    "error": "draft must be a string."
+  },
+  "name": "draft-array",
+  "status": 400,
+  "passed": true,
+  "providerRequests": []
+}

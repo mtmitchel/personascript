@@ -1,0 +1,18 @@
+
+> react-example@0.0.0 build
+> vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1710 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.49 kB │ gzip:   0.66 kB
+dist/assets/index-CC2TSsSt.css   40.17 kB │ gzip:   7.53 kB
+dist/assets/index-CBSK4CeI.js   419.22 kB │ gzip: 112.23 kB
+✓ built in 3.08s
+
+  dist/server.cjs      123.6kb
+  dist/server.cjs.map  194.8kb
+
+⚡ Done in 13ms

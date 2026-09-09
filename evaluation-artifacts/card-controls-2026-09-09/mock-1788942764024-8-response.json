@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"topics\":[{\"name\":\"Unrequested topic\",\"category\":\"intersecting\",\"description\":\"Refreshed overview of Failure fixture\",\"keyTerminology\":[\"information hierarchy\",\"comprehension\"],\"conventions\":[\"Explain concepts through concrete decisions.\"]}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-card-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

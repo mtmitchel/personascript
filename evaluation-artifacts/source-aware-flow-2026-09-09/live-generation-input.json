@@ -1,0 +1,11 @@
+{
+  "field": "Content Design",
+  "disciplines": [
+    "Content Design",
+    "UX Copywriting"
+  ],
+  "draft": "In 2024, I rewrote the Northstar upgrade prompts with a product manager and designer. I moved the usage-limit explanation before the plan comparison and replaced vague button labels with specific next steps.",
+  "projectBrief": "Fictional QA project: Northstar upgrade prompt catalog review. The documented work concerns information order and clearer actions for users who encounter a usage limit. The team did not conduct usability tests or controlled experiments for this rewrite. No conversion result is attributed to this work.",
+  "model": "gemini-3.1-pro-preview",
+  "reasoningLevel": "auto"
+}

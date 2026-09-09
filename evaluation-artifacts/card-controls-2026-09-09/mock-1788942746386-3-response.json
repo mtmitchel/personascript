@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"topics\":[{\"name\":\"Monetization UX\",\"category\":\"intersecting\",\"description\":\"Refreshed overview of Monetization UX\",\"keyTerminology\":[\"information hierarchy\",\"comprehension\"],\"conventions\":[\"Explain concepts through concrete decisions.\"]}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-card-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

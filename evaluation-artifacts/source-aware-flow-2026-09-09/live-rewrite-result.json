@@ -1,0 +1,251 @@
+{
+  "status": 200,
+  "durationMs": 21990,
+  "data": {
+    "id": "rewrite-1788944493697",
+    "profileId": "profile-primary",
+    "profileName": "Authentic Craftsman and Essayist",
+    "modelUsed": "gemini-3.8-flash",
+    "durationMs": 21974,
+    "writingDurationMs": 6148,
+    "intensity": "faithful",
+    "originalText": "In 2024, I rewrote the Northstar upgrade prompts with a product manager and designer. I moved the usage-limit explanation before the plan comparison and replaced vague button labels with specific next steps.",
+    "rewrittenText": "In 2024, I rewrote the Northstar upgrade prompts alongside a product manager and a designer. The original sequence was backwards: it confronted people with plan comparisons before explaining why their work had stopped. I reset the hierarchy, moving the usage-limit explanation ahead of the tiers so users understood the concrete boundary they had reached before being asked to make a choice. From there, I cut the vague button labels and replaced them with direct, specific next steps. Clear interfaces do not depend on persuasion; they depend on structural honesty and words that tell the reader precisely what happens next.",
+    "wordCountOriginal": 32,
+    "wordCountRewritten": 99,
+    "changesExplanation": "Plain-prose rewrite completed. Review findings are shown below.",
+    "review": {
+      "status": "complete",
+      "summary": "The final text maintains perfect factual fidelity to the source and project brief. It effectively expands the structural rationale using permitted domain concepts without inventing usability testing or conversion metrics, strictly adhering to the brief's constraints. The voice successfully incorporates the custom directive's demand for strong authorial conviction.",
+      "findings": [
+        {
+          "category": "preservation",
+          "severity": "info",
+          "detail": "The text accurately implements domain concepts (information hierarchy) to explain the source decisions without introducing forbidden empirical claims or unmeasured conversion results.",
+          "evidence": "I reset the hierarchy, moving the usage-limit explanation ahead of the tiers"
+        },
+        {
+          "category": "addition",
+          "severity": "info",
+          "detail": "Adds a strong concluding philosophical statement about interface design, which satisfies the custom directive for authorial conviction and aligns with the corpus, without fabricating historical project facts.",
+          "evidence": "Clear interfaces do not depend on persuasion; they depend on structural honesty and words that tell the reader precisely what happens next."
+        }
+      ],
+      "voiceObservations": [
+        "Employs declarative, confident assertions to establish a tone of authority and conviction, matching the provided custom directive.",
+        "Uses varied sentence lengths, building momentum through longer explanatory clauses before delivering a sharp, philosophical conclusion.",
+        "Mirrors the corpus's thematic emphasis on deliberate craftsmanship and structural integrity through phrases like 'structural honesty' and 'concrete boundary'."
+      ],
+      "localChecks": [
+        {
+          "kind": "numbers",
+          "passed": true,
+          "missing": [],
+          "unexpected": [],
+          "detail": "All source numbers were found in the final text."
+        },
+        {
+          "kind": "quotes",
+          "passed": true,
+          "missing": [],
+          "unexpected": [],
+          "detail": "All source quotations were found in the final text."
+        }
+      ],
+      "modelUsed": "gemini-3.1-pro-preview",
+      "durationMs": 15820
+    },
+    "toneAdjustments": {
+      "formality": 65,
+      "enthusiasm": 50,
+      "conciseness": 50,
+      "enabled": false
+    },
+    "domainExpertise": {
+      "enabled": true,
+      "field": "Content Design",
+      "disciplines": [
+        "Content Design",
+        "UX Copywriting"
+      ],
+      "topics": [
+        {
+          "id": "topic-1788944471698-1-1toy2",
+          "name": "Content Design",
+          "category": "discipline",
+          "description": "The practice of designing content to meet user needs, focusing on the structure, clarity, and presentation of information within digital interfaces.",
+          "keyTerminology": [
+            "Information hierarchy",
+            "Frontloading",
+            "Progressive disclosure",
+            "User empathy",
+            "Readability"
+          ],
+          "conceptAnnotations": {
+            "Information hierarchy": {
+              "status": "supported",
+              "explanation": "The author restructured the content by placing the usage-limit explanation before the plan comparison."
+            },
+            "Frontloading": {
+              "status": "supported",
+              "explanation": "Key context about the usage limit was moved earlier in the prompt to inform the user immediately."
+            },
+            "Progressive disclosure": {
+              "status": "adjacent",
+              "explanation": "While content order was changed, there is no mention of hiding and revealing information progressively."
+            },
+            "User empathy": {
+              "status": "adjacent",
+              "explanation": "Identifying user needs is foundational, but the draft describes functional changes rather than empathy research."
+            },
+            "Readability": {
+              "status": "adjacent",
+              "explanation": "The focus was on structure and action, not explicitly on simplifying reading grade levels."
+            }
+          },
+          "conventions": [
+            "Focus on how information structure serves user goals rather than just grammatical correctness."
+          ],
+          "enabled": true
+        },
+        {
+          "id": "topic-1788944471698-2-vjsd6",
+          "name": "UX Copywriting",
+          "category": "discipline",
+          "description": "The craft of writing concise, actionable, and clear interface copy that guides users through digital experiences.",
+          "keyTerminology": [
+            "Call-to-action optimization",
+            "Action-oriented language",
+            "Microcopy",
+            "Voice and tone",
+            "Error prevention"
+          ],
+          "conceptAnnotations": {
+            "Call-to-action optimization": {
+              "status": "supported",
+              "explanation": "Vague button labels were replaced with specific next steps."
+            },
+            "Action-oriented language": {
+              "status": "supported",
+              "explanation": "The rewrite prioritized specific, actionable language for buttons."
+            },
+            "Microcopy": {
+              "status": "supported",
+              "explanation": "The work directly involved rewriting small, contextual bits of interface text like prompts and buttons."
+            },
+            "Voice and tone": {
+              "status": "adjacent",
+              "explanation": "The draft mentions clarity and specificity, but does not explicitly discuss adjusting the brand voice or emotional tone."
+            },
+            "Error prevention": {
+              "status": "adjacent",
+              "explanation": "While clear prompts help, the scenario centers on hitting a usage limit rather than preventing a system error."
+            }
+          },
+          "conventions": [
+            "Ensure labels and actions set clear expectations for the immediate next step."
+          ],
+          "enabled": true
+        },
+        {
+          "id": "topic-1788944471698-3-3bnmi",
+          "name": "Growth Design and Conversion",
+          "category": "intersecting",
+          "description": "The intersection of user experience design, product strategy, and marketing aimed at improving user acquisition, activation, and monetization.",
+          "keyTerminology": [
+            "Upgrade path",
+            "Friction reduction",
+            "Conversion rate",
+            "A/B testing",
+            "Value proposition"
+          ],
+          "conceptAnnotations": {
+            "Upgrade path": {
+              "status": "supported",
+              "explanation": "The project involved reviewing and rewriting upgrade prompts for users hitting product limits."
+            },
+            "Friction reduction": {
+              "status": "supported",
+              "explanation": "Clarifying next steps and information order removes cognitive friction for the user."
+            },
+            "Conversion rate": {
+              "status": "adjacent",
+              "explanation": "The project brief explicitly notes that no conversion result is attributed to this work."
+            },
+            "A/B testing": {
+              "status": "adjacent",
+              "explanation": "The brief explicitly states no controlled experiments were conducted for this rewrite."
+            },
+            "Value proposition": {
+              "status": "adjacent",
+              "explanation": "Although plan comparisons are mentioned, the specific work described focuses on usage limits and actions, not refining the value proposition itself."
+            }
+          },
+          "conventions": [
+            "Evaluate business goals alongside user needs, recognizing when metrics are absent or unmeasured."
+          ],
+          "enabled": true
+        },
+        {
+          "id": "topic-1788944471698-4-3mn35",
+          "name": "Product Collaboration",
+          "category": "intersecting",
+          "description": "The dynamics and methodologies of working across specialties to build and ship digital products.",
+          "keyTerminology": [
+            "Cross-functional collaboration",
+            "Stakeholder alignment",
+            "Usability testing",
+            "Agile methodology",
+            "Product requirements"
+          ],
+          "conceptAnnotations": {
+            "Cross-functional collaboration": {
+              "status": "supported",
+              "explanation": "The writer explicitly states they worked directly with a product manager and a designer."
+            },
+            "Stakeholder alignment": {
+              "status": "supported",
+              "explanation": "Achieving the rewrite alongside a PM and designer implies aligning on the solution and design execution."
+            },
+            "Usability testing": {
+              "status": "adjacent",
+              "explanation": "The project brief explicitly states the team did not conduct usability tests."
+            },
+            "Agile methodology": {
+              "status": "adjacent",
+              "explanation": "No specific project management frameworks, sprints, or cycles are mentioned in the text."
+            },
+            "Product requirements": {
+              "status": "adjacent",
+              "explanation": "While limits exist, the draft discusses the content execution rather than defining the initial engineering requirements."
+            }
+          },
+          "conventions": [
+            "Acknowledge the roles of product management and design in shaping content decisions."
+          ],
+          "enabled": true
+        }
+      ],
+      "keyTerminology": [],
+      "conventions": [],
+      "audienceContext": "Hiring managers reviewing a content design portfolio.",
+      "customNotes": "Explain documented decisions accurately.",
+      "productKnowledge": []
+    },
+    "feedbackItems": [],
+    "createdAt": "2026-09-09T09:01:33.697Z",
+    "customInstructions": "",
+    "preservationLocks": "Keep all core metrics, statistics, and organizational roles intact.",
+    "projectBrief": "Fictional QA project: Northstar upgrade prompt catalog review. The documented work concerns information order and clearer actions for users who encounter a usage limit. The team did not conduct usability tests or controlled experiments for this rewrite. No conversion result is attributed to this work.",
+    "preservationSettings": {
+      "keepStructure": true,
+      "headingTreatment": "revise_in_voice",
+      "preserveNumbers": true,
+      "preserveQuotes": true,
+      "preserveTerms": false,
+      "customLocks": "Keep all core metrics, statistics, and organizational roles intact."
+    },
+    "writingModelUsed": "gemini-3.8-flash",
+    "analysisModelUsed": "gemini-3.1-pro-preview"
+  }
+}

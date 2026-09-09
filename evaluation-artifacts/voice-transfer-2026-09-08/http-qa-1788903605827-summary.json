@@ -1,0 +1,190 @@
+[
+  {
+    "name": "rewrite",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903605905-1-request.json",
+      "mock-1788903605908-2-request.json"
+    ]
+  },
+  {
+    "name": "empty-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "disabled-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "oversized-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "empty-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788903605985-3-request.json"
+    ]
+  },
+  {
+    "name": "truncated-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788903605996-4-request.json"
+    ]
+  },
+  {
+    "name": "blocked-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788903606005-5-request.json"
+    ]
+  },
+  {
+    "name": "generation-error",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788903606013-6-request.json"
+    ]
+  },
+  {
+    "name": "review-error",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903606066-7-request.json",
+      "mock-1788903606068-8-request.json"
+    ]
+  },
+  {
+    "name": "malformed-review",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903606080-9-request.json",
+      "mock-1788903606081-10-request.json"
+    ]
+  },
+  {
+    "name": "truncated-review",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903606090-11-request.json",
+      "mock-1788903606091-12-request.json"
+    ]
+  },
+  {
+    "name": "quick-refine",
+    "route": "/api/quick-refine",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903606101-13-request.json",
+      "mock-1788903606101-14-request.json"
+    ]
+  },
+  {
+    "name": "selection-edit",
+    "route": "/api/edit-selection",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903606107-15-request.json",
+      "mock-1788903606107-16-request.json"
+    ]
+  },
+  {
+    "name": "invalid-selection",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "malformed-selection-range",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "out-of-bounds-selection-range",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "duplicate-selection-with-range",
+    "route": "/api/edit-selection",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788903606125-17-request.json",
+      "mock-1788903606126-18-request.json"
+    ]
+  },
+  {
+    "name": "duplicate-selection-without-range",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "wrong-draft-type",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "wrong-refine-type",
+    "route": "/api/quick-refine",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "wrong-selection-type",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "wrong-preservation-type",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  },
+  {
+    "name": "synthesis-retains-user-settings",
+    "passed": true,
+    "httpStatus": 200
+  }
+]

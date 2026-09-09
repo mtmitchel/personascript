@@ -1,0 +1,104 @@
+[
+  {
+    "name": "rewrite",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902285074-7-request.json",
+      "mock-1788902285076-8-request.json"
+    ]
+  },
+  {
+    "name": "empty-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n500 !== 400\n",
+    "requests": []
+  },
+  {
+    "name": "disabled-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n500 !== 400\n",
+    "requests": []
+  },
+  {
+    "name": "oversized-corpus",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": false,
+    "error": "Expected values to be strictly equal:\n\n500 !== 400\n",
+    "requests": []
+  },
+  {
+    "name": "empty-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788902285150-9-request.json"
+    ]
+  },
+  {
+    "name": "truncated-output",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": false,
+    "error": "The expression evaluated to a falsy value:\n\n  assert.ok(status >= 400)\n",
+    "requests": [
+      "mock-1788902285162-10-request.json",
+      "mock-1788902285163-11-request.json"
+    ]
+  },
+  {
+    "name": "generation-error",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 500,
+    "passed": true,
+    "requests": [
+      "mock-1788902285180-12-request.json"
+    ]
+  },
+  {
+    "name": "review-error",
+    "route": "/api/rewrite-draft",
+    "httpStatus": 200,
+    "passed": false,
+    "error": "unexpected number of model calls\n\n3 !== 2\n",
+    "requests": [
+      "mock-1788902285254-13-request.json",
+      "mock-1788902285255-14-request.json",
+      "mock-1788902286258-15-request.json"
+    ]
+  },
+  {
+    "name": "quick-refine",
+    "route": "/api/quick-refine",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902286267-16-request.json",
+      "mock-1788902286267-17-request.json"
+    ]
+  },
+  {
+    "name": "selection-edit",
+    "route": "/api/edit-selection",
+    "httpStatus": 200,
+    "passed": true,
+    "requests": [
+      "mock-1788902286274-18-request.json",
+      "mock-1788902286277-19-request.json"
+    ]
+  },
+  {
+    "name": "invalid-selection",
+    "route": "/api/edit-selection",
+    "httpStatus": 400,
+    "passed": true,
+    "requests": []
+  }
+]

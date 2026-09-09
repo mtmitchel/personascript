@@ -1,0 +1,42 @@
+{
+  "checks": {
+    "unit_tests": "35 passed, 0 failed",
+    "typescript": "npm run lint passed",
+    "production_build": "npm run build passed",
+    "deterministic_api_cases": "22 passed; mocked SDK boundary, all three writing routes plus review and extraction",
+    "diff_whitespace": "git diff --check passed"
+  },
+  "desktop_browser": [
+    "Brief field below Original draft and above Tone adjustments",
+    "Markdown and DOCX upload populated brief without replacing draft",
+    "Markdown upload made no network request",
+    "Empty, oversized, and unsupported uploads retained previous content and showed errors",
+    "Brief and error survived navigation",
+    "Pending upload locked writing and brief controls across navigation",
+    "Draft and brief edits during writing were retained; history preserved request-time brief snapshot",
+    "Clear followed by quick refine sent no historical brief",
+    "Native textarea drag increased height with content unchanged"
+  ],
+  "live_trial": {
+    "fixture": "Fictional Northstar project and repository demo voice samples",
+    "writer": "gemini-3.8-flash, auto thinking",
+    "reviewer": "gemini-3.1-pro-preview, auto thinking",
+    "transport": "HTTP 200 with writer and reviewer responses",
+    "observed_success": "Removed unnecessary marketing comparison and used brief-supported program results",
+    "limitation": "Writer introduced unsupported complete-rollout wording, an engineering collaborator, and causal hype; reviewer missed these. This verifies context delivery and demonstrates editorial freedom, not reliable factual fidelity."
+  },
+  "unverified": [
+    "Successful PDF upload in browser was not separately exercised; unreadable PDF API path verified no remote OCR",
+    "No private user project brief was inserted or used in the live test"
+  ],
+  "source_sha256": {
+    "README.md": "0f610245b48119188b29bb4ce9c2628e66b6506c7cd6a9aba5223da88416e401",
+    "server.ts": "18132d68406b1178ad4f82f47ae9923f2ae361285f9edf5e6e0a144df9d58589",
+    "src/writingPipeline.ts": "6c742b96896980c6b1493eacea3467da5006ac95ae13a34b6fb2d5580b925397",
+    "src/context/WritingAssistantContext.tsx": "1b3440f652c11819d5c1971b6089c4f4cc183cb42bb7f65db2e1650b946363c6",
+    "src/components/StudioView.tsx": "b71d59cedf487cf981b47afc52387a5655c57094f978c51ab721ec862a8834c5",
+    "src/types.ts": "ef76ac6a9ad91a77e6b96be13276dcb80fde8a880142dbe94267a50315519fd1",
+    "tests/projectBrief.test.ts": "db27f16e779652cd353494d111ac911d8985734679b81b859bf57b391e5efeea",
+    "tests/writingPipeline.test.ts": "8bf6f0ac816327e05bf6febcc92bc20560c3a05aad4771b179c13e3777476c3d"
+  }
+}

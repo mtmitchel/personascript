@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "finishReason": "STOP",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"topics\":[{\"name\":\"Content Design\",\"category\":\"discipline\",\"description\":\"General principles of Content Design.\",\"keyTerminology\":[\"Information hierarchy\",\"Accessibility\"],\"conceptAnnotations\":[{\"term\":\"Information hierarchy\",\"status\":\"supported\",\"explanation\":\"The source describes moving the usage-limit explanation before the plan comparison.\"},{\"term\":\"Accessibility\",\"status\":\"adjacent\",\"explanation\":\"Accessibility may reveal related clarity gaps; the source does not claim accessibility testing.\"}],\"conventions\":[\"Explain the reasoning behind documented decisions without inventing research.\"]}]}"
+          }
+        ]
+      }
+    }
+  ],
+  "modelVersion": "deterministic-source-aware-qa",
+  "usageMetadata": {
+    "promptTokenCount": 0,
+    "candidatesTokenCount": 0
+  }
+}

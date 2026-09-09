@@ -1,0 +1,63 @@
+{
+  "input": {
+    "projectBrief": "  The source documents information ordering and clearer actions. The team did not conduct usability testing or controlled experiments. SOURCE_BRIEF_SENTINEL\n"
+  },
+  "response": {
+    "topics": [
+      {
+        "id": "topic-1788944388220-1-o62ky",
+        "name": "Content Design",
+        "category": "discipline",
+        "description": "General principles of Content Design.",
+        "keyTerminology": [
+          "Information hierarchy",
+          "Accessibility"
+        ],
+        "conceptAnnotations": {
+          "Information hierarchy": {
+            "status": "supported",
+            "explanation": "The source describes moving the usage-limit explanation before the plan comparison."
+          },
+          "Accessibility": {
+            "status": "adjacent",
+            "explanation": "Accessibility may reveal related clarity gaps; the source does not claim accessibility testing."
+          }
+        },
+        "conventions": [
+          "Explain the reasoning behind documented decisions without inventing research."
+        ],
+        "enabled": true
+      },
+      {
+        "id": "topic-1788944388220-2-t6u9q",
+        "name": "Decision Making",
+        "category": "intersecting",
+        "description": "General principles of Decision Making.",
+        "keyTerminology": [
+          "Information hierarchy",
+          "Accessibility"
+        ],
+        "conceptAnnotations": {
+          "Information hierarchy": {
+            "status": "supported",
+            "explanation": "The source describes moving the usage-limit explanation before the plan comparison."
+          },
+          "Accessibility": {
+            "status": "adjacent",
+            "explanation": "Accessibility may reveal related clarity gaps; the source does not claim accessibility testing."
+          }
+        },
+        "conventions": [
+          "Explain the reasoning behind documented decisions without inventing research."
+        ],
+        "enabled": true
+      }
+    ]
+  },
+  "name": "brief-only",
+  "status": 200,
+  "passed": true,
+  "providerRequests": [
+    "mock-1788944388219-7-request.json"
+  ]
+}

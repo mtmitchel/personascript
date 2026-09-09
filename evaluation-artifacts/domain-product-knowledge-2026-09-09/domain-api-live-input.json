@@ -1,0 +1,15 @@
+{
+  "field": "UX Copywriting & Content Design",
+  "disciplines": [
+    "UX Copywriting",
+    "Content Design"
+  ],
+  "existingTopics": [
+    "UX Copywriting & Content Design",
+    "Monetization & Conversion UX",
+    "AI Translation & Localization",
+    "AI Writing Assistance"
+  ],
+  "model": "gemini-3.1-pro-preview",
+  "reasoningLevel": "auto"
+}
