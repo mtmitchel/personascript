@@ -83,6 +83,7 @@ export const ProfileView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200">
         <div>
+          <p className="mb-2 text-xs font-medium text-neutral-500">Step 2 of 5 · Voice Blueprint</p>
           <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
             {activeProfile.name}
           </h1>
@@ -128,7 +129,7 @@ export const ProfileView: React.FC = () => {
             onClick={() => setActiveTab('draft-brief')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
           >
-            <span>Draft &amp; Brief</span>
+            <span>Continue to Draft &amp; Brief</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -312,15 +313,7 @@ export const ProfileView: React.FC = () => {
               onClick={() => setActiveTab('draft-brief')}
               className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
             >
-              Draft &amp; Brief
-            </button>
-            <button
-              id="btn-profile-next-studio"
-              type="button"
-              onClick={() => setActiveTab('studio')}
-              className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
-            >
-              Rewrite Studio
+              Continue to Draft &amp; Brief
             </button>
           </div>
         </div>

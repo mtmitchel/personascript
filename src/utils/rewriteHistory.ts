@@ -1,5 +1,6 @@
 import { RewriteFeedbackItem, RewriteResult } from '../types';
-import { READER_PURPOSE_MAX_CHARS } from '../writingPipeline';
+import { EDITORIAL_PREFERENCES_MAX_CHARS, READER_PURPOSE_MAX_CHARS } from '../writingPipeline';
+import { validateApprovedPlan } from '../editorialPlan';
 
 export const REWRITE_HISTORY_LIMIT = 20;
 
@@ -18,7 +19,8 @@ export function isRewriteFeedback(value: unknown): value is RewriteFeedbackItem[
   return Array.isArray(value) && value.every((item) => record(item)
     && ['id', 'selectedText', 'label', 'createdAt'].every((key) => string(item[key]))
     && ['too_formal', 'too_casual', 'not_my_voice', 'good', 'too_verbose', 'awkward_cadence', 'domain_inaccurate', 'custom'].includes(item.tag)
-    && optional(item.note, string));
+    && optional(item.note, string)
+    && optional(item.saveStatus, (status) => status === 'pending' || status === 'failed'));
 }
 
 /** Reject damaged records before rendering or autosaving them; retain the raw storage value. */
@@ -27,11 +29,15 @@ function isSavedRewrite(value: any): boolean {
     || !['profileId', 'profileName', 'originalText', 'rewrittenText', 'changesExplanation', 'createdAt'].every((key) => string(value[key]))
     || !['polish', 'faithful', 'transform'].includes(value.intensity)
     || !['wordCountOriginal', 'wordCountRewritten'].every((key) => finite(value[key]) && value[key] >= 0)
-    || !['id', 'parentId', 'customInstructions', 'preservationLocks', 'projectBrief', 'readerPurpose', 'modelUsed', 'writingModelUsed', 'analysisModelUsed'].every((key) => optional(value[key], string))
+    || !['id', 'parentId', 'customInstructions', 'preservationLocks', 'projectBrief', 'readerPurpose', 'editorialPreferences', 'modelUsed', 'writingModelUsed', 'analysisModelUsed'].every((key) => optional(value[key], string))
     || !['durationMs', 'writingDurationMs'].every((key) => optional(value[key], finite))
     || !optional(value.historicalAssessment, (item) => typeof item === 'boolean')
     || !optional(value.feedbackItems, isRewriteFeedback)) return false;
+  try {
+    validateApprovedPlan(value.editorialPlan, { draft: value.originalText, projectBrief: value.projectBrief || '', readerPurpose: value.readerPurpose || '', editorialPreferences: value.editorialPreferences });
+  } catch { return false; }
   if (!optional(value.readerPurpose, (item) => typeof item === 'string' && item.length <= READER_PURPOSE_MAX_CHARS)) return false;
+  if (!optional(value.editorialPreferences, (item) => typeof item === 'string' && item.length <= EDITORIAL_PREFERENCES_MAX_CHARS)) return false;
   if (!optional(value.revision, (revision) => record(revision)
     && ['rewrite', 'refine', 'selection'].includes(revision.kind)
     && optional(revision.instruction, string)

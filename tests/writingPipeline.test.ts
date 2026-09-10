@@ -364,6 +364,35 @@ test('treats reader-and-purpose guidance as subordinate editorial control', () =
   assert.equal((prompt.match(/QUALITATIVE FIDELITY:/g) || []).length, 1);
 });
 
+test('writer paths exclude generated imagery guidance but retain matching metrics and user directives', () => {
+  const imageryProfile = {
+    ...profile,
+    synthesizedGuidelines: {
+      ...profile.synthesizedGuidelines,
+      vocabularyPreferences: ['PROFILE_ONLY_IMAGERY'],
+      pacingGuide: 'PROFILE_ONLY_SENSORY_PACING',
+    },
+  };
+  const input = { draft: 'My role was to revise the prompts so they communicated value clearly.', profile: imageryProfile, samples };
+  const prompts = [
+    buildRewritePrompt(input),
+    buildQuickRefinePrompt({ ...input, currentText: input.draft, instruction: 'Clarify the role.' }),
+    buildSelectionPrompt({ ...input, currentText: input.draft, selectedText: input.draft, instruction: 'Clarify the role.' }),
+  ];
+  for (const prompt of prompts) {
+    assert.doesNotMatch(prompt, /PROFILE_ONLY_IMAGERY|PROFILE_ONLY_SENSORY_PACING|Pacing guidance:|Vocabulary preferences:/);
+    assert.match(prompt, /formality 50\/100/);
+    assert.match(prompt, /Keep the user directive/);
+    assert.match(prompt, /expression only/);
+    assert.match(prompt, /infinitives of purpose/);
+    assert.match(prompt, /purpose clauses/);
+    assert.match(prompt, /“was to”/);
+    assert.match(prompt, /manner adverb/);
+    assert.match(prompt, /“clearly”/);
+    assert.match(prompt, /with absolute clarity/);
+  }
+});
+
 test('applies tone sliders only when explicitly enabled', () => {
   const off = buildRewritePrompt({ draft: 'Draft.', profile, samples, toneAdjustments: { formality: 2, enthusiasm: 3, conciseness: 4 } });
   const on = buildRewritePrompt({ draft: 'Draft.', profile, samples, toneAdjustments: { formality: 2, enthusiasm: 3, conciseness: 4 }, toneEnabled: true });
@@ -585,4 +614,45 @@ test('normalization aligns case-varied annotation keys to canonical concepts wit
   const normalized = normalizeDomainExpertise(input);
   assert.deepEqual(Object.keys(normalized.topics![0].conceptAnnotations!), ['Information Hierarchy']);
   assert.deepEqual(normalizeDomainExpertise(normalized), normalized);
+});
+
+
+test('approved decisions reach every writing path and the reviewer without sending voice data to review', () => {
+  const editorialPlan = {
+    openingJob: 'Establish the author’s contribution and project context.',
+    items: [
+      { idea: 'Named reasoning', sourcePhrase: 'Reasoning evidence.', decision: 'keep' as const, limit: 'Retain the application of the principle.' },
+      { idea: 'Hypothetical example', sourcePhrase: 'An illustration.', decision: 'shorten' as const, limit: 'Keep hypothetical status.' },
+      { idea: 'Generic background', sourcePhrase: 'Readers know this.', decision: 'cut' as const, limit: 'Remove the idea, including paraphrases.' },
+    ],
+  };
+  const input = { draft: 'Reasoning evidence. An illustration. Readers know this.', profile, samples, editorialPlan };
+  const prompts = [buildRewritePrompt(input), buildQuickRefinePrompt({ ...input, currentText: input.draft, instruction: 'Clarify this.' }),
+    buildSelectionPrompt({ ...input, currentText: input.draft, selectedText: 'Reasoning evidence.', instruction: 'Clarify this.' }),
+    buildReviewPrompt({ ...input, sourceText: input.draft, finalText: 'Reasoning evidence.' })];
+  for (const prompt of prompts) {
+    const serialized = prompt.split('<editorial-decisions>')[1].split('</editorial-decisions>')[0].trim();
+    assert.deepEqual(JSON.parse(serialized), editorialPlan);
+  }
+  const writer = prompts[0];
+  assert.ok(writer.indexOf('<editorial-decisions>') < writer.indexOf('<writing-corpus>'));
+  assert.match(writer, /primary editorial constraint/);
+  assert.doesNotMatch(writer, /Supported facts from the project brief may strengthen the draft/);
+  const review = prompts[3];
+  for (const sample of samples) assert.ok(!review.includes(sample.content));
+  assert.ok(!review.includes(profile.customDirectives));
+  assert.doesNotMatch(review, /PROFILE GUIDANCE|<writing-corpus>|formality 50/);
+  assert.match(review, /even if paraphrased/);
+  assert.match(review, /brief-supported addition can still be an editorial defect/i);
+  assert.doesNotThrow(() => buildReviewPrompt({ sourceText: 'Source.', finalText: 'Final.' }));
+  assert.deepEqual(validateGeneratedReview(JSON.stringify({ summary: 'Checked decisions.', findings: [] })),
+    { summary: 'Checked decisions.', findings: [], voiceObservations: [] });
+});
+
+
+test('new reviews reject voice grading while legacy history retains its own reader', () => {
+  assert.throws(() => validateGeneratedReview(JSON.stringify({ summary: 'Style.', findings: [{ category: 'voice', severity: 'warning', detail: 'Cadence differs.' }] })), /malformed review/);
+  assert.throws(() => validateGeneratedReview(JSON.stringify({ summary: 'Style.', findings: [], voiceObservations: ['Shorter sentences.'] })), /malformed review/);
+  const prompt = buildReviewPrompt({ sourceText: 'Source.', finalText: 'Final.' });
+  assert.ok(prompt.indexOf('Approved decisions are the editorial checklist') < prompt.indexOf('Editorial relevance and explicit user instructions'));
 });

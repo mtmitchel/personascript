@@ -65,6 +65,7 @@ export interface WritingSample {
   createdAt: string;
   analysis?: LinguisticAnalysis;
   analyzing?: boolean;
+  analysisError?: string;
   enabled: boolean;
 }
 
@@ -117,6 +118,8 @@ export interface DomainExpertise {
 }
 
 export interface StyleProfile {
+  appliedFeedbackIds?: string[];
+  retiredFeedbackIds?: string[];
   id: string;
   name: string;
   description: string;
@@ -136,6 +139,28 @@ export interface StyleProfile {
 }
 
 export type RewriteIntensity = 'polish' | 'faithful' | 'transform';
+
+export interface EditorialPlan {
+  /** Older saved plans remain readable; new proposals use the evidenced contract. */
+  version?: 2;
+  openingJob: string;
+  items: {
+    paragraphId?: number;
+    idea: string;
+    sourcePhrase: string;
+    decision: 'keep' | 'shorten' | 'cut';
+    limit: string;
+    sourceConflict?: { draftQuote: string; briefQuote: string };
+  }[];
+}
+
+/** The exact source context reviewed by the user; edits require approval again. */
+export interface EditorialPlanState {
+  plan: EditorialPlan;
+  sources: { draft: string; projectBrief: string; readerPurpose: string; editorialPreferences?: string };
+  approved: boolean;
+  modelUsed?: string;
+}
 
 export type HeadingTreatment = 'revise_in_voice' | 'preserve_verbatim';
 
@@ -212,6 +237,7 @@ export type FeedbackTag =
   | 'custom';
 
 export interface RewriteFeedbackItem {
+  saveStatus?: 'pending' | 'failed';
   id: string;
   selectedText: string;
   tag: FeedbackTag;
@@ -248,6 +274,7 @@ export interface StylisticAudit {
 
 export interface RewriteResult {
   id: string;
+  editorialPlan?: EditorialPlanState;
   parentId?: string;
   revision?: {
     kind: 'rewrite' | 'refine' | 'selection';
@@ -279,6 +306,7 @@ export interface RewriteResult {
   projectBrief?: string;
   /** Independent reader and purpose context for the rewrite, if supplied. */
   readerPurpose?: string;
+  editorialPreferences?: string;
   modelUsed?: string;
   writingModelUsed?: string;
   analysisModelUsed?: string;
@@ -299,14 +327,18 @@ export type GeminiModelChoice =
   | 'gemini-3.6-flash'
   | 'gemini-3.1-pro-preview';
 
-export type ReasoningLevelChoice = 'auto' | 'minimal' | 'low' | 'high';
+export type ModelChoice = GeminiModelChoice | `openai:${string}` | `openrouter:${string}`;
+
+// Providers can advertise new effort names without an app release. Values are
+// validated as bounded identifiers before being sent, and never remapped.
+export type ReasoningLevelChoice = string;
 
 export interface ModelSettings {
-  writingModel: GeminiModelChoice;
+  writingModel: ModelChoice;
   writingReasoningLevel: ReasoningLevelChoice;
-  analysisModel: GeminiModelChoice;
+  analysisModel: ModelChoice;
   analysisReasoningLevel: ReasoningLevelChoice;
-  model?: GeminiModelChoice;
+  model?: ModelChoice;
   reasoningLevel?: ReasoningLevelChoice;
 }
 
@@ -340,7 +372,7 @@ export interface GenerateDomainKnowledgeRequest {
   targetTopic?: { name: string; category: 'discipline' | 'intersecting' };
   draft?: string;
   projectBrief?: string;
-  model?: GeminiModelChoice;
+  model?: ModelChoice;
   reasoningLevel?: ReasoningLevelChoice;
 }
 

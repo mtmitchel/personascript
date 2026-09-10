@@ -42,12 +42,12 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
   return (
     <div
       id="tone-sliders-control"
-      className="bg-white border border-neutral-200 rounded-xl p-4 space-y-4"
+      className="studio-settings-section space-y-4"
     >
       <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
         <div>
-          <h4 className="text-xs font-medium text-neutral-900">Tone adjustments</h4>
-          <p className="text-[11px] text-neutral-400 mt-0.5">Use the corpus tone by default; opt in to these saved values.</p>
+          <h3 className="text-xs font-medium text-neutral-900">Tone adjustments</h3>
+          <p className="text-[11px] text-neutral-400 mt-0.5">Use your writing samples, or adjust the tone below.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -59,7 +59,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
               onChange={(e) => onChange({ ...adjustments, enabled: e.target.checked })}
               className="w-3.5 h-3.5 accent-neutral-900"
             />
-            <span>Apply</span>
+            <span>Adjust tone</span>
           </label>
           <button
             id="btn-reset-sliders"
@@ -87,6 +87,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
           </div>
           <input
             id="slider-formality"
+            aria-label="Formality"
             type="range"
             min="0"
             max="100"
@@ -117,6 +118,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
           </div>
           <input
             id="slider-enthusiasm"
+            aria-label="Enthusiasm"
             type="range"
             min="0"
             max="100"
@@ -147,6 +149,7 @@ export const ToneSlidersControl: React.FC<ToneSlidersControlProps> = ({
           </div>
           <input
             id="slider-conciseness"
+            aria-label="Conciseness"
             type="range"
             min="0"
             max="100"

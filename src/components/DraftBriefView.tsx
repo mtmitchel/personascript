@@ -34,11 +34,12 @@ export const DraftBriefView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200">
         <div>
+          <p className="mb-2 text-xs font-medium text-neutral-500">Step 3 of 5</p>
           <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
             Draft &amp; Brief
           </h1>
           <p className="text-xs text-neutral-500 mt-1 max-w-xl">
-            Provide your draft, optional project brief, and reader and purpose. All are saved in this browser for rewriting and review. Draft and brief can also guide domain generation.
+            Add your draft, factual brief, and reader guidance. Next, review the domain and product knowledge for this draft.
           </p>
         </div>
 
@@ -47,9 +48,9 @@ export const DraftBriefView: React.FC = () => {
             id="btn-draft-brief-to-domain"
             type="button"
             onClick={() => setActiveTab('domain')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
           >
-            <span>Domain Knowledge</span>
+            <span>Continue to Domain Knowledge</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -121,7 +122,7 @@ export const DraftBriefView: React.FC = () => {
             aria-invalid={Boolean(draftUploadError)}
             onChange={(e) => setDraftText(e.target.value)}
             placeholder="Paste or write your raw draft here..."
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 resize-y"
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 resize-y"
           />
 
           {draftUploadError && (
@@ -192,7 +193,7 @@ export const DraftBriefView: React.FC = () => {
             aria-describedby="project-brief-help project-brief-count"
             aria-invalid={projectBrief.length > PROJECT_BRIEF_MAX_CHARS}
             placeholder="Paste background facts, metrics, decisions, and constraints for this draft..."
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
           />
 
           {(briefUploadError || projectBrief.length > PROJECT_BRIEF_MAX_CHARS) && (
@@ -228,7 +229,7 @@ export const DraftBriefView: React.FC = () => {
           </div>
 
           <p id="reader-purpose-help" className="text-xs text-neutral-500 leading-relaxed">
-            Describe who will read this and what the prose should help them understand or decide. This guides editorial emphasis and organization; it does not add facts or replace the source.
+            Describe who will read this, what they already know, and what the prose should help them understand or decide. This guides editorial emphasis and organization; it does not add facts or replace the source.
           </p>
 
           <textarea
@@ -239,8 +240,8 @@ export const DraftBriefView: React.FC = () => {
             disabled={isRewriting}
             aria-describedby="reader-purpose-help reader-purpose-count"
             aria-invalid={readerPurpose.length > READER_PURPOSE_MAX_CHARS}
-            placeholder="For example: Hiring managers reading a case study. Help them understand my role and the key decisions."
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
+            placeholder="For example: Experienced design leaders who already understand product workflows. Help them understand my role and the project-specific decisions."
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
           />
 
           {readerPurpose.length > READER_PURPOSE_MAX_CHARS && (
@@ -258,22 +259,15 @@ export const DraftBriefView: React.FC = () => {
         {/* Progression Footer */}
         <div className="flex items-center justify-between pt-2">
           <span className="text-xs text-neutral-400">
-            Draft, brief, and reader-and-purpose guidance are saved in this browser and restored when you return
+            Saved in this browser. Next, check the context the rewrite will use.
           </span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('domain')}
-              className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
+              className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
             >
-              Domain Knowledge
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('studio')}
-              className="px-3.5 py-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition"
-            >
-              Rewrite Studio
+              Continue to Domain Knowledge
             </button>
           </div>
         </div>

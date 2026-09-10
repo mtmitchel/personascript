@@ -1,9 +1,25 @@
-import express, { Request, Response } from 'express';
+import { generateExternalContent, listProviderModels } from './src/aiProvider';
+import { connectProvider, disconnectProvider, ConnectionError, requireLocalConnectionRequest } from './src/providerConnections';
+import { isReasoningLevelChoice, knownModelReasoning, parseModelChoice, validateModelReasoning } from './src/modelChoice';
+import { validateFeedbackUpdate } from './src/utils/voiceFeedback';
+import { buildEditorialPlanPrompt, EDITORIAL_PLAN_SCHEMA, PLAN_SYSTEM_INSTRUCTION, validatePlanSources, validateApprovedPlan, validateGeneratedPlan } from './src/editorialPlan';
+import type { EditorialPlan, ReasoningLevelChoice } from './src/types';
+import {
+  buildPlanSourceAuditPrompt,
+  PLAN_SOURCE_AUDIT_SCHEMA,
+  PLAN_SOURCE_AUDIT_SYSTEM_INSTRUCTION,
+  planSourceAuditContext,
+  planSourceAuditFindings,
+  validatePlanSourceAudit,
+  type PlanAssertionAudit,
+} from './src/planAssertionReview';
+import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
+import { cleanPdfPages, cleanSourceText } from './src/sourceText';
 import { createServer as createViteServer } from 'vite';
 import {
   buildQuickRefinePrompt,
@@ -14,6 +30,7 @@ import {
   normalizePreservationSettings,
   validateProjectBrief,
   validateReaderPurpose,
+  validateEditorialPreferences,
   REVIEW_SYSTEM_INSTRUCTION,
   runLocalPreservationChecks,
   unavailableReview,
@@ -38,15 +55,21 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Parse credential requests separately, so malformed JSON cannot reach Express's
+// default error logger (whose parse errors can include submitted values).
+app.use('/api/connections', express.json({ limit: '4kb' }), (error: unknown, req: Request, res: Response, next: NextFunction) => {
+  res.set('Cache-Control', 'no-store').status(400).json({ error: 'Could not read the connection. Enter the key and try again.' });
+});
+
 // Increase payload limits for documents & PDFs
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Lazy Gemini client helper
 function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is missing. Please configure it in AI Studio Secrets.');
+    throw new Error('Connect Gemini in Models → API connections before using this model.');
   }
   return new GoogleGenAI({
     apiKey,
@@ -137,7 +160,7 @@ function validateControlInputs(input: {
     ['reasoningLevel', input.reasoningLevel],
     ['analysisReasoningLevel', input.analysisReasoningLevel],
   ] as const) {
-    if (value !== undefined && !['auto', 'minimal', 'low', 'high'].includes(value as string)) {
+    if (value !== undefined && !isReasoningLevelChoice(value)) {
       throw new RequestValidationError(`${label} is invalid.`);
     }
   }
@@ -211,54 +234,59 @@ async function generateContentWithRetry(params: {
   contents: any;
   config?: any;
   preferredModel?: string;
-  reasoningLevel?: 'auto' | 'minimal' | 'low' | 'high';
+  reasoningLevel?: ReasoningLevelChoice;
   endpoint?: string;
   /** Writing and review stages must stay on the user-selected model. */
   allowFallback?: boolean;
+  signal?: AbortSignal;
 }) {
   const startTime = Date.now();
-  const ai = getGeminiClient();
   const selectedModel = params.preferredModel || 'gemini-3.8-flash';
+  const { provider } = parseModelChoice(selectedModel);
+  const reasoningLevel = params.reasoningLevel ?? 'auto';
+  try { validateModelReasoning(selectedModel, reasoningLevel); }
+  catch (error) { throw new RequestValidationError(error instanceof Error ? error.message : 'Reasoning is invalid.'); }
+  const allowFallback = provider === 'gemini' && params.allowFallback !== false;
   
   // Keep the historical cascade for unrelated analysis/import routes. Writing and
   // review calls opt out so a selected model is never silently replaced.
   const candidateModels: string[] = [selectedModel];
-  if (params.allowFallback !== false) {
+  if (allowFallback) {
     const fallbacks = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview'];
     for (const m of fallbacks) {
       if (!candidateModels.includes(m)) candidateModels.push(m);
     }
   }
 
-  const baseConfig = { ...(params.config || {}) };
+  const baseConfig = { ...(params.config || {}), ...(params.signal ? { abortSignal: params.signal } : {}) };
 
   let lastError: any = null;
   for (const model of candidateModels) {
-    const isPro = model.includes('pro');
+    // A fallback must accept the exact selected effort. Never lower it to make
+    // a different Gemini model accept the request.
+    const supportedEfforts = knownModelReasoning(model)?.efforts;
+    if (reasoningLevel !== 'auto' && supportedEfforts && !supportedEfforts.includes(reasoningLevel)) continue;
     const modelConfig = { ...baseConfig };
     
-    if (params.reasoningLevel && params.reasoningLevel !== 'auto') {
-      let level: ThinkingLevel = ThinkingLevel.LOW;
-      if (params.reasoningLevel === 'high') {
-        level = ThinkingLevel.HIGH;
-      } else if (params.reasoningLevel === 'minimal') {
-        level = isPro ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL;
-      } else if (params.reasoningLevel === 'low') {
-        level = ThinkingLevel.LOW;
+    if (provider === 'gemini' && reasoningLevel !== 'auto') {
+      const level = reasoningLevel.toUpperCase() as ThinkingLevel;
+      if (![ThinkingLevel.MINIMAL, ThinkingLevel.LOW, ThinkingLevel.MEDIUM, ThinkingLevel.HIGH].includes(level)) {
+        throw new RequestValidationError(`Gemini does not support the reasoning effort ${reasoningLevel}.`);
       }
       modelConfig.thinkingConfig = { thinkingLevel: level };
     }
 
     for (let attempt = 0; attempt < 2; attempt++) {
+      params.signal?.throwIfAborted();
       try {
-        const response = await ai.models.generateContent({
+        const response = provider === 'gemini' ? await getGeminiClient().models.generateContent({
           model,
           contents: params.contents,
           config: modelConfig,
-        });
+        }) : await generateExternalContent({ model, contents: params.contents, config: baseConfig, reasoningLevel: params.reasoningLevel, signal: params.signal });
 
         const durationMs = Date.now() - startTime;
-        (response as any).modelExecuted = model;
+        (response as any).modelExecuted ||= model;
         (response as any).durationMs = durationMs;
 
         const promptText = typeof params.contents === 'string'
@@ -272,7 +300,7 @@ async function generateContentWithRetry(params: {
           timestamp: new Date().toISOString(),
           endpoint: params.endpoint || 'generateContent',
           modelRequested: selectedModel,
-          modelExecuted: model,
+          modelExecuted: (response as any).modelExecuted,
           durationMs,
           inputTokens,
           outputTokens,
@@ -282,12 +310,13 @@ async function generateContentWithRetry(params: {
 
         return response;
       } catch (err: any) {
+        params.signal?.throwIfAborted();
         lastError = err;
         const msg = (err?.message || String(err)).toLowerCase();
 
         // If quota is exhausted, a fallback is only allowed for legacy routes.
         if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
-          if (params.allowFallback !== false) {
+          if (allowFallback) {
             console.warn(`Model ${model} quota reached, falling back to next available model.`);
           }
           break;
@@ -322,7 +351,7 @@ async function generateContentWithRetry(params: {
     error: rawMsg,
   });
 
-  if (rawMsg.toLowerCase().includes('429') || rawMsg.toLowerCase().includes('quota') || rawMsg.toLowerCase().includes('resource_exhausted')) {
+  if (provider === 'gemini' && (rawMsg.toLowerCase().includes('429') || rawMsg.toLowerCase().includes('quota') || rawMsg.toLowerCase().includes('resource_exhausted'))) {
     throw new Error('Gemini API quota exceeded for free tier. Please retry in a few moments, switch to Gemini 3.1 Flash Lite, or configure a paid API key in AI Studio Settings.');
   }
   throw lastError || new Error('Model generation failed across all available models.');
@@ -330,7 +359,47 @@ async function generateContentWithRetry(params: {
 
 // 1. Health check & Observability endpoints
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', hasKey: !!process.env.GEMINI_API_KEY });
+  const providers = { gemini: !!process.env.GEMINI_API_KEY?.trim(), openai: !!process.env.OPENAI_API_KEY?.trim(), openrouter: !!process.env.OPENROUTER_API_KEY?.trim() };
+  res.set('Cache-Control', 'no-store');
+  res.json({ status: 'ok', hasKey: Object.values(providers).some(Boolean), providers });
+});
+
+app.post('/api/connections', async (req: Request, res: Response) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    requireLocalConnectionRequest(req);
+    res.json(await connectProvider(req.body));
+  } catch (error) {
+    // Never log the request body, credentials, or raw provider failures.
+    res.status(error instanceof ConnectionError ? error.statusCode : 500).json({
+      error: error instanceof ConnectionError ? error.message : 'Could not save the connection. Try again.',
+    });
+  }
+});
+
+app.delete('/api/connections', async (req: Request, res: Response) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    requireLocalConnectionRequest(req);
+    res.json(await disconnectProvider(req.body));
+  } catch (error) {
+    res.status(error instanceof ConnectionError ? error.statusCode : 500).json({
+      error: error instanceof ConnectionError ? error.message : 'Could not remove the key. Try again.',
+    });
+  }
+});
+
+app.get('/api/models', async (req: Request, res: Response) => {
+  const provider = req.query.provider;
+  if (provider !== 'openai' && provider !== 'openrouter') {
+    return res.status(400).json({ error: 'Choose OpenAI or OpenRouter.' });
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    res.json({ models: await listProviderModels(provider) });
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : 'Could not load models.' });
+  }
 });
 
 app.get('/api/logs', (req: Request, res: Response) => {
@@ -340,7 +409,7 @@ app.get('/api/logs', (req: Request, res: Response) => {
 // 2. Extract text from uploaded document (docx, pdf, txt)
 app.post('/api/extract-text', async (req: Request, res: Response) => {
   try {
-    const { fileData, fileType, fileName, localOnly } = req.body;
+    const { fileData, fileType, fileName, localOnly, model, reasoningLevel } = req.body;
     if (localOnly !== undefined && typeof localOnly !== 'boolean') {
       return res.status(400).json({ error: 'localOnly must be a boolean.' });
     }
@@ -360,16 +429,16 @@ app.post('/api/extract-text', async (req: Request, res: Response) => {
       // 1. Local extraction via pdf-parse: Fast, offline, 0 API quota
       try {
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
+        const textResult = await parser.getText({ pageJoiner: '' });
         if (textResult && textResult.text && textResult.text.trim().length > 10) {
-          extractedText = textResult.text;
+          extractedText = cleanPdfPages(textResult.pages.map(page => page.text));
         }
         await parser.destroy();
       } catch (pdfErr) {
         console.warn('Local PDFParse could not parse document, attempting fallback:', pdfErr);
       }
 
-      // 2. If text is empty (e.g. scanned document), fallback to Gemini
+      // 2. If text is empty (e.g. scanned document), use the selected analysis model
       if (!extractedText || extractedText.trim().length === 0) {
         if (localOnly) {
           return res.status(400).json({
@@ -377,7 +446,9 @@ app.post('/api/extract-text', async (req: Request, res: Response) => {
           });
         }
         const response = await generateContentWithRetry({
-          preferredModel: 'gemini-3.1-flash-lite',
+          preferredModel: model || 'gemini-3.1-flash-lite',
+          reasoningLevel,
+          allowFallback: false,
           contents: [
             {
               inlineData: {
@@ -791,9 +862,12 @@ YOUR MISSION:
 
 // 3. Deep Linguistic Analysis of a writing sample
 app.post('/api/analyze-sample', async (req: Request, res: Response) => {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  res.on('close', cancel);
+  const timeout = setTimeout(() => controller.abort(new DOMException('Analysis timed out.', 'TimeoutError')), 600_000);
   try {
     const { text, title, fileType, pdfBase64, model, reasoningLevel } = req.body;
-    const ai = getGeminiClient();
 
     let contentsPayload: any[];
 
@@ -835,6 +909,7 @@ ${text}
 
     const response = await generateContentWithRetry({
       contents: contentsPayload,
+      signal: controller.signal,
       preferredModel: model,
       reasoningLevel,
       config: {
@@ -944,8 +1019,16 @@ ${text}
     const parsedJson = JSON.parse(response.text || '{}');
     res.json(parsedJson);
   } catch (error: any) {
+    if (res.destroyed) return;
+    if (controller.signal.aborted) {
+      res.status(504).json({ error: 'Analysis reached the 10-minute limit. Your sample is still available. Please try again.' });
+      return;
+    }
     console.error('Error in /api/analyze-sample:', error);
     res.status(500).json({ error: error.message || 'Failed to analyze writing sample' });
+  } finally {
+    clearTimeout(timeout);
+    res.off('close', cancel);
   }
 });
 
@@ -957,7 +1040,6 @@ app.post('/api/synthesize-profile', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'At least one writing sample is required' });
     }
 
-    const ai = getGeminiClient();
 
     const sampleSummaries = samples.map((s: any, idx: number) => {
       const a = s.analysis || {};
@@ -1062,8 +1144,10 @@ Synthesize a comprehensive profile including:
 // readable on the client through their optional legacy fields.
 async function reviewWrittenText(input: {
   sourceText: string;
+  editorialPlan?: EditorialPlan;
   projectBrief?: string;
   readerPurpose?: string;
+  editorialPreferences?: string;
   finalText: string;
   profile?: any;
   samples: RawWritingSample[];
@@ -1086,10 +1170,46 @@ async function reviewWrittenText(input: {
   );
   const reviewStart = Date.now();
   const requestedAnalysisModel = input.analysisModel || 'gemini-3.1-pro-preview';
+  const auditReasoningLevel = input.analysisReasoningLevel || 'auto';
+  let sourceAudit: PlanAssertionAudit | undefined;
+  let sourceAuditFindings: ReturnType<typeof planSourceAuditFindings> = [];
+
+  // Approved plans are audited before the prose reviewer sees the generated
+  // text. This applies to versioned and legacy plans so history follow-ups do
+  // not bypass the source-evidence boundary.
+  if (input.editorialPlan) {
+    const auditInput = {
+      draft: input.sourceText,
+      projectBrief: input.projectBrief,
+      editorialPlan: input.editorialPlan,
+    };
+    try {
+      const auditResponse = await generateContentWithRetry({
+        endpoint: `${input.endpoint}/plan-source-audit`,
+        contents: buildPlanSourceAuditPrompt(auditInput),
+        preferredModel: requestedAnalysisModel,
+        reasoningLevel: auditReasoningLevel as any,
+        allowFallback: false,
+        config: {
+          responseMimeType: 'application/json',
+          systemInstruction: PLAN_SOURCE_AUDIT_SYSTEM_INSTRUCTION,
+          responseSchema: PLAN_SOURCE_AUDIT_SCHEMA,
+        },
+      });
+      sourceAudit = validatePlanSourceAudit(auditResponse.text, auditResponse, auditInput);
+      sourceAuditFindings = planSourceAuditFindings(sourceAudit);
+    } catch (error) {
+      const unavailable = unavailableReview(error, localChecks);
+      unavailable.modelUsed = requestedAnalysisModel;
+      unavailable.durationMs = Date.now() - reviewStart;
+      return unavailable;
+    }
+  }
+
   try {
     const response = await generateContentWithRetry({
       endpoint: input.endpoint,
-      contents: buildReviewPrompt(input),
+      contents: `${buildReviewPrompt(input)}${sourceAudit ? planSourceAuditContext(sourceAudit) : ''}`,
       preferredModel: requestedAnalysisModel,
       reasoningLevel: input.analysisReasoningLevel as any,
       allowFallback: false,
@@ -1107,7 +1227,7 @@ async function reviewWrittenText(input: {
                 properties: {
                   category: {
                     type: Type.STRING,
-                    enum: ['omission', 'claim', 'addition', 'voice', 'preservation', 'editorial', 'local-check'],
+                    enum: ['omission', 'claim', 'addition', 'preservation', 'editorial', 'local-check'],
                   },
                   severity: {
                     type: Type.STRING,
@@ -1119,24 +1239,28 @@ async function reviewWrittenText(input: {
                 required: ['category', 'severity', 'detail'],
               },
             },
-            voiceObservations: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ['summary', 'findings', 'voiceObservations'],
+          required: ['summary', 'findings'],
         },
       },
     });
     const parsed = validateGeneratedReview(response.text, response);
     return {
       status: 'complete' as const,
-      summary: parsed.summary,
-      findings: parsed.findings,
+      summary: sourceAuditFindings.length
+        ? `Source audit found ${sourceAuditFindings.length} issue${sourceAuditFindings.length === 1 ? '' : 's'}. Draft review: ${parsed.summary}`
+        : parsed.summary,
+      findings: [...sourceAuditFindings, ...parsed.findings],
       voiceObservations: parsed.voiceObservations,
       localChecks,
       modelUsed: (response as any).modelExecuted || requestedAnalysisModel,
-      durationMs: (response as any).durationMs,
+      durationMs: Date.now() - reviewStart,
     };
   } catch (error) {
     const unavailable = unavailableReview(error, localChecks);
+    // Preserve a successfully completed source audit even when the later
+    // prose-compliance request is unavailable.
+    unavailable.findings = sourceAuditFindings;
     unavailable.modelUsed = requestedAnalysisModel;
     unavailable.durationMs = Date.now() - reviewStart;
     return unavailable;
@@ -1144,6 +1268,10 @@ async function reviewWrittenText(input: {
 }
 
 app.post('/api/generate-domain-knowledge', async (req: Request, res: Response) => {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  res.on('close', cancel);
+  const timeout = setTimeout(() => controller.abort(new DOMException('Domain generation timed out.', 'TimeoutError')), 600_000);
   try {
     const validatedInput = validateDomainGenerationRequest(req.body);
     const prompt = buildDomainGenerationPrompt({
@@ -1161,6 +1289,7 @@ app.post('/api/generate-domain-knowledge', async (req: Request, res: Response) =
       reasoningLevel: validatedInput.reasoningLevel,
       endpoint: 'generate-domain-knowledge',
       allowFallback: false,
+      signal: controller.signal,
       config: {
         responseMimeType: 'application/json',
         responseSchema: DOMAIN_GENERATION_SCHEMA,
@@ -1173,12 +1302,61 @@ app.post('/api/generate-domain-knowledge', async (req: Request, res: Response) =
         topics[0].category !== validatedInput.targetTopic.category)) {
       throw new Error('The model did not return the requested card. Existing knowledge has not been replaced.');
     }
+    controller.signal.throwIfAborted();
     return res.json({ topics });
   } catch (error: any) {
+    if (res.destroyed) return;
+    if (controller.signal.aborted) {
+      return res.status(504).json({ error: 'Domain generation reached the 10-minute limit. Your existing knowledge has been kept. Please try again.' });
+    }
     console.error('Error generating domain knowledge:', error);
     return res.status(statusForError(error)).json({
       error: error.message || 'Failed to generate domain knowledge',
     });
+  } finally {
+    clearTimeout(timeout);
+    res.off('close', cancel);
+  }
+});
+
+app.post('/api/plan-draft', async (req: Request, res: Response) => {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  res.on('close', cancel);
+  const timeout = setTimeout(() => controller.abort(new DOMException('Editorial planning timed out.', 'TimeoutError')), 600_000);
+  try {
+    const body = requireObject(req.body, 'Request');
+    if (Object.keys(body).some(key => !['draft', 'projectBrief', 'readerPurpose', 'editorialPreferences', 'model', 'reasoningLevel'].includes(key))) {
+      throw new RequestValidationError('Planning accepts only the draft, brief, reader and purpose, standing preferences, and model settings.');
+    }
+    const sources = validatePlanSources(body.draft, body.projectBrief, body.readerPurpose, body.editorialPreferences);
+    validateControlInputs({ model: body.model, reasoningLevel: body.reasoningLevel });
+    const model = optionalText(body.model, 'model') || 'gemini-3.1-pro-preview';
+    try { parseModelChoice(model); } catch (error) { throw new RequestValidationError(error instanceof Error ? error.message : 'Model choice is invalid.'); }
+    const response = await generateContentWithRetry({
+      endpoint: '/api/plan-draft',
+      contents: buildEditorialPlanPrompt(sources),
+      preferredModel: model,
+      reasoningLevel: body.reasoningLevel as any,
+      allowFallback: false,
+      signal: controller.signal,
+      config: { responseMimeType: 'application/json', systemInstruction: PLAN_SYSTEM_INSTRUCTION, responseSchema: EDITORIAL_PLAN_SCHEMA },
+    });
+    controller.signal.throwIfAborted();
+    res.json({
+      plan: validateGeneratedPlan(response.text, response, sources),
+      modelUsed: (response as any).modelExecuted || model,
+      durationMs: (response as any).durationMs,
+    });
+  } catch (error: any) {
+    if (res.destroyed) return;
+    if (controller.signal.aborted) {
+      return res.status(504).json({ error: 'Preparing suggestions reached the 10-minute limit. Your draft and any previous suggestions are unchanged. Please try again.' });
+    }
+    res.status(statusForError(error)).json({ error: error.message || 'Could not propose editorial decisions.' });
+  } finally {
+    clearTimeout(timeout);
+    res.off('close', cancel);
   }
 });
 
@@ -1189,6 +1367,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       draft,
       projectBrief,
       readerPurpose,
+      editorialPreferences,
       profile,
       intensity,
       preservationLocks,
@@ -1204,9 +1383,11 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       analysisReasoningLevel,
     } = req.body;
 
-    const draftText = requireText(draft, 'Draft text', 10);
-    const validProjectBrief = validateProjectBrief(projectBrief);
+    const draftText = cleanSourceText(requireText(draft, 'Draft text', 10));
+    const validProjectBrief = projectBrief == null ? validateProjectBrief(projectBrief) : cleanSourceText(validateProjectBrief(projectBrief) || '');
     const validReaderPurpose = validateReaderPurpose(readerPurpose);
+    const validEditorialPreferences = validateEditorialPreferences(editorialPreferences);
+    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: draftText, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences });
     requireObject(profile, 'profile');
     if (intensity !== undefined && !['polish', 'faithful', 'transform'].includes(intensity)) {
       throw new RequestValidationError('intensity is invalid.');
@@ -1227,6 +1408,8 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
         draft: draftText,
         projectBrief: validProjectBrief,
         readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+        editorialPlan: editorialPlan?.plan,
         profile,
         samples: corpus,
         intensity,
@@ -1247,6 +1430,8 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       sourceText: draftText,
       projectBrief: validProjectBrief,
       readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+      editorialPlan: editorialPlan?.plan,
       finalText: rewrittenText,
       profile,
       samples: corpus,
@@ -1284,6 +1469,8 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
       preservationLocks,
       projectBrief: validProjectBrief,
       readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+      editorialPlan,
       preservationSettings: normalizedPreservation,
       writingModelUsed: (response as any).modelExecuted || selectedModel,
       analysisModelUsed: review.modelUsed || analysisModel || 'gemini-3.1-pro-preview',
@@ -1307,7 +1494,6 @@ app.post('/api/learn-from-feedback', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Valid profile is required' });
     }
 
-    const ai = getGeminiClient();
 
     const formattedFeedback = feedbackItems
       .map(
@@ -1420,7 +1606,9 @@ Generate an updated StyleProfile object, along with a clear summary of what was 
       },
     });
 
+    if (response.candidates?.[0]?.finishReason !== 'STOP') throw new Error('The profile update did not finish. Retry saving your note.');
     const parsed = JSON.parse(response.text || '{}');
+    validateFeedbackUpdate(parsed);
 
     // Preserve IDs and samples while merging updated fields
     const updatedFullProfile = {
@@ -1454,6 +1642,7 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
       sourceDraft,
       projectBrief,
       readerPurpose,
+      editorialPreferences,
       instruction,
       profile,
       samples,
@@ -1470,8 +1659,9 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
     } = req.body;
     const currentTextValue = requireText(currentText, 'currentText');
     const instructionValue = requireText(instruction, 'instruction');
-    const validProjectBrief = validateProjectBrief(projectBrief);
+    const validProjectBrief = projectBrief == null ? validateProjectBrief(projectBrief) : cleanSourceText(validateProjectBrief(projectBrief) || '');
     const validReaderPurpose = validateReaderPurpose(readerPurpose);
+    const validEditorialPreferences = validateEditorialPreferences(editorialPreferences);
     if (profile !== undefined && profile !== null) requireObject(profile, 'profile');
     const sourceDraftValue = optionalText(sourceDraft, 'sourceDraft');
     const originalTextValue = optionalText(originalText, 'originalText');
@@ -1480,7 +1670,8 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
     validatePreservationInput(preservationSettings);
     validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
     const corpus = validateSamplesInput(samples);
-    const source = sourceDraftValue || originalTextValue || currentTextValue;
+    const source = cleanSourceText(sourceDraftValue || originalTextValue || currentTextValue);
+    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: source, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences });
     const domainInput = domainExpertise || profile?.domainExpertise;
     validateDomainExpertiseInput(domainInput);
     const activeDomain = normalizeDomainExpertise(domainInput);
@@ -1492,6 +1683,8 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
         draft: source,
         projectBrief: validProjectBrief,
         readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+        editorialPlan: editorialPlan?.plan,
         currentText: currentTextValue,
         instruction: instructionValue,
         profile,
@@ -1513,6 +1706,8 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
       sourceText: source,
       projectBrief: validProjectBrief,
       readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+      editorialPlan: editorialPlan?.plan,
       finalText: refinedText,
       profile,
       samples: corpus,
@@ -1529,6 +1724,8 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
       refinedText,
       projectBrief: validProjectBrief,
       readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+      editorialPlan,
       tweakSummary: 'Refinement completed. Review findings are shown below.',
       review,
       modelUsed: (response as any).modelExecuted || selectedModel,
@@ -1558,6 +1755,7 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
       sourceDraft,
       projectBrief,
       readerPurpose,
+      editorialPreferences,
       surroundingContext,
       instruction,
       tag,
@@ -1576,8 +1774,9 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
     } = req.body;
     const selectedTextValue = requireText(selectedText, 'selectedText');
     const currentTextValue = requireText(currentText, 'currentText');
-    const validProjectBrief = validateProjectBrief(projectBrief);
+    const validProjectBrief = projectBrief == null ? validateProjectBrief(projectBrief) : cleanSourceText(validateProjectBrief(projectBrief) || '');
     const validReaderPurpose = validateReaderPurpose(readerPurpose);
+    const validEditorialPreferences = validateEditorialPreferences(editorialPreferences);
     if (profile !== undefined && profile !== null) requireObject(profile, 'profile');
     const sourceDraftValue = optionalText(sourceDraft, 'sourceDraft');
     const originalTextValue = optionalText(originalText, 'originalText');
@@ -1589,7 +1788,8 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
     validatePreservationInput(preservationSettings);
     validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
     const corpus = validateSamplesInput(samples);
-    const source = sourceDraftValue || originalTextValue || currentTextValue;
+    const source = cleanSourceText(sourceDraftValue || originalTextValue || currentTextValue);
+    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: source, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences });
     const domainInput = domainExpertise || profile?.domainExpertise;
     validateDomainExpertiseInput(domainInput);
     const activeDomain = normalizeDomainExpertise(domainInput);
@@ -1610,6 +1810,8 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
         draft: source,
         projectBrief: validProjectBrief,
         readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+        editorialPlan: editorialPlan?.plan,
         currentText: currentTextValue,
         selectedText: selectedTextValue,
         selectionRange: range,
@@ -1636,6 +1838,8 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
       sourceText: source,
       projectBrief: validProjectBrief,
       readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+      editorialPlan: editorialPlan?.plan,
       finalText,
       profile,
       samples: corpus,
@@ -1653,6 +1857,8 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
       replacementText,
       projectBrief: validProjectBrief,
       readerPurpose: validReaderPurpose,
+      editorialPreferences: validEditorialPreferences,
+      editorialPlan,
       explanation: 'Selection edit completed. Review findings are shown below.',
       finalText,
       review,

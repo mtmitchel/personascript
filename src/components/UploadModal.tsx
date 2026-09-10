@@ -22,7 +22,7 @@ interface StagedFile {
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initialMode = 'upload' }) => {
-  const { addSample } = useWritingAssistant();
+  const { addSample, modelSettings } = useWritingAssistant();
   const [mode, setMode] = useState<'upload' | 'paste' | 'link'>('upload');
 
   useEffect(() => {
@@ -77,6 +77,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
           fileData: base64Data,
           fileType: detectedType,
           fileName: file.name,
+          model: modelSettings.analysisModel,
+          reasoningLevel: modelSettings.analysisReasoningLevel,
         }),
       });
 
@@ -199,7 +201,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
         setPasteContent('');
         onClose();
       } catch (err: any) {
-        setGeneralError(err.message || 'Failed to analyze sample');
+        setGeneralError(err.message || 'Failed to add sample');
       } finally {
         setIsSubmitting(false);
       }
@@ -290,7 +292,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
           </h3>
           <button
             onClick={onClose}
-            disabled={isSubmitting}
+            aria-label="Close add writing samples"
             className="p-1 text-neutral-400 hover:text-neutral-700 rounded transition disabled:opacity-40"
           >
             <X className="w-4 h-4" />
@@ -537,7 +539,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
               <button
                 type="button"
                 onClick={onClose}
-                disabled={isSubmitting}
                 className="px-3 py-1.5 text-xs text-neutral-600 hover:text-neutral-900 rounded-lg transition disabled:opacity-40"
               >
                 Cancel

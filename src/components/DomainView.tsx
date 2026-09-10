@@ -504,7 +504,7 @@ export const DomainView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-neutral-500 mt-1">
-            Help the model recognize relevant ideas in your draft and understand the products you describe.
+            Step 4 of 5 · Review the relevant concepts and product facts. Next, create the edit plan and rewrite in Studio.
           </p>
         </div>
 
@@ -536,7 +536,7 @@ export const DomainView: React.FC = () => {
             onClick={() => setActiveTab('studio')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
           >
-            <span>Rewrite Studio</span>
+            <span>Continue to Rewrite Studio</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

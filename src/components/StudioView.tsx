@@ -1,932 +1,212 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { ToneSlidersControl } from './ToneSlidersControl';
 import { DiffViewer } from './DiffViewer';
-import { StyleSimilarityCard } from './StyleSimilarityCard';
 import { RewriteFeedbackManager } from './RewriteFeedbackManager';
-import { ModelSelector } from './ModelSelector';
 import { WritingReviewPanel } from './WritingReviewPanel';
-import { RewriteHistory } from './RewriteHistory';
-import { PreservationSettings, RewriteIntensity, SelectionRange } from '../types';
-import { hasFreshProfileGuidance, PROJECT_BRIEF_MAX_CHARS } from '../writingPipeline';
-import {
-  FileText,
-  Copy,
-  Check,
-  Download,
-  GitCompare,
-  Columns,
-  RefreshCw,
-  Database,
-  Sliders,
-  ChevronDown,
-  ChevronUp,
-  ShieldCheck,
-  Sparkles,
-  ArrowRight,
-  Cpu,
-  BrainCircuit,
-} from 'lucide-react';
+import { RewriteHistory, RewriteVersionDetails } from './RewriteHistory';
+import { EditorialDecisions } from './EditorialDecisions';
+import { StudioDraftControls } from './StudioDraftControls';
+import { planMatchesSources } from '../editorialPlan';
+import { SelectionRange } from '../types';
+import { versionDate } from '../utils/rewriteHistory';
+import { actionableReviewIssueCount } from '../utils/reviewEvidence';
+import { Copy, Check, Download, RefreshCw, ArrowRight, History, X } from 'lucide-react';
 
 export const StudioView: React.FC = () => {
-  const {
-    samples,
-    draftText,
-    projectBrief,
-    readerPurpose,
-    isUploadingDraft,
-    isUploadingBrief,
-    rewriteIntensity,
-    setRewriteIntensity,
-    toneAdjustments,
-    setToneAdjustments,
-    resetToneAdjustments,
-    preservationLocks,
-    setPreservationLocks,
-    preservationSettings,
-    updatePreservationSettings,
-    customDirectives,
-    setCustomDirectives,
-    performRewrite,
-    isRewriting,
-    rewriteResult,
-    usingSavedVersionContext,
-    activeProfile,
-    domainExpertise,
-    updateDomainExpertise,
-    setActiveTab,
-    applyQuickRefine,
-    modelSettings,
+  const { draftText, projectBrief, readerPurpose, editorialPreferences, isUploadingDraft, isUploadingBrief,
+    performRewrite, generateEditorialPlan, approveEditorialPlan, isLearningFeedback, isRewriting, isPlanning,
+    editorialPlan, rewriteResult, setActiveTab, openModelSettings, restoreRewriteVersion,
   } = useWritingAssistant();
-
+  const [panel, setPanel] = useState<'edit' | 'review' | 'source'>('source');
+  const previousResultId = useRef(rewriteResult?.id);
+  const [documentPanel, setDocumentPanel] = useState<'history' | 'details' | null>(null);
+  const [editRequest, setEditRequest] = useState({ text: '', sequence: 0, resultId: rewriteResult?.id });
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'diff' | 'side-by-side' | 'final'>('final');
-  const [isRefining, setIsRefining] = useState(false);
-  const [customRefineInput, setCustomRefineInput] = useState('');
-  const [refineError, setRefineError] = useState<string | null>(null);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [selectedHighlight, setSelectedHighlight] = useState('');
   const [selectedRange, setSelectedRange] = useState<SelectionRange | undefined>();
-  const [showAdvancedLocks, setShowAdvancedLocks] = useState(false);
-  const [showModelControls, setShowModelControls] = useState(false);
-  const [modelControlsRequest, setModelControlsRequest] = useState({ role: 'writing' as 'writing' | 'analysis', sequence: 0 });
-  const modelControlsRef = useRef<HTMLDivElement>(null);
-  const [showAuditDetails, setShowAuditDetails] = useState(false);
-
-  const modelDisplayNames: Record<string, string> = {
-    'gemini-3.8-flash': 'Gemini 3.8 Flash',
-    'gemini-3.7-flash': 'Gemini 3.7 Flash',
-    'gemini-3.6-flash': 'Gemini 3.6 Flash',
-    'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
-  };
-  const currentModelName = modelDisplayNames[modelSettings.writingModel] || modelSettings.writingModel;
-  const currentReasoningLabel =
-    modelSettings.writingReasoningLevel.charAt(0).toUpperCase() + modelSettings.writingReasoningLevel.slice(1);
+  const resultRef = useRef<HTMLElement>(null);
+  const proseRef = useRef<HTMLDivElement>(null);
+  const workHeading = useRef<HTMLHeadingElement>(null);
+  const scrollPanel = useRef<HTMLDivElement>(null);
+  const historyButton = useRef<HTMLButtonElement>(null);
+  const detailsButton = useRef<HTMLButtonElement>(null);
+  const overlayClose = useRef<HTMLButtonElement>(null);
+  const busy = isRewriting || isPlanning || isLearningFeedback || isUploadingDraft || isUploadingBrief;
+  const decisionsReady = Boolean(editorialPlan?.approved && planMatchesSources(editorialPlan, { draft: draftText, projectBrief, readerPurpose, editorialPreferences }));
+  const needsApproval = Boolean(editorialPlan && !decisionsReady);
+  const showingRewrite = panel !== 'source' && Boolean(rewriteResult);
+  const documentText = showingRewrite ? rewriteResult!.rewrittenText : draftText;
+  const documentWords = documentText.trim() ? documentText.trim().split(/\s+/).length : 0;
+  const documentStatus = showingRewrite
+    ? viewMode === 'final' ? 'Select a passage to edit it' : 'Select passages in Draft view'
+    : 'Not being edited';
+  const review = rewriteResult?.review;
+  const attentionCount = actionableReviewIssueCount(review, rewriteResult?.originalText, rewriteResult?.rewrittenText);
+  const needsReview = Boolean(review && (review.status !== 'complete' || attentionCount || review.localChecks.some((check) => !check.passed)));
 
   useEffect(() => {
+    if (previousResultId.current === rewriteResult?.id) return;
+    previousResultId.current = rewriteResult?.id;
+    setDocumentPanel(null);
     setSelectedHighlight('');
     setSelectedRange(undefined);
     setCopied(false);
+    setEditRequest({ text: '', sequence: 0, resultId: rewriteResult?.id });
+    setPanel(rewriteResult ? 'edit' : 'source');
   }, [rewriteResult?.id]);
+  useEffect(() => {
+    if (documentPanel) overlayClose.current?.focus({ preventScroll: true });
+  }, [documentPanel]);
 
-  const configureReviewer = () => {
-    setModelControlsRequest((previous) => ({ role: 'analysis', sequence: previous.sequence + 1 }));
-    setShowModelControls(true);
-    modelControlsRef.current?.scrollIntoView({ block: 'center' });
-    modelControlsRef.current?.focus();
+  const clearSelection = () => {
+    setSelectedHighlight(''); setSelectedRange(undefined);
+    window.getSelection()?.removeAllRanges();
   };
-
-  const rewrittenProseRef = useRef<HTMLDivElement | null>(null);
-
-  const wordCountOriginal = draftText.trim() ? draftText.trim().split(/\s+/).length : 0;
-  const wordCountBrief = projectBrief.trim() ? projectBrief.trim().split(/\s+/).length : 0;
-  const wordCountReaderPurpose = readerPurpose.trim() ? readerPurpose.trim().split(/\s+/).length : 0;
-  const wordCountSource = rewriteResult?.originalText.trim()
-    ? rewriteResult.originalText.trim().split(/\s+/).length
-    : 0;
-  const wordCountRewritten = rewriteResult?.rewrittenText.trim()
-    ? rewriteResult.rewrittenText.trim().split(/\s+/).length
-    : 0;
-  const enabledSamples = samples
-    .filter((sample) => sample.enabled)
-    .map(({ id, title, content, enabled }) => ({ id, title, content, enabled }));
-  const hasFreshBlueprint = hasFreshProfileGuidance(activeProfile, enabledSamples);
-
-  const standardPreserveOptions: Array<{
-    label: string;
-    key: keyof Pick<PreservationSettings, 'preserveTerms' | 'preserveNumbers' | 'preserveQuotes'>;
-  }> = [
-    { label: 'Names & technical terms', key: 'preserveTerms' },
-    { label: 'Numbers & data points', key: 'preserveNumbers' },
-    { label: 'Direct quotes', key: 'preserveQuotes' },
-  ];
-
-  const togglePreserveOption = (key: keyof Pick<PreservationSettings, 'preserveTerms' | 'preserveNumbers' | 'preserveQuotes'>) => {
-    updatePreservationSettings({ [key]: !preservationSettings[key] });
+  const openPanel = (next: typeof panel) => {
+    if (next === 'edit' && panel === 'source' && rewriteResult) restoreRewriteVersion(rewriteResult.id);
+    setPanel(next);
+    setDocumentPanel(null);
+    clearSelection();
+    if (next === 'source') setViewMode('final');
+    requestAnimationFrame(() => workHeading.current?.focus({ preventScroll: true }));
   };
-
-  const handleCopy = () => {
-    if (!rewriteResult?.rewrittenText) return;
-    navigator.clipboard.writeText(rewriteResult.rewrittenText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const closeDocumentPanel = () => {
+    const trigger = documentPanel === 'history' ? historyButton : detailsButton;
+    setDocumentPanel(null);
+    trigger.current?.focus({ preventScroll: true });
   };
-
-  const handleDownload = (format: 'txt' | 'md') => {
-    if (!rewriteResult?.rewrittenText) return;
-    const blob = new Blob([rewriteResult.rewrittenText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rewritten-draft.${format}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const requestCorrection = (instruction: string) => {
+    clearSelection(); setPanel('edit');
+    setEditRequest((current) => ({ text: instruction, sequence: current.sequence + 1, resultId: rewriteResult?.id }));
   };
-
-
-  const handleTextSelection = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) return;
-
-    const text = selection.toString();
-    if (text.trim().length > 5) {
-      let range: SelectionRange | undefined;
-      const root = rewrittenProseRef.current;
-      if (root && viewMode === 'final') {
-        try {
-          const selectedRange = selection.getRangeAt(0);
-          if (root.contains(selectedRange.startContainer) && root.contains(selectedRange.endContainer)) {
-            const start = document.createRange();
-            start.selectNodeContents(root);
-            start.setEnd(selectedRange.startContainer, selectedRange.startOffset);
-            const end = document.createRange();
-            end.selectNodeContents(root);
-            end.setEnd(selectedRange.endContainer, selectedRange.endOffset);
-            const startOffset = start.toString().length;
-            const endOffset = end.toString().length;
-            const current = rewriteResult?.rewrittenText || '';
-            if (current.slice(startOffset, endOffset) === text) {
-              range = { start: startOffset, end: endOffset };
-            }
-          }
-        } catch {
-          range = undefined;
-        }
-      }
-      setSelectedHighlight(text);
-      setSelectedRange(range);
-    }
-  };
-
-  const handleQuickRefineAction = async (instruction: string) => {
-    if (!instruction.trim() || isRefining || isRewriting) return;
-    setIsRefining(true);
-    setRefineError(null);
+  const handleCopy = async () => {
+    if (!rewriteResult) return;
     try {
-      await applyQuickRefine(instruction);
-      setCustomRefineInput('');
-    } catch (err: any) {
-      setRefineError(err.message || 'Failed to refine draft');
-    } finally {
-      setIsRefining(false);
-    }
+      await navigator.clipboard.writeText(rewriteResult.rewrittenText);
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    } catch { setRewriteError('The draft could not be copied. Try exporting it instead.'); }
   };
-
-  const handlePerformRewrite = async () => {
-    if (isRewriting) return;
+  const download = (format: 'txt' | 'md') => {
+    if (!rewriteResult) return;
+    const url = URL.createObjectURL(new Blob([rewriteResult.rewrittenText], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'rewritten-draft.' + format;
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  };
+  const handleTextSelection = () => {
+    if (busy || !showingRewrite || viewMode !== 'final' || documentPanel || !rewriteResult) return;
+    const selection = window.getSelection();
+    const root = proseRef.current;
+    if (!selection || selection.isCollapsed || !selection.rangeCount || !root) return;
+    const text = selection.toString();
+    if (!text.trim()) return;
+    try {
+      const range = selection.getRangeAt(0);
+      if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return;
+      const start = document.createRange(); start.selectNodeContents(root); start.setEnd(range.startContainer, range.startOffset);
+      const end = document.createRange(); end.selectNodeContents(root); end.setEnd(range.endContainer, range.endOffset);
+      const offsets = { start: start.toString().length, end: end.toString().length };
+      if (rewriteResult.rewrittenText.slice(offsets.start, offsets.end) !== text) return;
+      setSelectedHighlight(text); setSelectedRange(offsets); setPanel('edit');
+    } catch { /* A changing DOM selection is ignored rather than widening the edit. */ }
+  };
+  const startRewrite = async () => {
+    if (busy) return;
+    if (!draftText.trim()) { setActiveTab('draft-brief'); return; }
     setRewriteError(null);
     try {
-      await performRewrite();
-    } catch (err: any) {
-      setRewriteError(err.message || 'Failed to rewrite draft');
+      if (!editorialPlan) {
+        await generateEditorialPlan();
+        requestAnimationFrame(() => { scrollPanel.current?.scrollTo({ top: 0 }); workHeading.current?.focus({ preventScroll: true }); });
+      } else {
+        await performRewrite(decisionsReady ? undefined : approveEditorialPlan());
+        requestAnimationFrame(() => resultRef.current?.focus({ preventScroll: true }));
+      }
+    } catch (failure) {
+      setRewriteError(failure instanceof Error ? failure.message : 'Could not complete the rewrite. Your current work is still available.');
     }
   };
 
-  return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Studio Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-neutral-200">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
-            Draft Rewriting Studio
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            id="btn-switch-to-profile"
-            onClick={() => setActiveTab('profile')}
-            className="text-xs text-neutral-600 hover:text-neutral-900 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 transition"
-          >
-            <Sliders className="w-3.5 h-3.5 text-neutral-400" />
-            <span>Voice: {activeProfile.name}</span>
-          </button>
-        </div>
-      </div>
-
-      {!hasFreshBlueprint && (
-        <div
-          id="stale-blueprint-notice"
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900"
-        >
-          <span>Your voice blueprint may be stale because it does not match the enabled writing samples.</span>
-          <button
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
-          >
-            Review blueprint
-          </button>
-        </div>
-      )}
-
-      {/* Main Workspace Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Inputs and Parameters */}
-        <div className="lg:col-span-5 space-y-5">
-          {/* Source Summary and Edit Navigation */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
-              <div className="flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-neutral-500" />
-                <span className="text-xs font-medium text-neutral-900">
-                  Source Draft &amp; Brief
-                </span>
-              </div>
-              <button
-                type="button"
-                id="btn-edit-draft-brief"
-                onClick={() => setActiveTab('draft-brief')}
-                className="text-xs text-neutral-700 hover:text-neutral-900 font-medium flex items-center gap-1 px-2.5 py-1 rounded border border-neutral-200 bg-white hover:bg-neutral-50 transition shadow-2xs"
-              >
-                <span>Edit draft &amp; brief</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono mb-1">
-                  <span className="font-sans font-medium text-neutral-800">Draft</span>
-                  <span>{wordCountOriginal} words · {draftText.length} chars</span>
-                </div>
-                <p className="text-neutral-600 line-clamp-2 leading-relaxed">
-                  {draftText.trim() ? draftText.trim().slice(0, 180) : 'No draft entered. Click Edit draft & brief to add text.'}
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono mb-1">
-                  <span className="font-sans font-medium text-neutral-800">Project Brief</span>
-                  <span>{wordCountBrief} words · {projectBrief.length} chars</span>
-                </div>
-                <p className="text-neutral-600 line-clamp-2 leading-relaxed">
-                  {projectBrief.trim() ? projectBrief.trim().slice(0, 180) : 'No project brief provided (optional).'}
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100">
-                <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono mb-1">
-                  <span className="font-sans font-medium text-neutral-800">Reader and purpose</span>
-                  <span>{wordCountReaderPurpose} words · {readerPurpose.length} chars</span>
-                </div>
-                <p className="text-neutral-600 line-clamp-2 leading-relaxed">
-                  {readerPurpose.trim() ? readerPurpose.trim().slice(0, 180) : 'No reader and purpose provided (optional).'}
-                </p>
-              </div>
-            </div>
+  return <div className="studio-shell">
+    <div className="studio-split">
+      <section ref={resultRef} tabIndex={-1} id="rewrite-result" className="studio-document" aria-label={showingRewrite ? 'Current rewritten version' : 'Original draft'}>
+        <div className="studio-document-toolbar">
+          {showingRewrite ? <div className="studio-view-switcher" aria-label="Document view">
+            {([{ id: 'final', label: 'Draft' }, { id: 'side-by-side', label: 'Side by side' }, { id: 'diff', label: 'Changes' }] as const).map((view) =>
+              <button key={view.id} id={'view-mode-' + view.id} type="button" aria-pressed={viewMode === view.id} disabled={!rewriteResult && view.id !== 'final'}
+                onClick={() => { setViewMode(view.id); clearSelection(); setDocumentPanel(null); }}>{view.label}</button>)}
+          </div> : <div className="studio-document-identity">
+            <span className="studio-document-label">Source preview</span>
+            <span className="studio-document-fact">{documentWords} words</span>
+            <span className="studio-document-fact">{documentStatus}</span>
+          </div>}
+          <div className="studio-document-actions">
+            {showingRewrite && <button id="btn-review-draft" type="button" aria-pressed={panel === 'review'} className={needsReview ? 'has-attention' : ''} onClick={() => openPanel(panel === 'review' ? 'edit' : 'review')}>{attentionCount ? 'Review (' + attentionCount + ')' : review?.status !== 'complete' ? 'Review unavailable' : needsReview ? 'Review differences' : 'Review'}</button>}
+            {!showingRewrite && rewriteResult && <button id="btn-open-saved-rewrite" type="button" disabled={busy} className="studio-open-saved" onClick={() => openPanel('edit')}>
+              <span>Open saved rewrite</span><span className="studio-saved-date">{versionDate(rewriteResult.createdAt)}</span>
+            </button>}
+            <button ref={historyButton} type="button" aria-expanded={documentPanel === 'history'} aria-controls="studio-document-panel" onClick={() => setDocumentPanel(documentPanel === 'history' ? null : 'history')}><History size={15}/><span>History</span></button>
+            {showingRewrite && <>
+              <button ref={detailsButton} type="button" aria-expanded={documentPanel === 'details'} aria-controls="studio-document-panel" onClick={() => setDocumentPanel(documentPanel === 'details' ? null : 'details')}>Details</button>
+              <button id="btn-copy-rewritten" type="button" onClick={handleCopy}>{copied ? <Check size={15}/> : <Copy size={15}/>}<span>{copied ? 'Copied' : 'Copy'}</span></button>
+              <details className="studio-export"><summary><Download size={15}/><span>Export</span></summary><div>
+                <button id="btn-download-txt" type="button" onClick={() => download('txt')}>Plain text (.txt)</button>
+                <button id="btn-download-md" type="button" onClick={() => download('md')}>Markdown (.md)</button>
+              </div></details>
+            </>}
           </div>
-
-          {/* Tone Sliders */}
-          <ToneSlidersControl
-            adjustments={toneAdjustments}
-            onChange={setToneAdjustments}
-            onReset={resetToneAdjustments}
-            baseFormality={activeProfile.metrics?.formality || 65}
-          />
-
-          {/* Domain Context & Topics Link */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0">
-                <Database className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                <div className="min-w-0">
-                  <span className="text-xs font-semibold text-neutral-900 block truncate">
-                    {domainExpertise?.enabled && domainExpertise?.field
-                      ? domainExpertise.field
-                      : 'Domain Knowledge'}
-                  </span>
-                  <span className="text-[11px] text-neutral-400 block">
-                    {domainExpertise?.enabled
-                      ? `${(domainExpertise?.topics || []).filter((t) => t.enabled).length} topics active`
-                      : 'Disabled in rewrites'}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                id="btn-nav-domain"
-                type="button"
-                onClick={() => setActiveTab('domain')}
-                className="text-xs text-neutral-700 hover:text-neutral-900 font-medium flex items-center gap-1 shrink-0 px-2 py-1 rounded border border-neutral-200 hover:bg-neutral-50 transition"
-              >
-                <span>Edit</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-
-            {/* Quick topic toggles */}
-            {domainExpertise?.enabled && domainExpertise?.topics && domainExpertise.topics.length > 0 && (
-              <div className="pt-2 border-t border-neutral-100 flex flex-wrap gap-1">
-                {domainExpertise.topics.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      const updatedTopics = domainExpertise.topics!.map((top) =>
-                        top.id === t.id ? { ...top, enabled: !top.enabled } : top
-                      );
-                      updateDomainExpertise({
-                        ...domainExpertise,
-                        topics: updatedTopics,
-                      });
-                    }}
-                    className={`text-[10px] px-2 py-0.5 rounded-full border transition flex items-center gap-1 ${
-                      t.enabled
-                        ? 'bg-neutral-900 text-white border-neutral-900'
-                        : 'bg-neutral-50 text-neutral-400 border-neutral-200 hover:text-neutral-700'
-                    }`}
-                    title={t.enabled ? `Disable ${t.name} for this rewrite` : `Enable ${t.name} for this rewrite`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${t.enabled ? 'bg-emerald-400' : 'bg-neutral-300'}`} />
-                    <span>{t.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+        </div>
+        {documentPanel ? <div id="studio-document-panel" className="studio-document-panel" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); closeDocumentPanel(); } }}>
+          <div className="flex justify-between items-center gap-4 mb-5"><h2 className="font-semibold">{documentPanel === 'history' ? 'Version history' : 'Version details'}</h2><button ref={overlayClose} type="button" onClick={closeDocumentPanel} aria-label={'Close ' + (documentPanel === 'history' ? 'version history' : 'version details')}><X size={18}/></button></div>
+          {documentPanel === 'history' ? <RewriteHistory expanded onContinue={() => openPanel('edit')}/> : rewriteResult && <RewriteVersionDetails version={rewriteResult}/>}
+        </div> : <>
+          <div id="rendered-prose-container" ref={proseRef} onMouseUp={handleTextSelection} onKeyUp={handleTextSelection} tabIndex={0}
+            aria-label={showingRewrite ? 'Rewritten draft. Select text to request an edit.' : 'Original draft text'} className="studio-prose-scroll">
+            {showingRewrite && rewriteResult && viewMode === 'diff' ? <DiffViewer original={rewriteResult.originalText} modified={rewriteResult.rewrittenText}/>
+              : showingRewrite && rewriteResult && viewMode === 'side-by-side' ? <div className="studio-compare"><div><h2>Original</h2><div className="whitespace-pre-wrap">{rewriteResult.originalText}</div></div><div><h2>Current version</h2><div className="whitespace-pre-wrap">{rewriteResult.rewrittenText}</div></div></div>
+              : documentText ? <div className="studio-prose whitespace-pre-wrap">{documentText}</div>
+              : <div className="studio-empty"><h2>Start with your draft.</h2><p>Add your writing and supporting facts in Draft &amp; Brief.</p></div>}
           </div>
-
-          {/* Transformation Controls */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-4">
-            <div>
-              <span className="text-xs font-medium text-neutral-900 block mb-2">
-                Rewrite intensity
-              </span>
-
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    id: 'polish',
-                    title: 'Light',
-                    desc: 'Tightens phrasing and sentence flow',
-                  },
-                  {
-                    id: 'faithful',
-                    title: 'Balanced',
-                    desc: 'Adapts pacing and syntax to match your voice',
-                  },
-                  {
-                    id: 'transform',
-                    title: 'Thorough',
-                    desc: 'Deeper recasting while preserving substance',
-                  },
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    id={`btn-intensity-${opt.id}`}
-                    onClick={() => setRewriteIntensity(opt.id as RewriteIntensity)}
-                    aria-pressed={rewriteIntensity === opt.id}
-                    className={`p-2.5 rounded-lg border text-left transition ${
-                      rewriteIntensity === opt.id
-                        ? 'border-neutral-900 bg-neutral-900 text-white'
-                        : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
-                    }`}
-                  >
-                    <span className="font-medium text-xs block">{opt.title}</span>
-                    <span
-                      className={`text-[10px] block mt-0.5 line-clamp-2 ${
-                        rewriteIntensity === opt.id ? 'text-neutral-300' : 'text-neutral-400'
-                      }`}
-                    >
-                      {opt.desc}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p aria-live="polite" className="text-[11px] text-neutral-400 mt-2 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
-                <span>
-                  {rewriteIntensity === 'polish'
-                    ? 'Makes restrained edits to phrasing and sentence flow while preserving core meaning.'
-                    : rewriteIntensity === 'transform'
-                      ? 'Recasts sentences and paragraphs extensively and cuts dispensable exposition while preserving core substance.'
-                      : 'Reshapes sentences and paragraphs to match your voice, condensing where useful while preserving core substance.'}{' '}
-                  {preservationSettings.keepStructure
-                    ? 'Keeps section order.'
-                    : 'May reorder sections.'}
-                </span>
-              </p>
-            </div>
-
-            {/* What to keep unchanged */}
-            <div className="space-y-2 pt-2 border-t border-neutral-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-800">
-                  <ShieldCheck className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Keep unchanged</span>
-                </div>
-                <span className="text-[11px] text-neutral-400">Control exact preservation</span>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {standardPreserveOptions.map((opt, idx) => {
-                  const isChecked = Boolean(preservationSettings[opt.key]);
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => togglePreserveOption(opt.key)}
-                      className={`text-[11px] px-2.5 py-1 rounded border transition ${
-                        isChecked
-                          ? 'bg-neutral-900 border-neutral-900 text-white font-medium'
-                          : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                      }`}
-                    >
-                      {isChecked ? '✓ ' : '+ '}
-                      {opt.label}
-                    </button>
-                  );
-                })}
-                <button
-                  id="btn-preserve-headings"
-                  type="button"
-                  onClick={() => updatePreservationSettings({
-                    headingTreatment: preservationSettings.headingTreatment === 'preserve_verbatim' ? 'revise_in_voice' : 'preserve_verbatim',
-                  })}
-                  className={`text-[11px] px-2.5 py-1 rounded border transition ${
-                    preservationSettings.headingTreatment === 'preserve_verbatim'
-                      ? 'bg-neutral-900 border-neutral-900 text-white font-medium'
-                      : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                  }`}
-                >
-                  {preservationSettings.headingTreatment === 'preserve_verbatim' ? '✓ ' : '+ '}Headings verbatim
-                </button>
-                <button
-                  id="btn-preserve-structure"
-                  type="button"
-                  onClick={() => updatePreservationSettings({ keepStructure: !preservationSettings.keepStructure })}
-                  className={`text-[11px] px-2.5 py-1 rounded border transition ${
-                    preservationSettings.keepStructure
-                      ? 'bg-neutral-900 border-neutral-900 text-white font-medium'
-                      : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                  }`}
-                >
-                  {preservationSettings.keepStructure ? '✓ ' : '+ '}Section order
-                </button>
-              </div>
-
-              <textarea
-                id="input-preservation-locks"
-                rows={2}
-                value={preservationLocks}
-                onChange={(e) => {
-                  setPreservationLocks(e.target.value);
-                  updatePreservationSettings({ customLocks: e.target.value });
-                }}
-                placeholder="Additional facts, names, or constraints to protect..."
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-
-            {/* Additional instructions */}
-            <div className="space-y-1.5 pt-2 border-t border-neutral-100">
-              <label htmlFor="input-custom-directives" className="text-xs font-medium text-neutral-800 block">
-                Additional instructions (optional)
-              </label>
-              <textarea
-                id="input-custom-directives"
-                rows={3}
-                value={customDirectives}
-                onChange={(e) => setCustomDirectives(e.target.value)}
-                placeholder="e.g. Keep under 250 words, make the conclusion stronger, focus on action items..."
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-
-            {/* Model and Reasoning Controls */}
-            <div ref={modelControlsRef} tabIndex={-1} aria-label="Writer and reviewer settings" className="pt-2 border-t border-neutral-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700">
-                  <Cpu className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Writer &amp; reviewer</span>
-                </div>
-                <button
-                  id="btn-toggle-model-settings"
-                  type="button"
-                  onClick={() => setShowModelControls(!showModelControls)}
-                  aria-expanded={showModelControls}
-                  aria-controls="studio-model-settings"
-                  className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-0.5"
-                >
-                  <span>{showModelControls ? 'Hide' : 'Configure'}</span>
-                  {showModelControls ? (
-                    <ChevronUp className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
-                </button>
-              </div>
-
-              <div className="space-y-1 text-[11px] text-neutral-700 bg-neutral-50 px-2.5 py-2 rounded-md border border-neutral-100">
-                <p><span className="font-medium">Writer:</span> {currentModelName} · {currentReasoningLabel} reasoning</p>
-                <p><span className="font-medium">Reviewer:</span> {modelDisplayNames[modelSettings.analysisModel] || modelSettings.analysisModel} · {modelSettings.analysisReasoningLevel} reasoning</p>
-                <p className="text-neutral-600">These selections apply to the next rewrite or edit. Review shares the model used for voice analysis.</p>
-              </div>
-
-              {showModelControls && (
-                <div id="studio-model-settings" className="pt-1">
-                  <ModelSelector key={modelControlsRequest.sequence} variant="inline" initialRole={modelControlsRequest.role} />
-                </div>
-              )}
-            </div>
-
-            {/* Primary Action Button */}
-            <button
-              id="btn-perform-rewrite"
-              onClick={handlePerformRewrite}
-              disabled={isRewriting || isUploadingDraft || isUploadingBrief || projectBrief.length > PROJECT_BRIEF_MAX_CHARS || wordCountOriginal === 0}
-              className="w-full py-2.5 px-4 rounded-lg font-medium text-xs bg-neutral-900 text-white hover:bg-neutral-800 transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isRewriting ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Writing and reviewing...</span>
-                </>
-              ) : (
-                <span>Rewrite in my voice</span>
-              )}
+        </>}
+      </section>
+      <aside className="studio-inspector" aria-label="Writing workspace">
+        <header className="studio-work-header">
+          <h2 ref={workHeading} tabIndex={-1} className="studio-panel-title">{panel === 'source' ? 'Rewrite your draft' : panel === 'review' ? 'Review this rewrite' : 'Edit this rewrite'}</h2>
+          {rewriteResult && (panel === 'edit'
+            ? <button id="btn-new-source-rewrite" type="button" disabled={busy} onClick={() => openPanel('source')} className="studio-text-button">New rewrite from source <ArrowRight size={14}/></button>
+            : panel === 'review' && <button type="button" onClick={() => openPanel('edit')} className="studio-text-button">Back to editing</button>)}
+        </header>
+        {rewriteResult && <div hidden={panel !== 'edit'} className="studio-work-content">
+          <RewriteFeedbackManager key={rewriteResult.id} selectedText={selectedHighlight} selectionRange={selectedRange} onClearSelection={clearSelection} editRequest={editRequest.resultId === rewriteResult.id ? editRequest : undefined}>
+            {panel === 'edit' && <StudioDraftControls disabled={busy}/>}
+          </RewriteFeedbackManager>
+        </div>}
+        {rewriteResult && <div hidden={panel !== 'review'} className="studio-inspector-scroll">
+          {review ? <WritingReviewPanel key={rewriteResult?.id} id="writing-review-panel" review={review} sourceText={rewriteResult?.originalText} projectBrief={rewriteResult?.projectBrief} rewrittenText={rewriteResult?.rewrittenText}
+            onCompareSources={() => { setViewMode('side-by-side'); clearSelection(); setDocumentPanel(null); }} onRequestEdit={requestCorrection} onConfigureReviewer={() => openModelSettings('analysis')}/>
+            : <p className="studio-panel-description">No review is saved with this version. Compare it with the original before using it.</p>}
+        </div>}
+        {panel === 'source' && <div className="studio-work-content">
+          <div ref={scrollPanel} className="studio-inspector-scroll">
+            <p className="studio-panel-description">You’re viewing your original draft. Prepare suggested changes, then approve them to create a rewrite.</p>
+            {draftText.trim() && <><button id="btn-edit-draft-brief" type="button" onClick={() => setActiveTab('draft-brief')} className="studio-text-button">Edit draft &amp; brief <ArrowRight size={14}/></button>
+              <StudioDraftControls sourceRewrite disabled={busy}/>
+            </>}
+            {editorialPlan && <div className="studio-decisions"><EditorialDecisions/></div>}
+          </div>
+          <div className="studio-work-action">
+            {rewriteError && <p role="alert" className="text-rose-700">{rewriteError}</p>}
+            <p role="status">{isPlanning ? 'Preparing suggestions…' : isRewriting ? 'Writing and reviewing your new version…' : isUploadingDraft || isUploadingBrief ? 'Waiting for your upload…' : decisionsReady ? 'Uses the approved plan and your source.' : draftText.trim() ? 'Preparing suggestions does not rewrite your draft.' : 'Add your source to begin.'}</p>
+            <button id="btn-start-source-rewrite" type="button" disabled={busy} onClick={startRewrite} className="studio-primary">
+              {busy && <RefreshCw size={15} className="animate-spin"/>}
+              {isPlanning ? 'Preparing suggestions…' : isRewriting ? 'Rewriting…' : !draftText.trim() ? 'Add draft' : needsApproval ? 'Approve and rewrite' : decisionsReady ? 'Rewrite from source' : 'Prepare suggestions'}
             </button>
-            {rewriteError && (
-              <p id="rewrite-error" className="text-xs text-rose-600 font-medium pt-1" role="alert">
-                {rewriteError}
-              </p>
-            )}
           </div>
-        </div>
-
-        {/* Right: Output */}
-        <div className="lg:col-span-7 space-y-5">
-          <RewriteHistory />
-          {rewriteResult ? (
-            <div className="space-y-5">
-              {/* Style Similarity */}
-              {rewriteResult.historicalAssessment && rewriteResult.styleSimilarity && (
-                <div className="space-y-2">
-                  <p
-                    id="historical-score-notice"
-                    className="text-[11px] text-neutral-500"
-                  >
-                    Historical voice score · unverified for this current corpus
-                  </p>
-                  <StyleSimilarityCard
-                    score={rewriteResult.styleSimilarity}
-                    profileName={activeProfile.name}
-                  />
-                </div>
-              )}
-
-              {rewriteResult.review && (
-                <WritingReviewPanel
-                  key={rewriteResult.id}
-                  id="writing-review-panel"
-                  review={rewriteResult.review}
-                  onConfigureReviewer={configureReviewer}
-                />
-              )}
-
-              {/* Output Container */}
-              <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-                {/* View Switcher and Action Bar */}
-                <div className="flex flex-wrap items-center justify-between px-4 py-2.5 border-b border-neutral-100 gap-2">
-                  <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg">
-                    <button
-                      id="view-mode-final"
-                      onClick={() => setViewMode('final')}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                        viewMode === 'final'
-                          ? 'bg-white text-neutral-900 shadow-xs'
-                          : 'text-neutral-500 hover:text-neutral-900'
-                      }`}
-                    >
-                      Final draft
-                    </button>
-                    <button
-                      id="view-mode-side-by-side"
-                      onClick={() => setViewMode('side-by-side')}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                        viewMode === 'side-by-side'
-                          ? 'bg-white text-neutral-900 shadow-xs'
-                          : 'text-neutral-500 hover:text-neutral-900'
-                      }`}
-                    >
-                      Side by side
-                    </button>
-                    <button
-                      id="view-mode-diff"
-                      onClick={() => setViewMode('diff')}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                        viewMode === 'diff'
-                          ? 'bg-white text-neutral-900 shadow-xs'
-                          : 'text-neutral-500 hover:text-neutral-900'
-                      }`}
-                    >
-                      Differences
-                    </button>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      id="btn-copy-rewritten"
-                      onClick={handleCopy}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      id="btn-download-md"
-                      onClick={() => handleDownload('md')}
-                      className="p-1 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50 text-xs"
-                      title="Download Markdown"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Metric Bar */}
-                <div className="px-4 py-2 bg-neutral-50/50 border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-neutral-500">
-                  <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] min-w-0">
-                    <span>Original: {wordCountSource} words</span>
-                    <span>→</span>
-                    <span className="text-neutral-900 font-medium">
-                      Rewritten: {wordCountRewritten} words
-                    </span>
-                    {(rewriteResult.writingModelUsed || rewriteResult.modelUsed) && (
-                      <span className="px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-700 font-sans text-[10px]">
-                        Writing: {modelDisplayNames[rewriteResult.writingModelUsed || rewriteResult.modelUsed || ''] || rewriteResult.writingModelUsed || rewriteResult.modelUsed}
-                        {rewriteResult.writingDurationMs ? ` (${(rewriteResult.writingDurationMs / 1000).toFixed(1)}s)` : ''}
-                      </span>
-                    )}
-                    {rewriteResult.analysisModelUsed && (
-                      <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-sans text-[10px]">
-                        {rewriteResult.review?.status === 'unavailable' ? 'Requested reviewer' : 'Review'}: {modelDisplayNames[rewriteResult.analysisModelUsed] || rewriteResult.analysisModelUsed}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-neutral-400 sm:ml-auto sm:text-right break-words">
-                    Tip: Highlight any sentence to leave notes or request revisions
-                  </span>
-                </div>
-
-                {/* Main Content Render */}
-                <div
-                  id="rendered-prose-container"
-                  ref={rewrittenProseRef}
-                  onMouseUp={handleTextSelection}
-                  onKeyUp={handleTextSelection}
-                  tabIndex={0}
-                  aria-label="Rewritten draft. Select text with the mouse or keyboard to request a line edit."
-                  className="p-5 select-text cursor-text focus:outline-none focus:ring-2 focus:ring-neutral-200"
-                >
-                  {viewMode === 'diff' && (
-                    <DiffViewer
-                      original={rewriteResult.originalText}
-                      modified={rewriteResult.rewrittenText}
-                    />
-                  )}
-
-                  {viewMode === 'side-by-side' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans leading-relaxed">
-                      <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-100">
-                        <span className="text-[11px] text-neutral-400 block mb-1">
-                          Original draft
-                        </span>
-                        <div className="whitespace-pre-wrap text-neutral-600">
-                          {rewriteResult.originalText}
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-white border border-neutral-200">
-                        <span className="text-[11px] text-neutral-900 font-medium block mb-1">
-                          Rewritten
-                        </span>
-                        <div className="whitespace-pre-wrap text-neutral-900">
-                          {rewriteResult.rewrittenText}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {viewMode === 'final' && (
-                    <div className="p-2 text-neutral-900 font-sans text-xs leading-relaxed whitespace-pre-wrap">
-                      {rewriteResult.rewrittenText}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-[11px] text-neutral-600">
-                {usingSavedVersionContext
-                  ? 'Editing a saved version: follow-up edits use its original draft, saved brief, and saved reader and purpose.'
-                  : 'Follow-up edits use this result’s original draft, current project brief, and current reader and purpose.'}{' '}
-                A full rewrite starts from the current Draft &amp; Brief inputs.
-              </p>
-
-              {/* Feedback Manager */}
-              <RewriteFeedbackManager
-                selectedText={selectedHighlight}
-                selectionRange={selectedRange}
-                onClearSelection={() => {
-                  setSelectedHighlight('');
-                  setSelectedRange(undefined);
-                }}
-              />
-
-              {/* Quick Refine */}
-              <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-neutral-900">
-                    Quick adjustments
-                  </span>
-                  {isRefining && (
-                    <span className="text-xs text-neutral-500 flex items-center gap-1">
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                      <span>Applying adjustment...</span>
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'Shorten sentences for a punchier rhythm',
-                    'Make slightly more conversational and candid',
-                    'Tighten prose and remove filler words',
-                    'Refine word choice for clarity',
-                  ].map((chip, idx) => (
-                    <button
-                      key={idx}
-                      disabled={isRefining || isRewriting}
-                      onClick={() => handleQuickRefineAction(chip)}
-                      className="px-2.5 py-1 rounded text-xs bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition border border-neutral-200 disabled:opacity-40"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    id="input-custom-refine"
-                    aria-label="Adjustment to the current draft"
-                    type="text"
-                    value={customRefineInput}
-                    onChange={(e) => setCustomRefineInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleQuickRefineAction(customRefineInput);
-                    }}
-                    placeholder="Enter an instruction (e.g. Expand on paragraph 2)..."
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-900"
-                  />
-                  <button
-                    id="btn-apply-refine"
-                    disabled={!customRefineInput.trim() || isRefining || isRewriting}
-                    onClick={() => handleQuickRefineAction(customRefineInput)}
-                    className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-medium hover:bg-neutral-800 disabled:opacity-40"
-                  >
-                    Apply adjustment
-                  </button>
-                </div>
-                {refineError && (
-                  <p className="text-xs text-rose-600 font-medium pt-1">
-                    {refineError}
-                  </p>
-                )}
-              </div>
-
-              {/* Summary of Changes */}
-              <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-medium text-neutral-900">
-                    Summary of changes
-                  </h3>
-                  <button
-                    id="btn-toggle-audit-details"
-                    onClick={() => setShowAuditDetails(!showAuditDetails)}
-                    className="text-xs text-neutral-500 hover:text-neutral-800 flex items-center gap-0.5"
-                  >
-                    <span>{showAuditDetails ? 'Collapse' : 'Expand'}</span>
-                    {showAuditDetails ? (
-                      <ChevronUp className="w-3 h-3" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3" />
-                    )}
-                  </button>
-                </div>
-
-                {showAuditDetails && (
-                  <div className="space-y-3 text-xs pt-1">
-                    <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-100 text-neutral-700 leading-relaxed">
-                      <span className="font-medium text-neutral-900 block mb-0.5">
-                        Editorial notes
-                      </span>
-                      {rewriteResult.changesExplanation}
-                    </div>
-
-                    {rewriteResult.stylisticAudit && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="p-3 rounded-lg border border-neutral-100 bg-neutral-50">
-                        <span className="font-medium text-neutral-900 block mb-0.5">
-                          Rhythm and pacing
-                        </span>
-                        <p className="text-neutral-600 leading-relaxed">
-                          {rewriteResult.stylisticAudit?.cadenceChanges}
-                        </p>
-                      </div>
-                      <div className="p-3 rounded-lg border border-neutral-100 bg-neutral-50">
-                        <span className="font-medium text-neutral-900 block mb-0.5">
-                          Structure and flow
-                        </span>
-                        <p className="text-neutral-600 leading-relaxed">
-                          {rewriteResult.stylisticAudit?.structuralTweaks}
-                        </p>
-                      </div>
-                    </div>}
-
-                    {rewriteResult.stylisticAudit?.vocabularySubstitutions &&
-                      rewriteResult.stylisticAudit.vocabularySubstitutions.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <span className="font-medium text-neutral-900 block text-xs">
-                            Word substitutions
-                          </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {rewriteResult.stylisticAudit.vocabularySubstitutions.map((sub, i) => (
-                              <div
-                                key={i}
-                                className="p-2.5 rounded-lg border border-neutral-100 bg-neutral-50 space-y-0.5"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-rose-700 font-medium line-through">
-                                    {sub.from}
-                                  </span>
-                                  <span className="text-neutral-400">→</span>
-                                  <span className="text-neutral-900 font-medium">{sub.to}</span>
-                                </div>
-                                <p className="text-[11px] text-neutral-500">{sub.reason}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center space-y-3">
-              <FileText className="w-8 h-8 text-neutral-300 mx-auto" />
-              <h3 className="text-sm font-medium text-neutral-900">
-                Rewritten draft will appear here
-              </h3>
-              <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
-                Add your draft and optional project brief in the Draft &amp; Brief tab, then click &ldquo;Rewrite in my voice&rdquo;.
-              </p>
-              <button
-                type="button"
-                id="btn-empty-go-to-draft-brief"
-                onClick={() => setActiveTab('draft-brief')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs"
-              >
-                <span>Open Draft &amp; Brief</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+        </div>}
+        {rewriteError && panel !== 'source' && <p role="alert" className="studio-error">{rewriteError}</p>}
+      </aside>
     </div>
-  );
+  </div>;
 };

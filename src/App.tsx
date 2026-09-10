@@ -15,7 +15,7 @@ function AppContent() {
   const { activeTab } = useWritingAssistant();
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col font-sans">
+    <div className={`${activeTab === 'studio' ? 'studio-app' : 'min-h-screen'} bg-neutral-50 text-neutral-900 flex flex-col font-sans`}>
       <Header />
       <WorkspaceSaveStatus />
 

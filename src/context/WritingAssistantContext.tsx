@@ -1,3 +1,4 @@
+import { isModelChoice } from '../modelChoice';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   WritingSample,
@@ -7,23 +8,31 @@ import {
   ToneAdjustments,
   DomainExpertise,
   RewriteFeedbackItem,
-  LearnFromFeedbackResponse,
-  GeminiModelChoice,
+  ModelChoice,
   ReasoningLevelChoice,
   ModelSettings,
   PreservationSettings,
   HeadingTreatment,
   FeedbackTag,
   SelectionRange,
+  EditorialPlan,
+  EditorialPlanState,
 } from '../types';
 import { DEFAULT_SAMPLES, DEFAULT_PROFILE, SAMPLE_DRAFT_TO_REWRITE } from '../data/defaultSamples';
 import { normalizeDomainExpertise, normalizePreservationSettings, validateProjectBrief, validateReaderPurpose } from '../writingPipeline';
 import { normalizeRewriteHistory, retainRewriteVersions, createVersionId } from '../utils/rewriteHistory';
+import { unappliedFeedback, persistFeedbackProfile, persistFeedbackRetirement, feedbackForHistory } from '../utils/voiceFeedback';
 import { readStudioWorkspace, saveStudioWorkspace, StudioWorkspace } from '../utils/studioWorkspace';
+import { validateApprovedPlan, validateEditorialPlan, validatePlanSources } from '../editorialPlan';
 
 export type NavigationTab = 'samples' | 'profile' | 'draft-brief' | 'domain' | 'studio';
 
 interface WritingAssistantContextType {
+  editorialPlan?: EditorialPlanState;
+  isPlanning: boolean;
+  generateEditorialPlan: () => Promise<void>;
+  editEditorialPlan: (plan: EditorialPlan) => void;
+  approveEditorialPlan: () => EditorialPlanState;
   samples: WritingSample[];
   activeProfile: StyleProfile;
   activeTab: NavigationTab;
@@ -38,6 +47,8 @@ interface WritingAssistantContextType {
   projectBrief: string;
   setProjectBrief: (brief: string) => void;
   readerPurpose: string;
+  editorialPreferences: string;
+  setEditorialPreferences: (preferences: string) => void;
   setReaderPurpose: (readerPurpose: string) => void;
   isUploadingBrief: boolean;
   briefUploadError: string | null;
@@ -53,6 +64,7 @@ interface WritingAssistantContextType {
   setCustomDirectives: (directives: string) => void;
   isRewriting: boolean;
   rewriteResult: RewriteResult | null;
+  rewriteResultOrigin: 'saved' | 'generated';
   usingSavedVersionContext: boolean;
   setRewriteResult: (result: RewriteResult | null) => void;
   rewriteHistory: RewriteResult[];
@@ -65,13 +77,15 @@ interface WritingAssistantContextType {
   setActiveSampleId: (id: string | null) => void;
 
   // Model and Reasoning Settings
+  modelSettingsRequest: { role: 'writing' | 'analysis'; sequence: number };
+  openModelSettings: (role: 'writing' | 'analysis') => void;
   modelSettings: ModelSettings;
   setModelSettings: React.Dispatch<React.SetStateAction<ModelSettings>>;
-  updateWritingModel: (model: GeminiModelChoice) => void;
+  updateWritingModel: (model: ModelChoice) => void;
   updateWritingReasoningLevel: (level: ReasoningLevelChoice) => void;
-  updateAnalysisModel: (model: GeminiModelChoice) => void;
+  updateAnalysisModel: (model: ModelChoice) => void;
   updateAnalysisReasoningLevel: (level: ReasoningLevelChoice) => void;
-  updateModel: (model: GeminiModelChoice) => void;
+  updateModel: (model: ModelChoice) => void;
   updateReasoningLevel: (level: ReasoningLevelChoice) => void;
 
   // Tone and Voice Sliders
@@ -86,27 +100,27 @@ interface WritingAssistantContextType {
 
   // Feedback Mechanism
   feedbackItems: RewriteFeedbackItem[];
-  addFeedbackItem: (item: Omit<RewriteFeedbackItem, 'id' | 'createdAt'>) => void;
-  removeFeedbackItem: (id: string) => void;
-  clearFeedbackItems: () => void;
+  saveFeedbackItem: (item: Omit<RewriteFeedbackItem, 'id' | 'createdAt' | 'saveStatus'> | RewriteFeedbackItem, afterEdit?: boolean) => Promise<void>;
+  feedbackSaveNotice: { state: 'saving' | 'saved' | 'failed' | 'retired'; message: string; item?: RewriteFeedbackItem; retryRetirement?: boolean } | null;
+  dismissFeedbackSaveNotice: () => void;
+  retireEarlierFeedback: () => void;
   isLearningFeedback: boolean;
-  learnFromFeedback: () => Promise<LearnFromFeedbackResponse>;
 
   // Actions
   addSample: (sample: Omit<WritingSample, 'id' | 'createdAt' | 'enabled'>) => Promise<WritingSample>;
   analyzeSample: (sampleId: string) => Promise<void>;
+  cancelSampleAnalysis: (sampleId: string) => void;
   toggleSample: (sampleId: string) => void;
   deleteSample: (sampleId: string) => void;
   restoreDefaultSamples: () => void;
   synthesizeProfileFromActiveSamples: () => Promise<void>;
   updateActiveProfile: (profile: StyleProfile) => void;
-  performRewrite: () => Promise<void>;
+  performRewrite: (approvedPlan?: EditorialPlanState) => Promise<void>;
   applyQuickRefine: (instruction: string) => Promise<void>;
   editSelection: (
     selectedText: string,
     instruction: string,
     tag?: FeedbackTag,
-    alsoSaveToProfile?: boolean,
     selectionRange?: SelectionRange
   ) => Promise<{ replacementText: string; explanation: string }>;
   loadSampleDraft: () => void;
@@ -197,7 +211,11 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const [samples, setSamples] = useState<WritingSample[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SAMPLES);
-      if (saved) return JSON.parse(saved);
+      if (saved) return JSON.parse(saved).map((sample: WritingSample) => ({
+        ...sample,
+        analyzing: false,
+        ...(sample.analyzing ? { analysisError: 'Analysis was interrupted. You can try again.' } : {}),
+      }));
     } catch (e) {
       console.warn('Could not read saved samples from storage', e);
     }
@@ -251,17 +269,19 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     return DEFAULT_TONE_ADJUSTMENTS;
   });
 
+  const [modelSettingsRequest, setModelSettingsRequest] = useState<{ role: 'writing' | 'analysis'; sequence: number }>({ role: 'writing', sequence: 0 });
+  const openModelSettings = (role: 'writing' | 'analysis') => setModelSettingsRequest((current) => ({ role, sequence: current.sequence + 1 }));
   const [modelSettings, setModelSettings] = useState<ModelSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_MODEL);
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
-          writingModel: parsed.writingModel || parsed.model || 'gemini-3.8-flash',
+          writingModel: isModelChoice(parsed.writingModel || parsed.model) ? (parsed.writingModel || parsed.model) : 'gemini-3.8-flash',
           writingReasoningLevel: parsed.writingReasoningLevel || parsed.reasoningLevel || 'auto',
-          analysisModel: parsed.analysisModel || 'gemini-3.1-pro-preview',
+          analysisModel: isModelChoice(parsed.analysisModel) ? parsed.analysisModel : 'gemini-3.1-pro-preview',
           analysisReasoningLevel: parsed.analysisReasoningLevel || 'auto',
-          model: parsed.writingModel || parsed.model || 'gemini-3.8-flash',
+          model: isModelChoice(parsed.writingModel || parsed.model) ? (parsed.writingModel || parsed.model) : 'gemini-3.8-flash',
           reasoningLevel: parsed.writingReasoningLevel || parsed.reasoningLevel || 'auto',
         };
       }
@@ -271,7 +291,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     return DEFAULT_MODEL_SETTINGS;
   });
 
-  const updateWritingModel = (writingModel: GeminiModelChoice) => {
+  const updateWritingModel = (writingModel: ModelChoice) => {
     setModelSettings((prev) => ({ ...prev, writingModel, model: writingModel }));
   };
 
@@ -279,7 +299,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     setModelSettings((prev) => ({ ...prev, writingReasoningLevel, reasoningLevel: writingReasoningLevel }));
   };
 
-  const updateAnalysisModel = (analysisModel: GeminiModelChoice) => {
+  const updateAnalysisModel = (analysisModel: ModelChoice) => {
     setModelSettings((prev) => ({ ...prev, analysisModel }));
   };
 
@@ -287,7 +307,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     setModelSettings((prev) => ({ ...prev, analysisReasoningLevel }));
   };
 
-  const updateModel = (model: GeminiModelChoice) => {
+  const updateModel = (model: ModelChoice) => {
     setModelSettings((prev) => ({ ...prev, model, writingModel: model }));
   };
 
@@ -297,7 +317,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
 
   const domainExpertise = activeProfile.domainExpertise || DEFAULT_PROFILE.domainExpertise!;
 
-  const [activeTab, setActiveTab] = useState<NavigationTab>('studio');
+  const [activeTab, setActiveTab] = useState<NavigationTab>('samples');
   const [draftText, setDraftText] = useState<string>(initialWorkspace.workspace.draftText);
   const [isUploadingDraft, setIsUploadingDraft] = useState(false);
   const [draftUploadError, setDraftUploadError] = useState<string | null>(null);
@@ -305,6 +325,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const [useDraftAndBrief, setUseDraftAndBrief] = useState(true);
   const [projectBrief, setProjectBrief] = useState<string>(initialWorkspace.workspace.projectBrief);
   const [readerPurpose, setReaderPurpose] = useState<string>(initialWorkspace.workspace.readerPurpose);
+  const [editorialPreferences, setEditorialPreferences] = useState<string>(initialWorkspace.workspace.editorialPreferences);
   const [isUploadingBrief, setIsUploadingBrief] = useState(false);
   const [briefUploadError, setBriefUploadError] = useState<string | null>(null);
   const briefUploadRef = useRef<symbol | null>(null);
@@ -347,28 +368,35 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
 
   const [customDirectives, setCustomDirectives] = useState<string>(initialWorkspace.workspace.customDirectives);
   const [isRewriting, setIsRewriting] = useState<boolean>(false);
+  const [editorialPlan, setEditorialPlan] = useState<EditorialPlanState | undefined>(initialWorkspace.workspace.editorialPlan);
+  const [isPlanning, setIsPlanning] = useState(false);
   const writingOperationLock = useRef(false);
   const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(initialResult);
+  const [rewriteResultOrigin, setRewriteResultOrigin] = useState<'saved' | 'generated'>('saved');
   const [usingSavedVersionContext, setUsingSavedVersionContext] = useState(initialWorkspace.found ? initialWorkspace.workspace.usingSavedVersionContext : Boolean(initialResult));
   const [isSynthesizingProfile, setIsSynthesizingProfile] = useState<boolean>(false);
   const [activeSampleId, setActiveSampleId] = useState<string | null>('sample-1');
 
   // Feedback state
-  const [feedbackItems, setFeedbackItems] = useState<RewriteFeedbackItem[]>(initialWorkspace.found ? initialWorkspace.workspace.feedbackItems : initialResult?.feedbackItems || []);
+  const [feedbackItems, setFeedbackItems] = useState<RewriteFeedbackItem[]>(unappliedFeedback(initialWorkspace.found ? initialWorkspace.workspace.feedbackItems : initialResult?.feedbackItems || [], activeProfile));
   const [isLearningFeedback, setIsLearningFeedback] = useState<boolean>(false);
+  const feedbackSaveLock = useRef(false);
+  const profileRef = useRef(activeProfile);
+  profileRef.current = activeProfile;
+  const [feedbackSaveNotice, setFeedbackSaveNotice] = useState<WritingAssistantContextType['feedbackSaveNotice']>(null);
 
   const workingCopy: StudioWorkspace = {
-    draftText, projectBrief, readerPurpose, customDirectives, rewriteIntensity, rewriteResult,
-    usingSavedVersionContext, feedbackItems,
+    draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives, rewriteIntensity, rewriteResult,
+    usingSavedVersionContext, feedbackItems, editorialPlan,
   };
 
   useEffect(() => {
     if (initialWorkspace.error) return;
     setWorkspaceSaveError(saveStudioWorkspace({ setItem: (key, value) => localStorage.setItem(key, value) }, {
-      draftText, projectBrief, readerPurpose, customDirectives, rewriteIntensity, rewriteResult,
-      usingSavedVersionContext, feedbackItems,
+      draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives, rewriteIntensity, rewriteResult,
+      usingSavedVersionContext, feedbackItems, editorialPlan,
     }));
-  }, [draftText, projectBrief, readerPurpose, customDirectives, rewriteIntensity, rewriteResult, usingSavedVersionContext, feedbackItems, initialWorkspace.error]);
+  }, [draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives, rewriteIntensity, rewriteResult, usingSavedVersionContext, feedbackItems, editorialPlan, initialWorkspace.error]);
 
   useEffect(() => {
     if (!workspaceSaveError && !historyStorageError) return;
@@ -452,7 +480,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     if (draftUploadRef.current || briefUploadRef.current) throw new Error('Wait for draft and brief uploads to finish.');
     validateProjectBrief(effectiveBrief);
     validateReaderPurpose(effectiveReaderPurpose);
-    if (writingOperationLock.current) return false;
+    if (feedbackSaveLock.current) throw new Error('Wait for your voice note to finish saving.');
+    if (writingOperationLock.current) throw new Error('Wait for the current planning or writing operation to finish.');
     writingOperationLock.current = true;
     setIsRewriting(true);
     return true;
@@ -540,120 +569,121 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
 
   const setDomainExpertise = updateDomainExpertise;
 
-  const addFeedbackItem = (item: Omit<RewriteFeedbackItem, 'id' | 'createdAt'>) => {
-    const newItem: RewriteFeedbackItem = {
-      ...item,
-      id: `fb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      createdAt: new Date().toISOString(),
+  const retireEarlierFeedback = () => {
+    if (feedbackSaveLock.current) return;
+    const earlier = feedbackItems.filter((item) => !item.saveStatus);
+    if (!earlier.length || !rewriteResult) return;
+    try {
+      // Keep the original notes with their version before clearing the old queue.
+      const archivedResult = { ...rewriteResult, feedbackItems };
+      const history = retainRewriteVersions(rewriteHistory, archivedResult);
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
+      const next = persistFeedbackRetirement(profileRef.current, earlier.map((item) => item.id),
+        (value) => localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(value)));
+      profileRef.current = next;
+      setActiveProfile(next);
+      setRewriteHistory(history);
+      setRewriteResult(archivedResult);
+      setFeedbackItems((prev) => unappliedFeedback(prev, next));
+      setFeedbackSaveNotice({ state: 'retired', message: 'Earlier notes cleared. Your voice profile is unchanged. No action needed.' });
+    } catch {
+      setFeedbackSaveNotice({ state: 'failed', message: 'Browser storage could not finish clearing the old notes. Your notes and voice profile are unchanged.', retryRetirement: true });
+    }
+  };
+
+  // The old queue survived successful learning. Retire it without running learning again.
+  useEffect(() => { retireEarlierFeedback(); }, []);
+
+  const saveFeedbackItem: WritingAssistantContextType['saveFeedbackItem'] = async (input, afterEdit = false) => {
+    if (feedbackSaveLock.current) return;
+    if (!rewriteResult) throw new Error('No active rewrite result.');
+    const profile = profileRef.current;
+    const item: RewriteFeedbackItem = 'id' in input ? input : {
+      ...input, id: `fb-${createVersionId()}`, createdAt: new Date().toISOString(), saveStatus: 'pending',
     };
-    setFeedbackItems((prev) => [...prev, newItem]);
-  };
-
-  const removeFeedbackItem = (id: string) => {
-    setFeedbackItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const clearFeedbackItems = () => {
-    setFeedbackItems([]);
-  };
-
-  const learnFromFeedback = async (): Promise<LearnFromFeedbackResponse> => {
-    if (feedbackItems.length === 0) {
-      throw new Error('No feedback items to learn from.');
+    if (profile.appliedFeedbackIds?.includes(item.id)) {
+      setFeedbackItems((prev) => unappliedFeedback(prev, profile));
+      setFeedbackSaveNotice({ state: 'saved', message: 'Voice note already saved to your profile.' });
+      return;
     }
-    if (!rewriteResult) {
-      throw new Error('No active rewrite result.');
-    }
-
+    // Historical notes have no receipt: never replay them automatically.
+    if ('id' in input && !input.saveStatus) throw new Error('This older note has no recorded save status.');
+    feedbackSaveLock.current = true;
     setIsLearningFeedback(true);
+    setFeedbackItems((prev) => [...prev.filter((entry) => entry.id !== item.id), { ...item, saveStatus: 'pending' }]);
+    setFeedbackSaveNotice({ state: 'saving', message: 'Saving voice note to your profile…' });
     try {
       const res = await fetch('/api/learn-from-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          feedbackItems,
-          profile: activeProfile,
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbackItems: [item], profile,
           rewrittenText: rewriteResult.rewrittenText,
           model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
-          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
-        }),
+          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto' }),
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update profile from feedback');
-      }
-
-      const data: LearnFromFeedbackResponse = await res.json();
-      setActiveProfile((current) => ({
-        ...data.updatedProfile,
-        domainExpertise: current.domainExpertise,
-      }));
-      return data;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update your voice profile.');
+      if (profileRef.current !== profile) throw new Error('Your profile changed while saving. Retry to use the current profile.');
+      const next = persistFeedbackProfile(data, profile, item.id, (value) => {
+        try { localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(value)); }
+        catch { throw new Error('Browser storage could not save your profile. Free space or restore storage access, then retry.'); }
+      });
+      profileRef.current = next;
+      setActiveProfile(next);
+      setFeedbackItems((prev) => unappliedFeedback(prev, next));
+      setRewriteResult((prev) => prev ? { ...prev, feedbackItems: unappliedFeedback(prev.feedbackItems || [], { ...next, retiredFeedbackIds: [] }) } : prev);
+      setRewriteHistory((prev) => prev.map((version) => ({ ...version, feedbackItems: unappliedFeedback(version.feedbackItems || [], { ...next, retiredFeedbackIds: [] }) })));
+      setFeedbackSaveNotice({ state: 'saved', message: 'Voice note saved. Your profile is updated.' });
+    } catch (error: any) {
+      const failed: RewriteFeedbackItem = { ...item, saveStatus: 'failed' };
+      setFeedbackItems((prev) => [...prev.filter((entry) => entry.id !== item.id), failed]);
+      setFeedbackSaveNotice({ state: 'failed', message: (afterEdit ? 'Your draft edit is complete. ' : '') + (error.message || 'Voice note could not be saved.'), item: failed });
     } finally {
+      feedbackSaveLock.current = false;
       setIsLearningFeedback(false);
     }
   };
 
+  const sampleAnalysisRequests = useRef(new Map<string, AbortController>());
+  useEffect(() => () => {
+    for (const request of sampleAnalysisRequests.current.values()) request.abort();
+    sampleAnalysisRequests.current.clear();
+  }, []);
+
   const addSample = async (sampleData: Omit<WritingSample, 'id' | 'createdAt' | 'enabled'>): Promise<WritingSample> => {
+    if (!sampleData.content.trim()) throw new Error('Please enter writing sample text.');
     const newSample: WritingSample = {
       ...sampleData,
-      id: `sample-${Date.now()}`,
+      id: `sample-${Array.from(crypto.getRandomValues(new Uint32Array(4)), (part) => part.toString(16).padStart(8, '0')).join('')}`,
       createdAt: new Date().toISOString(),
       enabled: true,
-      analyzing: true,
+      analyzing: false,
     };
-
     setSamples((prev) => [newSample, ...prev]);
     setActiveSampleId(newSample.id);
+    return newSample;
+  };
 
-    // Trigger analysis immediately
-    try {
-      const res = await fetch('/api/analyze-sample', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newSample.title,
-          text: newSample.content,
-          fileType: newSample.fileType,
-          model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
-          reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to analyze sample');
-      }
-
-      const analysis = await res.json();
-
-      setSamples((prev) =>
-        prev.map((s) => (s.id === newSample.id ? { ...s, analysis, analyzing: false } : s))
-      );
-
-      return { ...newSample, analysis, analyzing: false };
-    } catch (e: any) {
-      console.error('Failed sample analysis:', e);
-      setSamples((prev) =>
-        prev.map((s) => (s.id === newSample.id ? { ...s, analyzing: false } : s))
-      );
-      throw e;
-    }
+  const cancelSampleAnalysis = (sampleId: string) => {
+    sampleAnalysisRequests.current.get(sampleId)?.abort();
+    sampleAnalysisRequests.current.delete(sampleId);
+    setSamples((prev) => prev.map((sample) => sample.id === sampleId
+      ? { ...sample, analyzing: false, analysisError: 'Analysis cancelled. Your sample is still available.' }
+      : sample));
   };
 
   const analyzeSample = async (sampleId: string): Promise<void> => {
-    const target = samples.find((s) => s.id === sampleId);
-    if (!target) return;
-
-    setSamples((prev) =>
-      prev.map((s) => (s.id === sampleId ? { ...s, analyzing: true } : s))
-    );
-
+    const target = samples.find((sample) => sample.id === sampleId);
+    if (!target || sampleAnalysisRequests.current.has(sampleId)) return;
+    const controller = new AbortController();
+    sampleAnalysisRequests.current.set(sampleId, controller);
+    const timeout = setTimeout(() => controller.abort(new DOMException('Analysis timed out. Please try again.', 'TimeoutError')), 600_000);
+    setSamples((prev) => prev.map((sample) => sample.id === sampleId
+      ? { ...sample, analyzing: true, analysisError: undefined } : sample));
     try {
       const res = await fetch('/api/analyze-sample', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           title: target.title,
           text: target.content,
@@ -662,21 +692,24 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
         }),
       });
-
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Analysis failed');
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Analysis failed. Please try again.');
       }
-
       const analysis = await res.json();
-      setSamples((prev) =>
-        prev.map((s) => (s.id === sampleId ? { ...s, analysis, analyzing: false } : s))
-      );
-    } catch (e) {
-      setSamples((prev) =>
-        prev.map((s) => (s.id === sampleId ? { ...s, analyzing: false } : s))
-      );
-      throw e;
+      if (controller.signal.aborted || sampleAnalysisRequests.current.get(sampleId) !== controller) return;
+      setSamples((prev) => prev.map((sample) => sample.id === sampleId
+        ? { ...sample, analysis, analyzing: false, analysisError: undefined } : sample));
+    } catch (error) {
+      if (sampleAnalysisRequests.current.get(sampleId) !== controller) return;
+      const message = controller.signal.aborted
+        ? 'Analysis reached the 10-minute limit. Your sample is still available. Please try again.'
+        : error instanceof Error ? error.message : 'Analysis failed. Please try again.';
+      setSamples((prev) => prev.map((sample) => sample.id === sampleId
+        ? { ...sample, analyzing: false, analysisError: message } : sample));
+    } finally {
+      clearTimeout(timeout);
+      if (sampleAnalysisRequests.current.get(sampleId) === controller) sampleAnalysisRequests.current.delete(sampleId);
     }
   };
 
@@ -687,6 +720,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   };
 
   const deleteSample = (sampleId: string) => {
+    sampleAnalysisRequests.current.get(sampleId)?.abort();
+    sampleAnalysisRequests.current.delete(sampleId);
     setSamples((prev) => {
       const remaining = prev.filter((s) => s.id !== sampleId);
       if (activeSampleId === sampleId) {
@@ -697,6 +732,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   };
 
   const restoreDefaultSamples = () => {
+    for (const request of sampleAnalysisRequests.current.values()) request.abort();
+    sampleAnalysisRequests.current.clear();
     setSamples(DEFAULT_SAMPLES);
     setActiveSampleId(DEFAULT_SAMPLES[0]?.id || null);
   };
@@ -747,31 +784,73 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
 
   const storeCompletedVersion = (result: RewriteResult) => {
     setRewriteHistory((prev) => retainRewriteVersions(
-      prev, result, rewriteResult ? { ...rewriteResult, feedbackItems } : null,
+      prev, result, rewriteResult ? { ...rewriteResult, feedbackItems: feedbackForHistory(rewriteResult.feedbackItems || [], feedbackItems, profileRef.current) } : null,
     ));
     setRewriteResult(result);
-    setFeedbackItems(result.feedbackItems || []);
+    setRewriteResultOrigin('generated');
+    setFeedbackItems(unappliedFeedback(result.feedbackItems || [], profileRef.current));
   };
 
   const restoreRewriteVersion = (id: string) => {
-    if (writingOperationLock.current || isLearningFeedback) return;
+    if (writingOperationLock.current || feedbackSaveLock.current) return;
     const saved = rewriteHistory.find((entry) => entry.id === id);
-    if (!saved || saved.id === rewriteResult?.id) return;
+    if (!saved) return;
+    if (saved.id === rewriteResult?.id) { setRewriteResultOrigin('saved'); return; }
     if (rewriteResult) {
-      const outgoing = { ...rewriteResult, feedbackItems };
+      const outgoing = { ...rewriteResult, feedbackItems: feedbackForHistory(rewriteResult.feedbackItems || [], feedbackItems, profileRef.current) };
       setRewriteHistory((prev) => prev.some((entry) => entry.id === outgoing.id)
         ? prev.map((entry) => entry.id === outgoing.id ? outgoing : entry)
         : retainRewriteVersions(prev, outgoing));
     }
     setRewriteResult(saved);
-    setFeedbackItems(saved.feedbackItems || []);
+    setRewriteResultOrigin('saved');
+    setFeedbackItems(unappliedFeedback(saved.feedbackItems || [], profileRef.current));
     setUsingSavedVersionContext(true);
   };
 
-  const performRewrite = async () => {
+  const generateEditorialPlan = async () => {
+    const sources = validatePlanSources(draftText, projectBrief, readerPurpose, editorialPreferences);
+    if (draftUploadRef.current || briefUploadRef.current) throw new Error('Wait for draft and brief uploads to finish.');
+    if (writingOperationLock.current || feedbackSaveLock.current) throw new Error('Wait for the current operation to finish before planning.');
+    writingOperationLock.current = true;
+    setIsPlanning(true);
+    try {
+      const res = await fetch('/api/plan-draft', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...sources, model: modelSettings.analysisModel, reasoningLevel: modelSettings.analysisReasoningLevel }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Could not propose editorial decisions.');
+      const plan = validateEditorialPlan(result.plan, sources, { allowPendingConflictEvidence: true });
+      setEditorialPlan({ plan, sources, approved: false, modelUsed: result.modelUsed });
+    } finally {
+      writingOperationLock.current = false;
+      setIsPlanning(false);
+    }
+  };
+
+  const editEditorialPlan = (plan: EditorialPlan) => {
+    if (writingOperationLock.current) return;
+    setEditorialPlan(current => current ? { ...current, plan, approved: false } : current);
+  };
+
+  const approveEditorialPlan = () => {
+    if (!editorialPlan) throw new Error('Create an edit plan before rewriting.');
+    if (writingOperationLock.current) throw new Error('Wait for the current operation to finish.');
+    const sources = validatePlanSources(draftText, projectBrief, readerPurpose, editorialPreferences);
+    const plan = validateEditorialPlan(editorialPlan.plan, sources);
+    const approved = { ...editorialPlan, plan, sources, approved: true };
+    setEditorialPlan(approved);
+    return approved;
+  };
+
+  const performRewrite = async (approvedSnapshot?: EditorialPlanState) => {
     if (!draftText || draftText.trim().length < 10) {
       throw new Error('Please enter draft text to rewrite (minimum 10 characters).');
     }
+    const currentPlan = approvedSnapshot || editorialPlan;
+    if (!currentPlan) throw new Error('Create and approve an edit plan before rewriting.');
+    const approvedPlan = validateApprovedPlan(currentPlan, { draft: draftText, projectBrief, readerPurpose, editorialPreferences });
 
     if (!beginWritingOperation(projectBrief, readerPurpose)) return;
     try {
@@ -782,6 +861,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
       const corpus = activeSamples.map(({ id, title, content, enabled }) => ({ id, title, content, enabled }));
       const currentBrief = projectBrief;
       const currentReaderPurpose = readerPurpose;
+      const currentEditorialPreferences = editorialPreferences;
 
       const res = await fetch('/api/rewrite-draft', {
         method: 'POST',
@@ -790,6 +870,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           draft: draftText,
           projectBrief: currentBrief || undefined,
           readerPurpose: currentReaderPurpose || undefined,
+          editorialPreferences: currentEditorialPreferences,
+          editorialPlan: approvedPlan,
           profile: activeProfile,
           intensity: rewriteIntensity,
           preservationLocks,
@@ -819,6 +901,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         modelSettings: { ...modelSettings },
         projectBrief: result.projectBrief || currentBrief || undefined,
         readerPurpose: result.readerPurpose !== undefined ? result.readerPurpose : currentReaderPurpose || undefined,
+        editorialPreferences: result.editorialPreferences ?? currentEditorialPreferences,
       };
       storeCompletedVersion(finalResult);
       setUsingSavedVersionContext(false);
@@ -830,8 +913,9 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const applyQuickRefine = async (instruction: string) => {
     if (!rewriteResult?.rewrittenText) return;
 
-    const currentBrief = usingSavedVersionContext ? rewriteResult.projectBrief || '' : projectBrief;
-    const currentReaderPurpose = usingSavedVersionContext ? rewriteResult.readerPurpose || '' : readerPurpose;
+    const currentBrief = usingSavedVersionContext || rewriteResult.editorialPlan ? rewriteResult.projectBrief || '' : projectBrief;
+    const currentReaderPurpose = usingSavedVersionContext || rewriteResult.editorialPlan ? rewriteResult.readerPurpose || '' : readerPurpose;
+    const currentEditorialPreferences = rewriteResult.editorialPreferences ?? rewriteResult.editorialPlan?.sources.editorialPreferences ?? '';
     if (!beginWritingOperation(currentBrief, currentReaderPurpose)) return;
     try {
       const res = await fetch('/api/quick-refine', {
@@ -843,6 +927,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
           sourceDraft: rewriteResult.originalText,
           projectBrief: currentBrief || undefined,
           readerPurpose: currentReaderPurpose || undefined,
+          editorialPreferences: currentEditorialPreferences,
+          editorialPlan: rewriteResult.editorialPlan,
           instruction,
           profile: activeProfile,
           samples: samples.filter((s) => s.enabled).map(({ id, title, content, enabled }) => ({ id, title, content, enabled })),
@@ -900,6 +986,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         review,
         projectBrief: currentBrief || undefined,
         readerPurpose: currentReaderPurpose || undefined,
+          editorialPreferences: currentEditorialPreferences,
+        editorialPlan: rewriteResult.editorialPlan,
         modelUsed: modelUsed || writingModelUsed || modelSettings.writingModel || 'gemini-3.8-flash',
         durationMs: durationMs ?? rewriteResult.durationMs,
         writingModelUsed: writingModelUsed || modelUsed || modelSettings.writingModel || 'gemini-3.8-flash',
@@ -921,7 +1009,6 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     selectedText: string,
     instruction: string,
     tag?: FeedbackTag,
-    alsoSaveToProfile = false,
     selectionRange?: SelectionRange
   ): Promise<{ replacementText: string; explanation: string }> => {
     if (!rewriteResult?.rewrittenText || !selectedText.trim()) {
@@ -954,8 +1041,9 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     );
     const surroundingContext = currentText.slice(contextStart, contextEnd);
 
-    const currentBrief = usingSavedVersionContext ? rewriteResult.projectBrief || '' : projectBrief;
-    const currentReaderPurpose = usingSavedVersionContext ? rewriteResult.readerPurpose || '' : readerPurpose;
+    const currentBrief = usingSavedVersionContext || rewriteResult.editorialPlan ? rewriteResult.projectBrief || '' : projectBrief;
+    const currentReaderPurpose = usingSavedVersionContext || rewriteResult.editorialPlan ? rewriteResult.readerPurpose || '' : readerPurpose;
+    const currentEditorialPreferences = rewriteResult.editorialPreferences ?? rewriteResult.editorialPlan?.sources.editorialPreferences ?? '';
     if (!beginWritingOperation(currentBrief, currentReaderPurpose)) {
       throw new Error('Another writing operation is already in progress.');
     }
@@ -971,6 +1059,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         sourceDraft: rewriteResult.originalText,
         projectBrief: currentBrief || undefined,
         readerPurpose: currentReaderPurpose || undefined,
+          editorialPreferences: currentEditorialPreferences,
+        editorialPlan: rewriteResult.editorialPlan,
         surroundingContext,
         instruction,
         tag,
@@ -1031,6 +1121,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         wordCountRewritten,
         projectBrief: currentBrief || undefined,
         readerPurpose: currentReaderPurpose || undefined,
+          editorialPreferences: currentEditorialPreferences,
+        editorialPlan: rewriteResult.editorialPlan,
         modelUsed: modelUsed || writingModelUsed || modelSettings.writingModel || 'gemini-3.8-flash',
         durationMs: durationMs ?? rewriteResult.durationMs,
         changesExplanation: `[Line Edit: ${explanation}]\n\n${rewriteResult.changesExplanation}`,
@@ -1045,15 +1137,6 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
       };
 
       storeCompletedVersion(updatedResult);
-
-      if (alsoSaveToProfile) {
-        addFeedbackItem({
-          selectedText,
-          tag: tag || 'not_my_voice',
-          label: tag || 'Line Edit',
-          note: instruction || `Replaced with: "${replacementText.slice(0, 80)}"`,
-        });
-      }
 
       return { replacementText, explanation };
     } finally {
@@ -1076,6 +1159,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   return (
     <WritingAssistantContext.Provider
       value={{
+        editorialPlan, isPlanning, generateEditorialPlan, editEditorialPlan, approveEditorialPlan,
         samples,
         activeProfile,
         activeTab,
@@ -1091,6 +1175,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         setProjectBrief: updateProjectBrief,
         readerPurpose,
         setReaderPurpose,
+        editorialPreferences,
+        setEditorialPreferences,
         isUploadingBrief,
         briefUploadError,
         uploadProjectBrief,
@@ -1105,6 +1191,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         setCustomDirectives,
         isRewriting,
         rewriteResult,
+        rewriteResultOrigin,
         usingSavedVersionContext,
         setRewriteResult,
         rewriteHistory,
@@ -1116,6 +1203,8 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         activeSampleId,
         setActiveSampleId,
         modelSettings,
+        modelSettingsRequest,
+        openModelSettings,
         setModelSettings,
         updateWritingModel,
         updateWritingReasoningLevel,
@@ -1130,13 +1219,14 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         setDomainExpertise,
         updateDomainExpertise,
         feedbackItems,
-        addFeedbackItem,
-        removeFeedbackItem,
-        clearFeedbackItems,
+        saveFeedbackItem,
+        feedbackSaveNotice,
+        dismissFeedbackSaveNotice: () => setFeedbackSaveNotice(null),
+        retireEarlierFeedback,
         isLearningFeedback,
-        learnFromFeedback,
         addSample,
         analyzeSample,
+        cancelSampleAnalysis,
         toggleSample,
         deleteSample,
         restoreDefaultSamples,

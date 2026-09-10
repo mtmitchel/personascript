@@ -1,22 +1,9 @@
+import { isModelChoice, isReasoningLevelChoice, validateModelReasoning } from './modelChoice';
 import { Type } from '@google/genai';
-import { DomainTopic, GenerateDomainKnowledgeRequest, GeminiModelChoice, ReasoningLevelChoice, ConceptAnnotation } from './types';
+import { DomainTopic, GenerateDomainKnowledgeRequest, ModelChoice, ReasoningLevelChoice, ConceptAnnotation } from './types';
 import { ValidationError, PROJECT_BRIEF_MAX_CHARS } from './writingPipeline';
 
 export const DRAFT_MAX_CHARS = 100_000;
-
-const SUPPORTED_MODELS: GeminiModelChoice[] = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
-  'gemini-3.6-flash',
-  'gemini-3.1-pro-preview',
-];
-
-const SUPPORTED_REASONING_LEVELS: ReasoningLevelChoice[] = [
-  'auto',
-  'minimal',
-  'low',
-  'high',
-];
 
 export interface ValidatedDomainGenerationInput {
   field: string;
@@ -25,7 +12,7 @@ export interface ValidatedDomainGenerationInput {
   targetTopic?: GenerateDomainKnowledgeRequest['targetTopic'];
   draft?: string;
   projectBrief?: string;
-  model: GeminiModelChoice;
+  model: ModelChoice;
   reasoningLevel: ReasoningLevelChoice;
 }
 
@@ -120,21 +107,23 @@ export function validateDomainGenerationRequest(body: unknown): ValidatedDomainG
     throw new ValidationError('Please provide at least one field or discipline, or a draft or brief, to generate domain knowledge.');
   }
 
-  let model: GeminiModelChoice = 'gemini-3.1-pro-preview';
+  let model: ModelChoice = 'gemini-3.1-pro-preview';
   if (record.model !== undefined && record.model !== null) {
-    if (typeof record.model !== 'string' || !SUPPORTED_MODELS.includes(record.model as GeminiModelChoice)) {
+    if (!isModelChoice(record.model)) {
       throw new ValidationError('model choice is invalid.');
     }
-    model = record.model as GeminiModelChoice;
+    model = record.model as ModelChoice;
   }
 
   let reasoningLevel: ReasoningLevelChoice = 'auto';
   if (record.reasoningLevel !== undefined && record.reasoningLevel !== null) {
-    if (typeof record.reasoningLevel !== 'string' || !SUPPORTED_REASONING_LEVELS.includes(record.reasoningLevel as ReasoningLevelChoice)) {
+    if (!isReasoningLevelChoice(record.reasoningLevel)) {
       throw new ValidationError('reasoningLevel is invalid.');
     }
     reasoningLevel = record.reasoningLevel as ReasoningLevelChoice;
   }
+  try { validateModelReasoning(model, reasoningLevel); }
+  catch (error) { throw new ValidationError(error instanceof Error ? error.message : 'reasoningLevel is invalid.'); }
 
   return {
     field,

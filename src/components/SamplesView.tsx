@@ -26,6 +26,7 @@ export const SamplesView: React.FC = () => {
     deleteSample,
     restoreDefaultSamples,
     analyzeSample,
+    cancelSampleAnalysis,
     synthesizeProfileFromActiveSamples,
     isSynthesizingProfile,
     setActiveTab,
@@ -95,9 +96,11 @@ export const SamplesView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200">
         <div>
+          <p className="mb-2 text-xs font-medium text-neutral-500">Step 1 of 5</p>
           <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
             Writing Samples
           </h1>
+          <p className="mt-2 text-sm text-neutral-600">Add your writing and analyze its voice. Next, review the voice blueprint.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -137,6 +140,10 @@ export const SamplesView: React.FC = () => {
                 <span>Analyze Voice Profile ({activeSamplesCount})</span>
               </>
             )}
+          </button>
+          <button id="btn-samples-to-profile" type="button" onClick={() => setActiveTab('profile')}
+            className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-medium text-white hover:bg-neutral-800">
+            Continue to Voice Blueprint <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -275,14 +282,13 @@ export const SamplesView: React.FC = () => {
                     <button
                       id="btn-reanalyze-sample"
                       type="button"
-                      onClick={() => analyzeSample(activeSample.id)}
-                      disabled={activeSample.analyzing}
+                      onClick={() => activeSample.analyzing ? cancelSampleAnalysis(activeSample.id) : analyzeSample(activeSample.id)}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition"
                     >
                       <RefreshCw
                         className={`w-3.5 h-3.5 ${activeSample.analyzing ? 'animate-spin' : ''}`}
                       />
-                      <span>Re-analyze</span>
+                      <span>{activeSample.analyzing ? 'Cancel analysis' : activeSample.analysis ? 'Re-analyze' : 'Analyze sample'}</span>
                     </button>
 
                     <button
@@ -297,11 +303,16 @@ export const SamplesView: React.FC = () => {
                   </div>
                 </div>
 
+                {activeSample.analysisError && (
+                  <p role="status" className="mb-4 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    {activeSample.analysisError}
+                  </p>
+                )}
                 {activeSample.analyzing ? (
                   <div className="py-16 text-center space-y-3">
                     <div className="w-8 h-8 border-2 border-neutral-200 border-t-neutral-900 rounded-full animate-spin mx-auto" />
                     <p className="text-xs text-neutral-500">
-                      Analyzing stylistic markers...
+                      Analyzing stylistic markers... Higher reasoning levels can take several minutes. You can cancel at any time.
                     </p>
                   </div>
                 ) : activeSample.analysis ? (
@@ -576,7 +587,7 @@ export const SamplesView: React.FC = () => {
                         onClick={() => setActiveTab('profile')}
                         className="flex items-center gap-1.5 text-xs font-medium text-neutral-900 hover:text-neutral-700"
                       >
-                        <span>Voice Blueprint</span>
+                        <span>Continue to Voice Blueprint</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -584,7 +595,7 @@ export const SamplesView: React.FC = () => {
                 ) : (
                   <div className="py-12 text-center space-y-3">
                     <p className="text-xs text-neutral-500">
-                      This sample has not been analyzed yet.
+                      Your sample is ready to use. Analyze it to see a style breakdown.
                     </p>
                     <button
                       onClick={() => analyzeSample(activeSample.id)}

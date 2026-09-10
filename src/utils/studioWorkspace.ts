@@ -1,13 +1,17 @@
-import { RewriteFeedbackItem, RewriteIntensity, RewriteResult } from '../types';
+import { EditorialPlanState, RewriteFeedbackItem, RewriteIntensity, RewriteResult } from '../types';
 import { isRewriteFeedback, normalizeRewriteHistory } from './rewriteHistory';
+import { DEFAULT_EDITORIAL_PREFERENCES } from '../writingPipeline';
+import { isEditorialPlanState } from '../editorialPlan';
 
 export const STUDIO_WORKSPACE_KEY = 'personascript_workspace_v1';
 
 /** Current work only. The existing history key remains the owner of saved versions. */
 export interface StudioWorkspace {
+  editorialPlan?: EditorialPlanState;
   draftText: string;
   projectBrief: string;
   readerPurpose: string;
+  editorialPreferences: string;
   customDirectives: string;
   rewriteIntensity: RewriteIntensity;
   rewriteResult: RewriteResult | null;
@@ -16,7 +20,7 @@ export interface StudioWorkspace {
 }
 
 export const EMPTY_STUDIO_WORKSPACE: StudioWorkspace = {
-  draftText: '', projectBrief: '', readerPurpose: '', customDirectives: '', rewriteIntensity: 'faithful',
+  draftText: '', projectBrief: '', readerPurpose: '', editorialPreferences: DEFAULT_EDITORIAL_PREFERENCES, customDirectives: '', rewriteIntensity: 'faithful',
   rewriteResult: null, usingSavedVersionContext: false, feedbackItems: [],
 };
 
@@ -25,7 +29,9 @@ export function parseStudioWorkspace(saved: string): StudioWorkspace {
   if (!value || typeof value !== 'object'
     || typeof value.draftText !== 'string'
     || typeof value.projectBrief !== 'string'
+    || (value.editorialPreferences !== undefined && typeof value.editorialPreferences !== 'string')
     || (value.readerPurpose !== undefined && typeof value.readerPurpose !== 'string')
+    || (value.editorialPlan !== undefined && !isEditorialPlanState(value.editorialPlan))
     || typeof value.customDirectives !== 'string'
     || !['polish', 'faithful', 'transform'].includes(value.rewriteIntensity)
     || typeof value.usingSavedVersionContext !== 'boolean'
@@ -33,9 +39,11 @@ export function parseStudioWorkspace(saved: string): StudioWorkspace {
     throw new Error('The saved working copy could not be read.');
   }
   return {
+    ...(value.editorialPlan === undefined ? {} : { editorialPlan: value.editorialPlan }),
     draftText: value.draftText,
     projectBrief: value.projectBrief,
     readerPurpose: value.readerPurpose === undefined ? '' : value.readerPurpose,
+    editorialPreferences: value.editorialPreferences === undefined ? DEFAULT_EDITORIAL_PREFERENCES : value.editorialPreferences,
     customDirectives: value.customDirectives,
     rewriteIntensity: value.rewriteIntensity,
     rewriteResult: value.rewriteResult === null ? null : normalizeRewriteHistory([value.rewriteResult])[0],
