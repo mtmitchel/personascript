@@ -4,7 +4,7 @@ import { DiffViewer } from './DiffViewer';
 import { RewriteFeedbackManager } from './RewriteFeedbackManager';
 import { WritingReviewPanel } from './WritingReviewPanel';
 import { RewriteHistory, RewriteVersionDetails } from './RewriteHistory';
-import { EditorialDecisions } from './EditorialDecisions';
+import { EditorialDecisions, planReadiness } from './EditorialDecisions';
 import { StudioDraftControls } from './StudioDraftControls';
 import { planMatchesSources } from '../editorialPlan';
 import { SelectionRange } from '../types';
@@ -36,6 +36,12 @@ export const StudioView: React.FC = () => {
   const busy = isRewriting || isPlanning || isLearningFeedback || isUploadingDraft || isUploadingBrief;
   const decisionsReady = Boolean(editorialPlan?.approved && planMatchesSources(editorialPlan, { draft: draftText, projectBrief, readerPurpose, editorialPreferences }));
   const needsApproval = Boolean(editorialPlan && !decisionsReady);
+  // The action bar reports the same blockers the plan panel does, so approving
+  // can never be offered for a plan the validator would refuse.
+  const planBlocked = Boolean(editorialPlan && decisionsReady === false && (() => {
+    const readiness = planReadiness(editorialPlan!.plan, draftText);
+    return readiness.blockers > 0 || readiness.openingJobMissing;
+  })());
   const showingRewrite = panel !== 'source' && Boolean(rewriteResult);
   const documentText = showingRewrite ? rewriteResult!.rewrittenText : draftText;
   const documentWords = documentText.trim() ? documentText.trim().split(/\s+/).length : 0;
@@ -173,7 +179,7 @@ export const StudioView: React.FC = () => {
       </section>
       <aside className="studio-inspector" aria-label="Writing workspace">
         <header className="studio-work-header">
-          <h2 ref={workHeading} tabIndex={-1} className="studio-panel-title">{panel === 'source' ? 'Rewrite your draft' : panel === 'review' ? 'Review this rewrite' : 'Edit this rewrite'}</h2>
+          <h2 ref={workHeading} tabIndex={-1} className="studio-panel-title">{panel === 'source' ? 'Review the rewrite plan' : panel === 'review' ? 'Review this rewrite' : 'Edit this rewrite'}</h2>
           {rewriteResult && (panel === 'edit'
             ? <button id="btn-new-source-rewrite" type="button" disabled={busy} onClick={() => openPanel('source')} className="studio-text-button">New rewrite from source <ArrowRight size={14}/></button>
             : panel === 'review' && <button type="button" onClick={() => openPanel('edit')} className="studio-text-button">Back to editing</button>)}
@@ -191,15 +197,16 @@ export const StudioView: React.FC = () => {
         {panel === 'source' && <div className="studio-work-content">
           <div ref={scrollPanel} className="studio-inspector-scroll">
             <p className="studio-panel-description">You’re viewing your original draft. Prepare suggested changes, then approve them to create a rewrite.</p>
-            {draftText.trim() && <><button id="btn-edit-draft-brief" type="button" onClick={() => setActiveTab('draft-brief')} className="studio-text-button">Edit draft &amp; brief <ArrowRight size={14}/></button>
-              <StudioDraftControls sourceRewrite disabled={busy}/>
-            </>}
+            {draftText.trim() && <button id="btn-edit-draft-brief" type="button" onClick={() => setActiveTab('draft-brief')} className="studio-text-button">Edit draft &amp; brief <ArrowRight size={14}/></button>}
             {editorialPlan && <div className="studio-decisions"><EditorialDecisions/></div>}
+            {/* Settings that shape the rewrite come after the decisions they apply to,
+                so they never sit between the panel intro and the review. */}
+            {draftText.trim() && <StudioDraftControls sourceRewrite disabled={busy}/>}
           </div>
           <div className="studio-work-action">
             {rewriteError && <p role="alert" className="text-rose-700">{rewriteError}</p>}
-            <p role="status">{isPlanning ? 'Preparing suggestions…' : isRewriting ? 'Writing and reviewing your new version…' : isUploadingDraft || isUploadingBrief ? 'Waiting for your upload…' : decisionsReady ? 'Uses the approved plan and your source.' : draftText.trim() ? 'Preparing suggestions does not rewrite your draft.' : 'Add your source to begin.'}</p>
-            <button id="btn-start-source-rewrite" type="button" disabled={busy} onClick={startRewrite} className="studio-primary">
+            <p role="status">{isPlanning ? 'Preparing suggestions…' : isRewriting ? 'Writing and reviewing your new version…' : isUploadingDraft || isUploadingBrief ? 'Waiting for your upload…' : ''}</p>
+            <button id="btn-start-source-rewrite" type="button" disabled={busy || planBlocked} onClick={startRewrite} className="studio-primary">
               {busy && <RefreshCw size={15} className="animate-spin"/>}
               {isPlanning ? 'Preparing suggestions…' : isRewriting ? 'Rewriting…' : !draftText.trim() ? 'Add draft' : needsApproval ? 'Approve and rewrite' : decisionsReady ? 'Rewrite from source' : 'Prepare suggestions'}
             </button>
