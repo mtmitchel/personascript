@@ -29,11 +29,17 @@ test('PDF hard wraps recover smaller passages while preserving all substantive t
   assert.deepEqual(getDraftParagraphs(wrapped), paragraphs);
 });
 
-test('planner sees paragraph IDs and the finer independent-claim requirement', () => {
+test('planner sees paragraph IDs, the smallest-useful-choice requirement, and the rewrite request', () => {
   const prompt = buildEditorialPlanPrompt(sources);
-  assert.match(prompt, /one item per claim/);
+  assert.match(prompt, /smallest useful set/);
+  assert.match(prompt, /one item per paragraph/);
   assert.match(prompt, /EVERY paragraph/);
+  assert.match(prompt, /No additional limits\./);
+  assert.ok(prompt.includes('Rewrite request (editorial guidance'));
+  assert.ok(prompt.includes('No additional request.'));
   for (const paragraph of getDraftParagraphs(draft)) assert.ok(prompt.includes(`<paragraph id="${paragraph.id}">\n${paragraph.text}`));
+  const requested = buildEditorialPlanPrompt({ ...sources, customInstructions: 'Keep it under 500 words.' });
+  assert.ok(requested.includes('Keep it under 500 words.'));
 });
 
 

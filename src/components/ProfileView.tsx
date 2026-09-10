@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
+import { ToneSlidersControl } from './ToneSlidersControl';
 import { StyleProfile } from '../types';
 import {
   Sliders,
@@ -16,6 +17,9 @@ export const ProfileView: React.FC = () => {
     activeProfile,
     updateActiveProfile,
     setActiveTab,
+    toneAdjustments,
+    setToneAdjustments,
+    resetToneAdjustments,
   } = useWritingAssistant();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -201,6 +205,18 @@ export const ProfileView: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Tone adjustments applied at write time */}
+      <div className="p-5 rounded-xl border border-neutral-200 bg-white space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-900">
+          <Sliders className="w-4 h-4 text-neutral-700" />
+          <span>Tone for new writing</span>
+        </div>
+        <p className="text-xs text-neutral-500 leading-relaxed">
+          Optional adjustments layered on your blueprint voice. They apply to every new rewrite and edit until you change them.
+        </p>
+        <ToneSlidersControl adjustments={toneAdjustments} onChange={setToneAdjustments} onReset={resetToneAdjustments}/>
       </div>
 
       {/* Rules: Dos and Don'ts */}

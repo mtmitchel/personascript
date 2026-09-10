@@ -37,8 +37,10 @@ test('changed preferences require approval again, and malformed or oversized inp
   assert.equal(planMatchesSources(state, sources), true);
   for (const editorialPreferences of ['', 'A different preference.']) {
     assert.equal(planMatchesSources(state, { ...sources, editorialPreferences }), false);
-    assert.throws(() => validateApprovedPlan(state, { ...sources, editorialPreferences }), /standing preferences changed/);
+    assert.throws(() => validateApprovedPlan(state, { ...sources, editorialPreferences }), /writing instructions or preferences changed/);
   }
+  assert.equal(planMatchesSources(state, { ...sources, customInstructions: 'Focus on the opening.' }), false);
+  assert.throws(() => validateApprovedPlan(state, { ...sources, customInstructions: 'Focus on the opening.' }), /writing instructions or preferences changed/);
   for (const value of [42, {}, [], 'x'.repeat(EDITORIAL_PREFERENCES_MAX_CHARS + 1)]) {
     assert.throws(() => validateEditorialPreferences(value));
     assert.throws(() => validatePlanSources(draft, '', '', value));

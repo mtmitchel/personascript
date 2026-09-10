@@ -23,7 +23,7 @@ const FEEDBACK_TAGS: FeedbackTagOption[] = [
   {
     tag: 'good',
     label: 'Sounds like me',
-    desc: 'Captured my authentic phrasing',
+    desc: 'Matches my phrasing',
   },
   {
     tag: 'too_casual',
@@ -178,26 +178,25 @@ export const RewriteFeedbackManager: React.FC<RewriteFeedbackManagerProps> = ({
       <div className="studio-edit-composer">
         <label htmlFor="input-edit-request" className="font-semibold text-sm">What should change?</label>
         <textarea id="input-edit-request" ref={input} rows={4} value={customNote} disabled={busy}
-          aria-invalid={Boolean(error)} aria-describedby="edit-request-help"
+          aria-invalid={Boolean(error)}
           onChange={(event) => { setCustomNote(event.target.value); setError(null); }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void applyChanges(); }
           }}
           placeholder="For example, tighten the opening and keep the project details."/>
-        <p id="edit-request-help" className="text-xs leading-6 text-neutral-600">Describe a change, or adjust the writing settings below.</p>
       </div>
       {children}
       <div className="studio-voice-preference">
         <label className="studio-save-rule"><input type="checkbox" checked={alsoSaveRule} disabled={busy} onChange={(event) => setAlsoSaveRule(event.target.checked)}/>Also save this as a style rule</label>
         {alsoSaveRule && <fieldset disabled={busy} className="mt-3 space-y-3">
           <legend className="sr-only">Style preference</legend>
-          <p className="text-xs leading-6 text-neutral-600">Saves a reusable preference to your Voice Blueprint for future writing.</p>
-          <label htmlFor="voice-feedback-category" className="block text-xs font-medium">Feedback category</label>
+          <p className="text-xs leading-6 text-neutral-600">Use this preference in future writing.</p>
+          <label htmlFor="voice-feedback-category" className="block text-xs font-medium">Style issue</label>
           <select id="voice-feedback-category" value={activeTag} onChange={(event) => setActiveTag(event.target.value as FeedbackTag)} className="w-full rounded-lg border border-neutral-300 bg-white p-2 text-sm">
             {FEEDBACK_TAGS.map((option) => <option value={option.tag} key={option.tag}>{option.label}</option>)}
           </select>
           <p className="text-xs text-neutral-600">{FEEDBACK_TAGS.find((option) => option.tag === activeTag)?.desc}</p>
-          <button id="btn-save-note-only" type="button" onClick={saveNote} disabled={activeTag === 'custom' && !customNote.trim()} className="text-xs underline">Save to voice profile without editing</button>
+          <button id="btn-save-note-only" type="button" onClick={saveNote} disabled={activeTag === 'custom' && !customNote.trim()} className="text-xs underline">Save rule without editing</button>
         </fieldset>}
       </div>
       {feedbackSaveNotice && <div id="voice-save-status" role={feedbackSaveNotice.state === 'failed' ? 'alert' : 'status'} className="studio-voice-status">

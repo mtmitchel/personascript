@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS } from '../writingPipeline';
-import { FileText, UploadCloud, ArrowRight } from 'lucide-react';
+import { EDITORIAL_PREFERENCES_MAX_CHARS, PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS } from '../writingPipeline';
+import { FileText, Sparkles, UploadCloud, ArrowRight } from 'lucide-react';
 
 export const DraftBriefView: React.FC = () => {
   const {
@@ -14,6 +14,8 @@ export const DraftBriefView: React.FC = () => {
     setProjectBrief,
     readerPurpose,
     setReaderPurpose,
+    editorialPreferences,
+    setEditorialPreferences,
     isUploadingBrief,
     briefUploadError,
     uploadProjectBrief,
@@ -253,6 +255,53 @@ export const DraftBriefView: React.FC = () => {
           <div id="reader-purpose-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
             <span>{wordCountReaderPurpose} words</span>
             <span>{readerPurpose.length} chars</span>
+          </div>
+        </div>
+
+        {/* Standing preferences */}
+        <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-neutral-700" />
+              <label htmlFor="standing-editorial-preferences" className="text-sm font-semibold text-neutral-900 cursor-pointer">
+                Standing preferences (optional)
+              </label>
+            </div>
+            <button
+              type="button"
+              id="btn-clear-editorial-preferences"
+              onClick={() => setEditorialPreferences('')}
+              disabled={!editorialPreferences.length || isRewriting}
+              className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Clear
+            </button>
+          </div>
+
+          <p id="standing-preferences-help" className="text-xs text-neutral-500 leading-relaxed">
+            Editorial guidance used for every rewrite, such as keeping named design principles or attributing results to their recorded team. These guide choices; they never replace source facts. Changing them requires approving the Studio edit plan again.
+          </p>
+
+          <textarea
+            id="standing-editorial-preferences"
+            rows={5}
+            value={editorialPreferences}
+            onChange={(e) => setEditorialPreferences(e.target.value)}
+            disabled={isRewriting}
+            aria-describedby="standing-preferences-help standing-preferences-count"
+            aria-invalid={editorialPreferences.length > EDITORIAL_PREFERENCES_MAX_CHARS}
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
+          />
+
+          {editorialPreferences.length > EDITORIAL_PREFERENCES_MAX_CHARS && (
+            <div role="alert" className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5 leading-relaxed">
+              Shorten these preferences to {EDITORIAL_PREFERENCES_MAX_CHARS.toLocaleString()} characters or fewer before creating an edit plan or rewriting. Your saved text is available above.
+            </div>
+          )}
+
+          <div id="standing-preferences-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+            <span>{editorialPreferences.trim() ? editorialPreferences.trim().split(/\s+/).length : 0} words</span>
+            <span>{editorialPreferences.length} chars</span>
           </div>
         </div>
 

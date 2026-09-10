@@ -157,7 +157,7 @@ export interface EditorialPlan {
 /** The exact source context reviewed by the user; edits require approval again. */
 export interface EditorialPlanState {
   plan: EditorialPlan;
-  sources: { draft: string; projectBrief: string; readerPurpose: string; editorialPreferences?: string };
+  sources: { draft: string; projectBrief: string; readerPurpose: string; editorialPreferences?: string; customInstructions?: string };
   approved: boolean;
   modelUsed?: string;
 }

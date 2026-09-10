@@ -57,3 +57,17 @@ test('a replaced active result missing from history is retained within the exist
   assert.deepEqual(result.slice(0, 3).map((entry) => entry.id), ['next', 'unsaved', 'old-0']);
   assert.equal(history.length, REWRITE_HISTORY_LIMIT);
 });
+
+test('a planned version validates against its own saved rewrite instructions', () => {
+  const draft = 'Original source.';
+  const base = {
+    approved: true,
+    plan: { version: 2, openingJob: 'Explain the source.', items: [{ paragraphId: 1, idea: 'Keep the account.', sourcePhrase: draft, decision: 'keep' as const, limit: 'Retain the recorded scope.' }] },
+  };
+  const withInstructions = { ...version('planned'), editorialPlan: { ...base, sources: { draft, projectBrief: '', readerPurpose: '', customInstructions: 'Keep it under 500 words.' } } };
+  assert.equal(normalizeRewriteHistory([withInstructions])[0].editorialPlan?.sources.customInstructions, 'Keep it under 500 words.');
+  const withoutInstructions = { ...version('legacy-planned'), editorialPlan: { ...base, sources: { draft, projectBrief: '', readerPurpose: '' } } };
+  assert.equal(normalizeRewriteHistory([withoutInstructions])[0].editorialPlan?.sources.customInstructions, undefined);
+  const mismatched = { ...version('bad'), editorialPlan: { ...base, sources: { draft: 'A different draft entirely.', projectBrief: '', readerPurpose: '', customInstructions: 'x' } } };
+  assert.throws(() => normalizeRewriteHistory([mismatched]), /could not be read/);
+});

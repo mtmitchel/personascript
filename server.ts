@@ -1326,10 +1326,10 @@ app.post('/api/plan-draft', async (req: Request, res: Response) => {
   const timeout = setTimeout(() => controller.abort(new DOMException('Editorial planning timed out.', 'TimeoutError')), 600_000);
   try {
     const body = requireObject(req.body, 'Request');
-    if (Object.keys(body).some(key => !['draft', 'projectBrief', 'readerPurpose', 'editorialPreferences', 'model', 'reasoningLevel'].includes(key))) {
-      throw new RequestValidationError('Planning accepts only the draft, brief, reader and purpose, standing preferences, and model settings.');
+    if (Object.keys(body).some(key => !['draft', 'projectBrief', 'readerPurpose', 'editorialPreferences', 'customInstructions', 'model', 'reasoningLevel'].includes(key))) {
+      throw new RequestValidationError('Planning accepts only the draft, brief, reader and purpose, writing instructions, preferences, and model settings.');
     }
-    const sources = validatePlanSources(body.draft, body.projectBrief, body.readerPurpose, body.editorialPreferences);
+    const sources = validatePlanSources(body.draft, body.projectBrief, body.readerPurpose, body.editorialPreferences, body.customInstructions);
     validateControlInputs({ model: body.model, reasoningLevel: body.reasoningLevel });
     const model = optionalText(body.model, 'model') || 'gemini-3.1-pro-preview';
     try { parseModelChoice(model); } catch (error) { throw new RequestValidationError(error instanceof Error ? error.message : 'Model choice is invalid.'); }
@@ -1387,7 +1387,7 @@ app.post('/api/rewrite-draft', async (req: Request, res: Response) => {
     const validProjectBrief = projectBrief == null ? validateProjectBrief(projectBrief) : cleanSourceText(validateProjectBrief(projectBrief) || '');
     const validReaderPurpose = validateReaderPurpose(readerPurpose);
     const validEditorialPreferences = validateEditorialPreferences(editorialPreferences);
-    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: draftText, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences });
+    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: draftText, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences, customInstructions });
     requireObject(profile, 'profile');
     if (intensity !== undefined && !['polish', 'faithful', 'transform'].includes(intensity)) {
       throw new RequestValidationError('intensity is invalid.');
@@ -1671,7 +1671,7 @@ app.post('/api/quick-refine', async (req: Request, res: Response) => {
     validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
     const corpus = validateSamplesInput(samples);
     const source = cleanSourceText(sourceDraftValue || originalTextValue || currentTextValue);
-    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: source, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences });
+    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: source, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences, customInstructions: req.body.editorialPlan?.sources?.customInstructions });
     const domainInput = domainExpertise || profile?.domainExpertise;
     validateDomainExpertiseInput(domainInput);
     const activeDomain = normalizeDomainExpertise(domainInput);
@@ -1789,7 +1789,7 @@ app.post('/api/edit-selection', async (req: Request, res: Response) => {
     validateControlInputs({ model, reasoningLevel, analysisModel, analysisReasoningLevel, toneAdjustments, toneEnabled, domainExpertise });
     const corpus = validateSamplesInput(samples);
     const source = cleanSourceText(sourceDraftValue || originalTextValue || currentTextValue);
-    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: source, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences });
+    const editorialPlan = validateApprovedPlan(req.body.editorialPlan, { draft: source, projectBrief: validProjectBrief || '', readerPurpose: validReaderPurpose || '', editorialPreferences: validEditorialPreferences, customInstructions: req.body.editorialPlan?.sources?.customInstructions });
     const domainInput = domainExpertise || profile?.domainExpertise;
     validateDomainExpertiseInput(domainInput);
     const activeDomain = normalizeDomainExpertise(domainInput);

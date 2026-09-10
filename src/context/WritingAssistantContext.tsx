@@ -808,8 +808,10 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     setUsingSavedVersionContext(true);
   };
 
+  // The rewrite request is a planning input: the approved snapshot records it,
+  // so changing it after approval requires approving the plan again.
   const generateEditorialPlan = async () => {
-    const sources = validatePlanSources(draftText, projectBrief, readerPurpose, editorialPreferences);
+    const sources = validatePlanSources(draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives);
     if (draftUploadRef.current || briefUploadRef.current) throw new Error('Wait for draft and brief uploads to finish.');
     if (writingOperationLock.current || feedbackSaveLock.current) throw new Error('Wait for the current operation to finish before planning.');
     writingOperationLock.current = true;
@@ -837,7 +839,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
   const approveEditorialPlan = () => {
     if (!editorialPlan) throw new Error('Create an edit plan before rewriting.');
     if (writingOperationLock.current) throw new Error('Wait for the current operation to finish.');
-    const sources = validatePlanSources(draftText, projectBrief, readerPurpose, editorialPreferences);
+    const sources = validatePlanSources(draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives);
     const plan = validateEditorialPlan(editorialPlan.plan, sources);
     const approved = { ...editorialPlan, plan, sources, approved: true };
     setEditorialPlan(approved);
@@ -850,7 +852,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     }
     const currentPlan = approvedSnapshot || editorialPlan;
     if (!currentPlan) throw new Error('Create and approve an edit plan before rewriting.');
-    const approvedPlan = validateApprovedPlan(currentPlan, { draft: draftText, projectBrief, readerPurpose, editorialPreferences });
+    const approvedPlan = validateApprovedPlan(currentPlan, { draft: draftText, projectBrief, readerPurpose, editorialPreferences, customInstructions: customDirectives });
 
     if (!beginWritingOperation(projectBrief, readerPurpose)) return;
     try {

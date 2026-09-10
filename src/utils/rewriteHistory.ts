@@ -34,7 +34,7 @@ function isSavedRewrite(value: any): boolean {
     || !optional(value.historicalAssessment, (item) => typeof item === 'boolean')
     || !optional(value.feedbackItems, isRewriteFeedback)) return false;
   try {
-    validateApprovedPlan(value.editorialPlan, { draft: value.originalText, projectBrief: value.projectBrief || '', readerPurpose: value.readerPurpose || '', editorialPreferences: value.editorialPreferences });
+    validateApprovedPlan(value.editorialPlan, { draft: value.originalText, projectBrief: value.projectBrief || '', readerPurpose: value.readerPurpose || '', editorialPreferences: value.editorialPreferences, customInstructions: value.editorialPlan?.sources?.customInstructions });
   } catch { return false; }
   if (!optional(value.readerPurpose, (item) => typeof item === 'string' && item.length <= READER_PURPOSE_MAX_CHARS)) return false;
   if (!optional(value.editorialPreferences, (item) => typeof item === 'string' && item.length <= EDITORIAL_PREFERENCES_MAX_CHARS)) return false;

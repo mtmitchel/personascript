@@ -96,7 +96,6 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
     : [...current, key]);
 
   const actions = (key: string, instruction: string) => <div className="review-actions">
-    {onCompareSources && <button type="button" onClick={onCompareSources}>Compare sources</button>}
     {onRequestEdit && <button type="button" onClick={() => onRequestEdit(instruction)}>Edit this issue</button>}
     <button
       type="button"
@@ -134,10 +133,10 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
   const status = unavailable
     ? 'Review unavailable. Your draft is still available.'
     : actionableCount > 0
-      ? `Review flagged ${actionableCount} possible ${actionableCount === 1 ? 'issue' : 'issues'}. Compare the passages before editing.`
+      ? `${actionableCount} possible ${actionableCount === 1 ? 'issue' : 'issues'}. Check the passages before editing.`
       : failedChecks.length > 0
-        ? 'No reviewer issues were flagged. Supporting checks found possible text differences.'
-        : 'No reviewer issues were flagged. Give the draft a final read.';
+        ? 'No issues flagged. Text checks found differences.'
+        : 'No issues flagged. Give the draft a final read.';
 
   return <section id={id} className="review-panel">
     <p className="review-status">{status}</p>
@@ -154,8 +153,8 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
     })}
 
     {failedChecks.length > 0 && <details className="studio-notes">
-      <summary>Supporting checks ({failedChecks.length})</summary>
-      <p className="review-explanation">These checks compare protected text by occurrence count. They help locate passages for review; they do not establish a factual change.</p>
+      <summary>Text checks ({failedChecks.length})</summary>
+      <p className="review-explanation">Counts show text differences, not necessarily errors.</p>
       {onCompareSources && <button type="button" onClick={onCompareSources} className="underline">Compare sources</button>}
       {failedChecks.map((check) => {
         const missing = [...new Set(check.missing || [])];
@@ -173,16 +172,16 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
     </details>}
 
     {checked.length > 0 && <p className="review-explanation" role="status">
-      {checked.length} {checked.length === 1 ? 'issue' : 'issues'} marked reviewed for this session only. This does not change the saved review or the draft.
+      {checked.length} {checked.length === 1 ? 'issue' : 'issues'} marked reviewed this session.
     </p>}
 
-    <details className="studio-notes"><summary>Review commentary &amp; details</summary>
+    <details className="studio-notes"><summary>Review details</summary>
       <p>{review.summary}</p>
       {findings.filter((finding) => finding.severity === 'info').map((finding, index) => <p key={index}>{finding.detail}</p>)}
       {(review.voiceObservations || []).map((observation, index) => <p key={index}>{observation}</p>)}
       {checks.filter((check) => check.passed).map((check) => <p key={check.kind}>{check.detail}</p>)}
       <p>{unavailable ? 'Requested reviewer' : 'Reviewer'}: {review.modelUsed ? modelDisplayName(review.modelUsed) : 'Not recorded'}</p>
-      <p>Reviewer observations are advisory. Marking an issue reviewed is session-only; it does not change the review or the draft.</p>
+      <p>Review notes may be wrong. Marking reviewed does not edit the draft.</p>
       {onConfigureReviewer && <button type="button" onClick={onConfigureReviewer} className="underline">Change reviewer</button>}
     </details>
   </section>;
