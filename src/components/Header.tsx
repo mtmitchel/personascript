@@ -80,11 +80,13 @@ export const Header: React.FC = () => {
             </span>
             <button
               id="btn-reset-demo"
+              aria-label="Reset voice and model presets"
               title="Reset voice and model presets"
               onClick={() => setShowResetConfirm(true)}
-              className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors"
+              className="text-xs text-neutral-600 hover:text-neutral-900 flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-neutral-100 transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5 text-neutral-500" />
+              <span>Reset presets</span>
             </button>
           </div>
         </div>

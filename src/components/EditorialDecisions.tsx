@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import type { EditorialConflict, EditorialPlan, EditorialPlanState } from '../types';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { compactPlanText, planPreview, planStaleReasons, sectionPlan, uncoveredParagraphRefs, type PlanSection } from '../utils/editorialSummary';
+import { compactPlanText, planPreview, planStaleReasons, sectionPlan, uncoveredParagraphRefs, type PlanSection, type PlanSectionGroup } from '../utils/editorialSummary';
 
 type Response = NonNullable<EditorialPlan['items'][number]['response']>;
 
@@ -45,7 +45,7 @@ export const EditorialDecisions: React.FC = () => {
   const { plan } = editorialPlan;
 
   // A plan in the earlier per-paragraph format is replaced, not reviewed.
-  if (plan.version !== 3 && !editorialPlan.approved) {
+  if (plan.version !== 3 && plan.version !== 4 && !editorialPlan.approved) {
     return (
       <p className="studio-notice is-warning" role="status">
         These suggestions were prepared paragraph by paragraph. Get new suggestions to review them by section.
@@ -82,8 +82,29 @@ export const EditorialDecisions: React.FC = () => {
     editEditorialPlan({ ...plan, ...(requests.length ? { requests } : { requests: undefined }) });
   };
 
+  const changes = plan.items.filter(item => item.decision !== 'keep');
+  const total = changes.length;
+  const answered = changes.filter(item => Boolean(item.response)).length;
+  const pending = note.pending;
+
+  const acceptAllPending = () => {
+    editEditorialPlan({
+      ...plan,
+      items: plan.items.map(item => {
+        if (item.decision !== 'keep' && !item.response) {
+          return { ...item, response: 'accepted' as const };
+        }
+        return item;
+      }),
+    });
+  };
+
   const renderSuggestion = (section: PlanSection) => {
     const response = section.item.response;
+    const limit = section.item.limit.trim();
+    // A keep with a limit is a statement the writer must respect, not a
+    // question for the author; it carries no accept/reject controls.
+    const answerable = section.item.decision !== 'keep';
     return (
       <li
         key={section.index}
@@ -99,8 +120,9 @@ export const EditorialDecisions: React.FC = () => {
             {section.item.idea.trim() && <> — {compactPlanText(section.item.idea)}</>}
           </p>
           {section.item.reason?.trim() && <p className="studio-note-reason">{compactPlanText(section.item.reason)}</p>}
+          {limit && <p className="studio-note-reason">Do not go beyond: {compactPlanText(limit)}</p>}
         </div>
-        {!readOnly && (
+        {!readOnly && answerable && (
           <div className="studio-note-actions">
             {response ? (
               <>
@@ -117,6 +139,39 @@ export const EditorialDecisions: React.FC = () => {
           </div>
         )}
       </li>
+    );
+  };
+
+  /** One disclosure group per section: name and count, then a row per suggestion. */
+  const renderSectionGroup = (group: PlanSectionGroup, heading: 'h3' | 'h4') => {
+    const rows = group.items.filter(section => section.item.decision !== 'keep' || section.item.limit.trim());
+    const unchanged = group.items.filter(section => section.item.decision === 'keep' && !section.item.limit.trim());
+    const Heading = heading;
+    return (
+      <details
+        key={`${group.from}-${group.to}`}
+        className="studio-note-section"
+        open={group.changes > 0 || group.limited > 0}
+      >
+        <summary>
+          <Heading className="studio-note-name">{group.name}</Heading>
+          <span className="studio-note-state">
+            {group.changes > 0 ? `${group.changes} change${group.changes === 1 ? '' : 's'}` : 'Unchanged'}
+          </span>
+        </summary>
+        {rows.length > 0 && <ul>{rows.map(renderSuggestion)}</ul>}
+        {unchanged.length > 0 && (
+          <p className="studio-note-kept">
+            Unchanged:{' '}
+            {unchanged.map((section, position) => (
+              <React.Fragment key={section.index}>
+                {position > 0 && <span aria-hidden="true"> · </span>}
+                <span onMouseEnter={() => highlightRange(section.from, section.to)} onMouseLeave={clearHighlight}>{section.name}</span>
+              </React.Fragment>
+            ))}
+          </p>
+        )}
+      </details>
     );
   };
 
@@ -197,33 +252,18 @@ export const EditorialDecisions: React.FC = () => {
         <p className="studio-note-opening">No section changes suggested; the rewrite adjusts wording only.</p>
       )}
 
-      {note.cuts.length > 0 && (
-        <div className="studio-note-group">
-          <h3 className="studio-note-heading">Cut</h3>
-          <ul>{note.cuts.map(renderSuggestion)}</ul>
+      {total > 0 && (
+        <div className="studio-note-summary">
+          <span>{answered} of {total} suggestions answered</span>
+          {!readOnly && pending > 0 && (
+            <button type="button" className="studio-text-button" onClick={acceptAllPending}>
+              Accept all
+            </button>
+          )}
         </div>
       )}
 
-      {note.tightens.length > 0 && (
-        <div className="studio-note-group">
-          <h3 className="studio-note-heading">Tighten</h3>
-          <ul>{note.tightens.map(renderSuggestion)}</ul>
-        </div>
-      )}
-
-      {note.keeps.length > 0 && (
-        <div className="studio-note-group">
-          <h3 className="studio-note-heading">Unchanged</h3>
-          <p className="studio-note-kept">
-            {note.keeps.map((section, position) => (
-              <React.Fragment key={section.index}>
-                {position > 0 && <span aria-hidden="true"> · </span>}
-                <span onMouseEnter={() => highlightRange(section.from, section.to)} onMouseLeave={clearHighlight}>{section.name}</span>
-              </React.Fragment>
-            ))}
-          </p>
-        </div>
-      )}
+      {note.sections.map(group => renderSectionGroup(group, 'h3'))}
     </div>
   );
 };
@@ -231,7 +271,6 @@ export const EditorialDecisions: React.FC = () => {
 /** Read-only view of the suggestions a saved version followed. */
 export const SavedEditorialDecisions: React.FC<{ state: EditorialPlanState }> = ({ state }) => {
   const note = sectionPlan(state.plan, state.sources.draft);
-  const changes: Array<[string, PlanSection[]]> = [['Cut', note.cuts], ['Tighten', note.tightens]];
   return (
     <div className="studio-note is-saved">
       <p className="studio-note-opening">{compactPlanText(state.plan.openingJob)}</p>
@@ -252,30 +291,39 @@ export const SavedEditorialDecisions: React.FC<{ state: EditorialPlanState }> = 
           </ul>
         </div>
       )}
-      {changes.filter(([, sections]) => sections.length > 0).map(([label, sections]) => (
-        <div key={label} className="studio-note-group">
-          <h4 className="studio-note-heading">{label}</h4>
-          <ul>
-            {sections.map(section => (
-              <li key={section.index} className="studio-note-row">
-                <div className="studio-note-row-text">
-                  <p>
-                    <span className="studio-note-name">{section.name}</span>
-                    {section.item.idea.trim() && <> — {compactPlanText(section.item.idea)}</>}
-                  </p>
-                  {section.item.reason?.trim() && <p className="studio-note-reason">{compactPlanText(section.item.reason)}</p>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-      {note.keeps.length > 0 && (
-        <div className="studio-note-group">
-          <h4 className="studio-note-heading">Unchanged</h4>
-          <p className="studio-note-kept">{note.keeps.map(section => section.name).join(' · ')}</p>
-        </div>
-      )}
+      {note.sections.map(group => {
+        const rows = group.items.filter(section => section.item.decision !== 'keep' || section.item.limit.trim());
+        const unchanged = group.items.filter(section => section.item.decision === 'keep' && !section.item.limit.trim());
+        return (
+          <details key={`${group.from}-${group.to}`} className="studio-note-section" open={group.changes > 0}>
+            <summary>
+              <h4 className="studio-note-name">{group.name}</h4>
+              <span className="studio-note-state">
+                {group.changes > 0 ? `${group.changes} change${group.changes === 1 ? '' : 's'}` : 'Unchanged'}
+              </span>
+            </summary>
+            {rows.length > 0 && (
+              <ul>
+                {rows.map(section => (
+                  <li key={section.index} className="studio-note-row">
+                    <div className="studio-note-row-text">
+                      <p>
+                        <span className="studio-note-name">{section.name}</span>
+                        {section.item.idea.trim() && <> — {compactPlanText(section.item.idea)}</>}
+                      </p>
+                      {section.item.reason?.trim() && <p className="studio-note-reason">{compactPlanText(section.item.reason)}</p>}
+                      {section.item.limit.trim() && <p className="studio-note-reason">Do not go beyond: {compactPlanText(section.item.limit)}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {unchanged.length > 0 && (
+              <p className="studio-note-kept">Unchanged: {unchanged.map(section => section.name).join(' · ')}</p>
+            )}
+          </details>
+        );
+      })}
     </div>
   );
 };

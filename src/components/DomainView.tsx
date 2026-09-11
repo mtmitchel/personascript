@@ -1,30 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { DomainExpertise, DomainTopic, ProductReference } from '../types';
+import { DomainExpertise } from '../types';
 import {
   Plus,
   X,
-  ArrowRight,
   Check,
-  ListPlus,
-  Sparkles,
   Layers,
-  Globe,
-  DollarSign,
-  Cpu,
-  Bot,
-  Sliders,
-  RotateCcw,
-  Tag,
-  BookOpen,
-  ChevronDown,
-  ChevronUp,
-  Package,
-  RefreshCw,
-  Trash2,
-  AlertCircle,
 } from 'lucide-react';
 import { normalizeDomainExpertise } from '../writingPipeline';
+import { DomainTopicsSection } from './DomainTopicsSection';
+import { DomainProductsSection } from './DomainProductsSection';
+import { StepFooter } from './StepFooter';
 
 export const DomainView: React.FC = () => {
   const {
@@ -48,27 +34,6 @@ export const DomainView: React.FC = () => {
 
   const [newDisciplineInput, setNewDisciplineInput] = useState('');
   const [savedFeedback, setSavedFeedback] = useState(false);
-  const generationBusy = useRef(false);
-  const generationController = useRef<AbortController | null>(null);
-  const [generatingTopicId, setGeneratingTopicId] = useState<string | null>(null);
-  const [topicGenerationError, setTopicGenerationError] = useState<{ id: string; message: string } | null>(null);
-
-  useEffect(() => () => generationController.current?.abort(), []);
-  const [focusProductId, setFocusProductId] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-
-  // Quick state for adding a new topic
-  const [isAddingTopic, setIsAddingTopic] = useState(false);
-  const [newTopicName, setNewTopicName] = useState('');
-  const [newTopicCategory, setNewTopicCategory] = useState<'discipline' | 'intersecting'>('intersecting');
-  const [newTopicDesc, setNewTopicDesc] = useState('');
-  const [newTopicTerms, setNewTopicTerms] = useState('');
-  const [newTopicConventions, setNewTopicConventions] = useState('');
-
-  // Per-topic inline term input states: { [topicId]: string }
-  const [topicTermInputs, setTopicTermInputs] = useState<Record<string, string>>({});
-  const [expandedTopicIds, setExpandedTopicIds] = useState<Set<string>>(new Set());
 
   // Unified guidelines text
   const [guidelinesText, setGuidelinesText] = useState<string>(() => {
@@ -84,16 +49,8 @@ export const DomainView: React.FC = () => {
   // Sync from context when changed externally
   useEffect(() => {
     setLocalExpertise(normalizeDomainExpertise(domainExpertise));
-
     setGuidelinesText(domainExpertise.customNotes ?? (domainExpertise.conventions || []).join('\n'));
   }, [domainExpertise]);
-
-  useEffect(() => {
-    if (focusProductId) {
-      document.getElementById(`product-name-${focusProductId}`)?.focus();
-      setFocusProductId(null);
-    }
-  }, [focusProductId, localExpertise.productKnowledge]);
 
   const flashSaved = () => {
     setSavedFeedback(true);
@@ -158,306 +115,6 @@ export const DomainView: React.FC = () => {
     updateDomainExpertise(updated);
   };
 
-  // Toggle a topic on/off
-  const handleToggleTopic = (topicId: string) => {
-    const currentTopics = localExpertise.topics || [];
-    const updatedTopics = currentTopics.map((t) =>
-      t.id === topicId ? { ...t, enabled: !t.enabled } : t
-    );
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-  };
-
-  // Add term to a specific topic
-  const handleAddTermToTopic = (topicId: string) => {
-    const raw = (topicTermInputs[topicId] || '').trim();
-    if (!raw) return;
-
-    const newTerms = raw.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
-    const currentTopics = localExpertise.topics || [];
-    const updatedTopics = currentTopics.map((topic) => {
-      if (topic.id !== topicId) return topic;
-      const existing = topic.keyTerminology || [];
-      const added = newTerms.filter((term) => !existing.includes(term));
-      return {
-        ...topic,
-        keyTerminology: [...existing, ...added],
-      };
-    });
-
-    setTopicTermInputs((prev) => ({ ...prev, [topicId]: '' }));
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-  };
-
-  // Remove term from a specific topic
-  const handleRemoveTermFromTopic = (topicId: string, termToRemove: string) => {
-    const currentTopics = localExpertise.topics || [];
-    const updatedTopics = currentTopics.map((topic) => {
-      if (topic.id !== topicId) return topic;
-      const remainingTerms = (topic.keyTerminology || []).filter((t) => t !== termToRemove);
-      let updatedAnnotations = topic.conceptAnnotations ? { ...topic.conceptAnnotations } : undefined;
-      if (updatedAnnotations) {
-        delete updatedAnnotations[termToRemove];
-        delete updatedAnnotations[termToRemove.toLowerCase()];
-      }
-      return {
-        ...topic,
-        keyTerminology: remainingTerms,
-        conceptAnnotations: updatedAnnotations && Object.keys(updatedAnnotations).length > 0 ? updatedAnnotations : undefined,
-      };
-    });
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-  };
-
-  // Add convention to a specific topic
-  const handleAddConventionToTopic = (topicId: string) => {
-    const rule = window.prompt('Enter new rule or convention for this topic:');
-    if (!rule || !rule.trim()) return;
-
-    const currentTopics = localExpertise.topics || [];
-    const updatedTopics = currentTopics.map((topic) => {
-      if (topic.id !== topicId) return topic;
-      return {
-        ...topic,
-        conventions: [...(topic.conventions || []), rule.trim()],
-      };
-    });
-
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-  };
-
-  // Remove convention from a specific topic
-  const handleRemoveConventionFromTopic = (topicId: string, index: number) => {
-    const currentTopics = localExpertise.topics || [];
-    const updatedTopics = currentTopics.map((topic) => {
-      if (topic.id !== topicId) return topic;
-      const filtered = (topic.conventions || []).filter((_, i) => i !== index);
-      return {
-        ...topic,
-        conventions: filtered,
-      };
-    });
-
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-  };
-
-  // Create new custom topic
-  const handleCreateTopic = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTopicName.trim()) return;
-
-    const terms = newTopicTerms
-      .split(/[,;]/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    const conventions = newTopicConventions
-      .split('\n')
-      .map((c) => c.trim().replace(/^[•\-\*]\s*/, ''))
-      .filter(Boolean);
-
-    const newTopic: DomainTopic = {
-      id: `topic-${Date.now()}`,
-      name: newTopicName.trim(),
-      category: newTopicCategory,
-      description: newTopicDesc.trim() || undefined,
-      keyTerminology: terms,
-      conventions: conventions,
-      enabled: true,
-    };
-
-    const updatedTopics = [...(localExpertise.topics || []), newTopic];
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-
-    // Reset creator state
-    setNewTopicName('');
-    setNewTopicDesc('');
-    setNewTopicTerms('');
-    setNewTopicConventions('');
-    setIsAddingTopic(false);
-  };
-
-  // Delete a topic
-  const handleDeleteTopic = (topicId: string) => {
-    const updatedTopics = (localExpertise.topics || []).filter((t) => t.id !== topicId);
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
-    });
-  };
-
-  // Product reference knowledge management
-  const createLocalProductId = () => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return `product-${crypto.randomUUID()}`;
-    }
-    return `product-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  };
-
-  const handleAddProduct = () => {
-    const newId = createLocalProductId();
-    const newProduct: ProductReference = {
-      id: newId,
-      name: '',
-      notes: '',
-      enabled: true,
-    };
-    saveExpertise({
-      ...localExpertise,
-      productKnowledge: [...(localExpertise.productKnowledge || []), newProduct],
-    });
-    setFocusProductId(newId);
-  };
-
-  const handleUpdateProduct = (id: string, updates: Partial<ProductReference>) => {
-    const updated = (localExpertise.productKnowledge || []).map((p) =>
-      p.id === id ? { ...p, ...updates } : p
-    );
-    saveExpertise({
-      ...localExpertise,
-      productKnowledge: updated,
-    });
-  };
-
-  const handleDeleteProduct = (id: string) => {
-    const updated = (localExpertise.productKnowledge || []).filter((p) => p.id !== id);
-    saveExpertise({
-      ...localExpertise,
-      productKnowledge: updated,
-    });
-  };
-
-  const handleGenerateKnowledge = async (targetTopic?: DomainTopic) => {
-    if (generationBusy.current || sourceUploadPending) return;
-    generationBusy.current = true;
-    const controller = new AbortController();
-    generationController.current = controller;
-    if (targetTopic) {
-      setGeneratingTopicId(targetTopic.id);
-      setTopicGenerationError(null);
-    } else {
-      setIsGenerating(true);
-      setGenerationError(null);
-    }
-
-    try {
-      const existingTopicNames = (localExpertise.topics || [])
-        .map((t) => t.name)
-        .filter(Boolean);
-
-      const requestBody: Record<string, unknown> = {
-        field: localExpertise.field || (localExpertise.disciplines || []).join(' & '),
-        disciplines: localExpertise.disciplines || [],
-        existingTopics: targetTopic ? [] : existingTopicNames,
-        targetTopic: targetTopic ? { name: targetTopic.name, category: targetTopic.category === 'discipline' ? 'discipline' : 'intersecting' } : undefined,
-        model: modelSettings.analysisModel || 'gemini-3.1-pro-preview',
-        reasoningLevel: modelSettings.analysisReasoningLevel || 'auto',
-      };
-
-      if (useDraftAndBrief) {
-        if (draftText.trim()) requestBody.draft = draftText;
-        if (projectBrief.trim()) requestBody.projectBrief = projectBrief;
-      }
-
-      const res = await fetch('/api/generate-domain-knowledge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to generate domain knowledge');
-      }
-
-      const { topics: newTopics } = await res.json();
-      if (!Array.isArray(newTopics) || newTopics.length === 0) {
-        throw new Error('No domain topics returned by the server.');
-      }
-
-      if (controller.signal.aborted) return;
-      if (targetTopic) {
-        if (newTopics.length !== 1 || newTopics[0].name !== targetTopic.name.trim() ||
-            newTopics[0].category !== (targetTopic.category === 'discipline' ? 'discipline' : 'intersecting')) {
-          throw new Error('The model did not return the requested card. Your card has been kept.');
-        }
-        updateDomainExpertise((prev) => ({
-          ...prev,
-          topics: (prev.topics || []).map((topic) => topic.id === targetTopic.id
-            ? {
-                ...topic,
-                description: newTopics[0].description,
-                keyTerminology: newTopics[0].keyTerminology,
-                conceptAnnotations: newTopics[0].conceptAnnotations,
-                conventions: newTopics[0].conventions,
-              }
-            : topic),
-        }));
-      } else {
-        updateDomainExpertise((prev) => ({
-          ...prev,
-          topics: newTopics,
-          keyTerminology: [],
-          conventions: [],
-        }));
-      }
-      flashSaved();
-    } catch (err: any) {
-      if (controller.signal.aborted) return;
-      const message = err.message || 'Failed to generate domain knowledge';
-      if (targetTopic) setTopicGenerationError({ id: targetTopic.id, message });
-      else setGenerationError(message);
-    } finally {
-      generationBusy.current = false;
-      generationController.current = null;
-      setIsGenerating(false);
-      setGeneratingTopicId(null);
-    }
-  };
-
-  const handleClearTopic = (topicId: string) => {
-    if (isGenerating || generatingTopicId === topicId) return;
-    setTopicGenerationError((prev) => prev?.id === topicId ? null : prev);
-    setTopicTermInputs((prev) => ({ ...prev, [topicId]: '' }));
-    updateDomainExpertise((prev) => ({
-      ...prev,
-      topics: (prev.topics || []).map((topic) => topic.id === topicId
-        ? { ...topic, description: undefined, keyTerminology: [], conceptAnnotations: undefined, conventions: [] }
-        : topic),
-    }));
-    flashSaved();
-  };
-
-  const handleClearTopics = () => {
-    if (generationBusy.current) return;
-    setGenerationError(null);
-    const updated: DomainExpertise = {
-      ...localExpertise,
-      topics: [],
-      keyTerminology: [],
-      conventions: [],
-    };
-    saveExpertise(updated);
-  };
-
   const handleGuidelinesChange = (val: string) => {
     setGuidelinesText(val);
     const updated = {
@@ -468,25 +125,7 @@ export const DomainView: React.FC = () => {
     updateDomainExpertise(updated);
   };
 
-  const getTopicIcon = (name: string, category?: string) => {
-    const lower = name.toLowerCase();
-    if (lower.includes('monetiz') || lower.includes('pricing') || lower.includes('conversion')) {
-      return <DollarSign className="w-3.5 h-3.5 text-emerald-600" />;
-    }
-    if (lower.includes('translation') || lower.includes('localiz') || lower.includes('i18n')) {
-      return <Globe className="w-3.5 h-3.5 text-sky-600" />;
-    }
-    if (lower.includes('writing assist') || lower.includes('ai') || lower.includes('bot')) {
-      return <Bot className="w-3.5 h-3.5 text-amber-600" />;
-    }
-    if (category === 'discipline' || lower.includes('copywriting') || lower.includes('content design')) {
-      return <BookOpen className="w-3.5 h-3.5 text-neutral-800" />;
-    }
-    return <Layers className="w-3.5 h-3.5 text-neutral-600" />;
-  };
-
   const topicsList = localExpertise.topics || [];
-  const hasTopics = topicsList.length > 0;
   const activeTopicCount = topicsList.filter((t) => t.enabled).length;
   const activeProductCount = (localExpertise.productKnowledge || []).filter((p) => p.enabled).length;
 
@@ -495,54 +134,45 @@ export const DomainView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
-              Domain & Product Knowledge
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
-              {localExpertise.enabled ? 'Knowledge enabled' : 'Knowledge off'}
-            </span>
-          </div>
-          <p className="text-xs text-neutral-500 mt-1">
-            Step 4 of 5 · Review the relevant concepts and product facts. Next, create the edit plan and rewrite in Studio.
+          <p className="mb-2 text-xs font-medium text-neutral-500">Step 4 of 5</p>
+          <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+            Domain Knowledge
+          </h1>
+          <p className="text-xs text-neutral-500 mt-1 max-w-xl">
+            Review the relevant concepts and product facts. Next, create the edit plan and rewrite in Studio.
           </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer select-none">
-            <input
-              id="toggle-domain-enable"
-              type="checkbox"
-              checked={localExpertise.enabled}
-              onChange={(e) => handleToggleEnabled(e.target.checked)}
-              className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900"
-            />
-            <div className="flex flex-col">
-              <span className="font-medium">Active in rewrites</span>
-              <span className="text-[10px] text-neutral-400">Controls all domain topics and product references</span>
-            </div>
-          </label>
-
-          {savedFeedback && (
-            <span className="text-xs text-emerald-700 flex items-center gap-1 font-medium animate-in fade-in">
-              <Check className="w-3.5 h-3.5" />
-              Saved
-            </span>
-          )}
-
-          <button
-            id="btn-domain-to-studio"
-            type="button"
-            onClick={() => setActiveTab('studio')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
-          >
-            <span>Continue to Rewrite Studio</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
 
-      {/* Top Overview Bar */}
+      {/* Switch row */}
+      <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+        <label htmlFor="toggle-domain-enable" className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            id="toggle-domain-enable"
+            type="checkbox"
+            checked={localExpertise.enabled}
+            onChange={(e) => handleToggleEnabled(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer"
+          />
+          <div>
+            <span className="text-sm font-medium text-neutral-900 block">
+              Use this knowledge in rewrites
+            </span>
+            <span className="text-xs text-neutral-500">
+              Off means the writer ignores every topic and product below.
+            </span>
+          </div>
+        </label>
+
+        {savedFeedback && (
+          <span className="text-xs text-emerald-700 flex items-center gap-1 font-medium animate-in fade-in">
+            <Check className="w-3.5 h-3.5" />
+            Saved
+          </span>
+        )}
+      </div>
+
+      {/* Overview bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-1">
           <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
@@ -595,13 +225,13 @@ export const DomainView: React.FC = () => {
         </div>
       </div>
 
-      {/* Disciplines & Target Audience Row */}
+      {/* Section 1 — Fields and audience */}
       <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
           <div>
             <h2 className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
               <Layers className="w-4 h-4 text-neutral-700" />
-              <span>Core Disciplines & Audience Context</span>
+              <span>Fields and audience</span>
             </h2>
             <p className="text-xs text-neutral-500 mt-0.5">
               Specify the primary disciplines that frame your writing and portfolio case studies.
@@ -654,7 +284,7 @@ export const DomainView: React.FC = () => {
                 id="btn-add-discipline"
                 onClick={handleAddDiscipline}
                 disabled={!newDisciplineInput.trim()}
-                className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition disabled:opacity-40 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs disabled:opacity-40 flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add</span>
@@ -682,629 +312,28 @@ export const DomainView: React.FC = () => {
         </div>
       </div>
 
-      {/* Intersecting Fields & Topics Cards */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-neutral-900 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-neutral-800" />
-                <span>Intersecting Fields, Disciplines & Topics</span>
-              </h2>
-              <span className="text-[11px] font-mono text-neutral-400">
-                Model: {modelSettings.analysisModel || 'gemini-3.1-pro-preview'}
-              </span>
-            </div>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              Choose the fields the model should draw on. Concepts are examples to recognize when relevant, not a list of words to include.
-            </p>
-            {hasTopics && (
-              <p className="text-[11px] text-neutral-400 mt-0.5">
-                Use Clear or Regenerate on a card to change only that card. Clear keeps its name and empties its description, concepts, and rules.
-              </p>
-            )}
-          </div>
+      {/* Section 2 — Topics */}
+      <DomainTopicsSection
+        localExpertise={localExpertise}
+        saveExpertise={saveExpertise}
+        updateDomainExpertise={updateDomainExpertise}
+        flashSaved={flashSaved}
+        modelSettings={modelSettings}
+        draftText={draftText}
+        projectBrief={projectBrief}
+        sourceUploadPending={sourceUploadPending}
+        useDraftAndBrief={useDraftAndBrief}
+        setUseDraftAndBrief={setUseDraftAndBrief}
+        onEditDraftBrief={() => setActiveTab('draft-brief')}
+      />
 
-          <div className="flex items-center gap-2 self-start flex-wrap">
-            {hasTopics && (
-              <>
-                <button
-                  type="button"
-                  id="btn-regenerate-topics"
-                  disabled={isGenerating || generatingTopicId !== null || sourceUploadPending}
-                  onClick={() => handleGenerateKnowledge()}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
-                  title="Regenerate topics and concepts from your configured fields (replaces this section)"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-neutral-500 ${isGenerating ? 'animate-spin' : ''}`} />
-                  <span>{isGenerating ? 'Regenerating all...' : 'Regenerate all'}</span>
-                </button>
+      {/* Section 3 — Products */}
+      <DomainProductsSection
+        localExpertise={localExpertise}
+        saveExpertise={saveExpertise}
+      />
 
-                <button
-                  type="button"
-                  id="btn-clear-topics"
-                  disabled={isGenerating || generatingTopicId !== null}
-                  onClick={handleClearTopics}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition shadow-2xs disabled:opacity-50"
-                  title="Clear all topics and concept examples from this section"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Clear all</span>
-                </button>
-              </>
-            )}
-
-            <button
-              type="button"
-              id="btn-open-add-topic"
-              disabled={isGenerating}
-              onClick={() => setIsAddingTopic(!isAddingTopic)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5 text-neutral-600" />
-              <span>Add field or topic</span>
-            </button>
-          </div>
-        </div>
-
-          {/* Source-Aware Checkbox and Edit Link */}
-          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-neutral-50 rounded-xl border border-neutral-200">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <input
-                type="checkbox"
-                id="checkbox-use-draft-brief"
-                checked={useDraftAndBrief}
-                disabled={isGenerating || generatingTopicId !== null}
-                onChange={(e) => setUseDraftAndBrief(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer shrink-0"
-              />
-              <div>
-                <label htmlFor="checkbox-use-draft-brief" className="text-xs font-medium text-neutral-900 cursor-pointer block">
-                  Use draft and brief
-                </label>
-                <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
-                  Generation uses your draft and brief to identify supported concepts and adjacent ideas. Labels reflect the sources used when generated; review them when your draft or brief changes.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              id="btn-link-edit-draft-brief"
-              onClick={() => setActiveTab('draft-brief')}
-              className="text-xs text-neutral-700 hover:text-neutral-900 font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded border border-neutral-200 bg-white hover:bg-neutral-50 transition"
-            >
-              <span>Edit draft &amp; brief</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-
-        {sourceUploadPending && (
-          <p role="status" className="text-xs text-neutral-600">Waiting for draft and brief uploads to finish before generating concepts.</p>
-        )}
-
-        {generationError && (
-          <div
-            id="domain-generation-error"
-            className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between animate-in fade-in"
-          >
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{generationError}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setGenerationError(null)}
-              className="text-rose-500 hover:text-rose-700 p-1 rounded"
-              title="Dismiss error"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Add New Topic Form */}
-        <fieldset disabled={isGenerating} className="space-y-4 min-w-0">
-        {isAddingTopic && (
-          <form
-            onSubmit={handleCreateTopic}
-            className="p-4 rounded-xl bg-neutral-50 border border-neutral-300 space-y-3.5 animate-in fade-in"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-neutral-900">Add New Topic or Discipline</h3>
-              <button
-                type="button"
-                onClick={() => setIsAddingTopic(false)}
-                className="text-neutral-400 hover:text-neutral-700"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-neutral-700 block mb-1">
-                  Topic Name
-                </label>
-                <input
-                  type="text"
-                  value={newTopicName}
-                  onChange={(e) => setNewTopicName(e.target.value)}
-                  placeholder="e.g. Growth Experimentation & A/B Testing"
-                  className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-neutral-700 block mb-1">
-                  Category
-                </label>
-                <select
-                  value={newTopicCategory}
-                  onChange={(e) => setNewTopicCategory(e.target.value as any)}
-                  className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
-                >
-                  <option value="intersecting">Intersecting Topic</option>
-                  <option value="discipline">Core Discipline</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-medium text-neutral-700 block mb-1">
-                Short Description
-              </label>
-              <input
-                type="text"
-                value={newTopicDesc}
-                onChange={(e) => setNewTopicDesc(e.target.value)}
-                placeholder="e.g. Conversion funnels, hypothesis testing, uplift metrics, sample size"
-                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-neutral-700 block mb-1">
-                  Concept examples (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={newTopicTerms}
-                  onChange={(e) => setNewTopicTerms(e.target.value)}
-                  placeholder="statistical significance, variance, primary metric, baseline"
-                  className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-neutral-700 block mb-1">
-                  Conventions & Rules (one per line)
-                </label>
-                <textarea
-                  rows={2}
-                  value={newTopicConventions}
-                  onChange={(e) => setNewTopicConventions(e.target.value)}
-                  placeholder="Always report both relative and absolute uplift&#10;Tie microcopy changes to behavioral metrics"
-                  className="w-full text-xs p-2 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setIsAddingTopic(false)}
-                className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-3.5 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-medium hover:bg-neutral-800"
-              >
-                Save Topic
-              </button>
-            </div>
-          </form>
-        )}
-
-        {!hasTopics ? (
-          <div className="p-8 rounded-xl bg-neutral-50/70 border border-dashed border-neutral-300 text-center space-y-3">
-            <Sparkles className="w-6 h-6 text-neutral-400 mx-auto" />
-            <div className="space-y-1">
-              <h3 className="text-xs font-semibold text-neutral-800">
-                No domain topics generated yet
-              </h3>
-              <p className="text-[11px] text-neutral-500 max-w-md mx-auto leading-relaxed">
-                Generate broad domain disciplines, intersecting topics, and concept examples based on your configured core disciplines above. You can also add topics manually.
-              </p>
-            </div>
-            <button
-              type="button"
-              id="btn-generate-topics-empty"
-              disabled={isGenerating || sourceUploadPending}
-              onClick={() => handleGenerateKnowledge()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition shadow-xs disabled:opacity-50"
-            >
-              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-              <span>{isGenerating ? 'Generating knowledge...' : 'Generate domain knowledge'}</span>
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {topicsList.map((topic) => {
-            const isExpanded = expandedTopicIds.has(topic.id);
-            const termInputVal = topicTermInputs[topic.id] || '';
-
-            return (
-              <fieldset
-                key={topic.id}
-                id={`topic-card-${topic.id}`}
-                aria-label={topic.name}
-                aria-busy={generatingTopicId === topic.id}
-                disabled={generatingTopicId === topic.id}
-                className={`min-w-0 rounded-xl border transition-all duration-200 p-4 space-y-3.5 ${
-                  topic.enabled
-                    ? 'bg-white border-neutral-300 shadow-xs'
-                    : 'bg-neutral-50/80 border-neutral-200 opacity-60 hover:opacity-100'
-                }`}
-              >
-                {/* Topic Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5 min-w-0">
-                    <input
-                      type="checkbox"
-                      id={`check-topic-${topic.id}`}
-                      checked={topic.enabled}
-                      onChange={() => handleToggleTopic(topic.id)}
-                      className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer"
-                    />
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="p-1 rounded bg-neutral-100 border border-neutral-200 shrink-0">
-                          {getTopicIcon(topic.name, topic.category)}
-                        </span>
-                        <label
-                          htmlFor={`check-topic-${topic.id}`}
-                          className="text-xs font-semibold text-neutral-900 cursor-pointer hover:underline truncate"
-                        >
-                          {topic.name}
-                        </label>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded font-medium border ${
-                            topic.category === 'discipline'
-                              ? 'bg-neutral-100 text-neutral-800 border-neutral-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}
-                        >
-                          {topic.category === 'discipline' ? 'Core Field' : 'Intersecting Topic'}
-                        </span>
-                      </div>
-
-                      {topic.description && (
-                        <p className="text-[11px] text-neutral-500 mt-1 leading-relaxed">
-                          {topic.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedTopicIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(topic.id)) next.delete(topic.id);
-                          else next.add(topic.id);
-                          return next;
-                        })
-                      }
-                      className="text-neutral-400 hover:text-neutral-700 p-1 rounded"
-                      title={isExpanded ? 'Collapse conventions' : 'Expand conventions'}
-                    >
-                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTopic(topic.id)}
-                      className="text-neutral-300 hover:text-rose-600 p-1 rounded transition"
-                      title="Delete topic"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    id={`btn-regenerate-topic-${topic.id}`}
-                    aria-label={`Regenerate ${topic.name}`}
-                    disabled={generatingTopicId !== null || sourceUploadPending}
-                    onClick={() => handleGenerateKnowledge(topic)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${generatingTopicId === topic.id ? 'animate-spin' : ''}`} />
-                    <span>{generatingTopicId === topic.id ? 'Regenerating...' : 'Regenerate'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    id={`btn-clear-topic-${topic.id}`}
-                    aria-label={`Clear ${topic.name}`}
-                    onClick={() => handleClearTopic(topic.id)}
-                    disabled={!topic.description && !topic.keyTerminology?.length && !topic.conventions?.length}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Clear</span>
-                  </button>
-                </div>
-                {topicGenerationError?.id === topic.id && (
-                  <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">
-                    {topicGenerationError.message}
-                  </p>
-                )}
-
-                {/* Terminology Tags */}
-                <div className="space-y-1.5 pt-1 border-t border-neutral-100">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-medium text-neutral-700">Concept examples</span>
-                    <span className="text-neutral-400 font-mono">
-                      {(topic.keyTerminology || []).length} concepts
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    {(topic.keyTerminology || []).map((term) => {
-                      const annotation = topic.conceptAnnotations?.[term] || topic.conceptAnnotations?.[term.toLowerCase()];
-                      const isSupported = annotation?.status === 'supported';
-                      const isAdjacent = annotation?.status === 'adjacent';
-
-                      let badgeClass = 'bg-neutral-100 text-neutral-700 border-neutral-200';
-                      if (isSupported) {
-                        badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
-                      } else if (isAdjacent) {
-                        badgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
-                      }
-
-                      return (
-                        <span
-                          key={term}
-                          title={annotation?.explanation || (isSupported ? 'Supported concept' : isAdjacent ? 'Adjacent suggestion' : undefined)}
-                          className={`inline-flex items-center gap-1 text-[10px] border px-1.5 py-0.5 rounded-md ${badgeClass}`}
-                        >
-                          {isSupported && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
-                          {isAdjacent && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
-                          <span>{term}</span>
-                          {isSupported && <span className="text-[9px] text-emerald-600 font-normal">(supported)</span>}
-                          {isAdjacent && <span className="text-[9px] text-amber-600 font-normal">(adjacent)</span>}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTermFromTopic(topic.id, term)}
-                            className="text-neutral-400 hover:text-neutral-700 ml-0.5"
-                            title={`Remove ${term}`}
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
-
-                  {topic.conceptAnnotations && Object.keys(topic.conceptAnnotations).length > 0 && (
-                    <div className="space-y-1 pt-1">
-                      <div className="text-[10px] text-neutral-500 font-medium">Concept relevance:</div>
-                      <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
-                        {topic.keyTerminology.map((conceptTerm) => {
-                          const annot = topic.conceptAnnotations?.[conceptTerm];
-                          if (!annot) return null;
-                          return (
-                          <div key={conceptTerm} className="text-[10px] leading-snug flex items-start gap-1.5 text-neutral-600">
-                            <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${annot.status === 'supported' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                            <span>
-                              <strong className="text-neutral-800">{conceptTerm}:</strong> {annot.explanation || (annot.status === 'supported' ? 'Demonstrated in source draft or brief.' : 'Related adjacent concept.')}
-                            </span>
-                          </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Add term inline */}
-                  <div className="flex gap-1.5 pt-1">
-                    <input
-                      type="text"
-                      value={termInputVal}
-                      onChange={(e) =>
-                        setTopicTermInputs({ ...topicTermInputs, [topic.id]: e.target.value })
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddTermToTopic(topic.id);
-                        }
-                      }}
-                      placeholder="Add concept (e.g. information hierarchy, comprehension)"
-                      className="flex-1 text-[11px] px-2 py-1 bg-white rounded border border-neutral-200 focus:outline-none focus:border-neutral-900"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddTermToTopic(topic.id)}
-                      disabled={!termInputVal.trim()}
-                      className="px-2 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-medium transition disabled:opacity-40"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Conventions & Writing Rules */}
-                <div className="space-y-1 pt-1 border-t border-neutral-100">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-medium text-neutral-700">Writing Rules & Conventions</span>
-                    <button
-                      type="button"
-                      onClick={() => handleAddConventionToTopic(topic.id)}
-                      className="text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 font-medium"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>Add rule</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-1">
-                    {(topic.conventions || []).slice(0, isExpanded ? undefined : 2).map((conv, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start justify-between gap-2 text-[11px] text-neutral-600 bg-neutral-50/70 p-1.5 rounded border border-neutral-150 leading-relaxed"
-                      >
-                        <span className="flex-1">• {conv}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveConventionFromTopic(topic.id, idx)}
-                          className="text-neutral-300 hover:text-neutral-600 shrink-0 mt-0.5"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    ))}
-                    {!isExpanded && (topic.conventions || []).length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedTopicIds((prev) => new Set([...prev, topic.id]))
-                        }
-                        className="text-[10px] text-neutral-500 hover:text-neutral-900 font-medium"
-                      >
-                        + {(topic.conventions || []).length - 2} more rules (click to expand)
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </fieldset>
-            );
-          })}
-        </div>
-        )}
-        </fieldset>
-      </div>
-
-      {/* Product Knowledge Reference Section */}
-      <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-neutral-100 pb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-neutral-800" />
-              <h2 className="text-base font-semibold text-neutral-900">Product knowledge</h2>
-              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200">
-                Reference notes
-              </span>
-            </div>
-            <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-              Add what the model should know about a product. Include sources and dates when they matter. Enable the references relevant to your draft.
-            </p>
-            <p className="text-[11px] text-neutral-500 mt-0.5">
-              These notes help interpret product details. The review can flag possible conflicts; check its suggestions before changing facts.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            id="btn-add-product"
-            onClick={handleAddProduct}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition shadow-2xs shrink-0 self-start"
-          >
-            <Plus className="w-3.5 h-3.5 text-neutral-600" />
-            <span>Add product</span>
-          </button>
-        </div>
-
-        {(!localExpertise.productKnowledge || localExpertise.productKnowledge.length === 0) ? (
-          <div className="p-6 rounded-xl bg-neutral-50/70 border border-dashed border-neutral-300 text-center space-y-2">
-            <Package className="w-6 h-6 text-neutral-500 mx-auto" />
-            <div className="text-xs font-medium text-neutral-700">No product references added yet</div>
-            <p className="text-[11px] text-neutral-500 max-w-md mx-auto">
-              Add a product, such as DeepL Translator or DeepL Write, and describe what it does.
-            </p>
-            <button
-              type="button"
-              id="btn-add-first-product"
-              onClick={handleAddProduct}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-800 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition shadow-2xs"
-            >
-              <Plus className="w-3.5 h-3.5 text-neutral-600" />
-              <span>Add product entry</span>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {localExpertise.productKnowledge.map((product) => (
-              <div
-                key={product.id}
-                className={`p-4 rounded-xl border transition-all ${
-                  product.enabled
-                    ? 'bg-white border-neutral-300 shadow-xs'
-                    : 'bg-neutral-50/70 border-neutral-200 '
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                    <input
-                      type="checkbox"
-                      id={`toggle-product-${product.id}`}
-                      aria-label={`Enable product ${product.name || 'entry'}`}
-                      checked={product.enabled}
-                      onChange={(e) => handleUpdateProduct(product.id, { enabled: e.target.checked })}
-                      className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      id={`product-name-${product.id}`}
-                      aria-label="Product name"
-                      value={product.name}
-                      onChange={(e) => handleUpdateProduct(product.id, { name: e.target.value })}
-                      placeholder="e.g. DeepL Translator"
-                      className="text-xs font-semibold text-neutral-900 bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 focus:outline-none px-1 py-0.5 w-full max-w-sm"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    id={`btn-delete-product-${product.id}`}
-                    aria-label={`Remove product ${product.name || 'entry'}`}
-                    onClick={() => handleDeleteProduct(product.id)}
-                    className="text-neutral-500 hover:text-rose-600 p-1 rounded transition"
-                    title="Remove product entry"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="mt-2.5 pl-6.5">
-                  <label htmlFor={`product-notes-${product.id}`} className="text-[11px] font-medium text-neutral-700 block mb-1">
-                    Reference notes
-                  </label>
-                  <textarea
-                    id={`product-notes-${product.id}`}
-                    aria-label="Reference notes"
-                    rows={4}
-                    value={product.notes}
-                    onChange={(e) => handleUpdateProduct(product.id, { notes: e.target.value })}
-                    placeholder="What does this product do? Add relevant features, naming, sources, and dates."
-                    className="w-full text-xs p-2 bg-neutral-50 rounded-lg border border-neutral-200 focus:bg-white focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-500 resize-y leading-relaxed"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Global Guidelines & Nuances */}
+      {/* Section 4 — Domain guidance */}
       <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -1335,6 +364,13 @@ export const DomainView: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Step Footer */}
+      <StepFooter
+        label="Next: Rewrite Studio →"
+        id="btn-domain-to-studio"
+        onClick={() => setActiveTab('studio')}
+      />
     </div>
   );
 };

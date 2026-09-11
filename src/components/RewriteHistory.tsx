@@ -1,72 +1,49 @@
 import React, { useState } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { revisionLabel, versionDate, REWRITE_HISTORY_LIMIT } from '../utils/rewriteHistory';
-import { WritingReviewPanel } from './WritingReviewPanel';
 import { SavedEditorialDecisions } from './EditorialDecisions';
 import { RewriteResult } from '../types';
 
-export const RewriteHistory: React.FC<{ expanded?: boolean; onContinue?: () => void }> = ({ expanded = false, onContinue }) => {
-  const { rewriteHistory, rewriteResult, restoreRewriteVersion, isRewriting, isPlanning, isLearningFeedback } = useWritingAssistant();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+/**
+ * Saved versions, newest first. Each row names the version and offers Open and
+ * Delete; reading a version means opening it, so nothing is previewed here.
+ */
+export const RewriteHistory: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
+  const { rewriteHistory, rewriteResult, restoreRewriteVersion, deleteRewriteVersion, isRewriting, isPlanning, isLearningFeedback } = useWritingAssistant();
   const [message, setMessage] = useState('');
-  const selected = rewriteHistory.find((entry) => entry.id === selectedId);
+  const busy = isRewriting || isPlanning || isLearningFeedback;
+  const remove = (entry: RewriteResult) => {
+    const current = entry.id === rewriteResult?.id;
+    if (!window.confirm(current
+      ? 'Delete the version you have open? The Studio returns to the original draft. This cannot be undone.'
+      : 'Delete this version? This cannot be undone.')) return;
+    deleteRewriteVersion(entry.id);
+    setMessage(current ? 'Version deleted. The original draft is open.' : 'Version deleted.');
+  };
   return (
-    <details open={expanded || undefined} id="rewrite-history" className="rounded-xl border border-neutral-200 bg-white">
-      <summary className={`${expanded ? 'hidden' : ''} cursor-pointer px-4 py-3 text-xs font-medium text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900`}>
-        Version history ({rewriteHistory.length})
-      </summary>
-      <div className="px-4 pb-4 space-y-3 text-xs">
-        <p className="text-neutral-600">The last {REWRITE_HISTORY_LIMIT} versions are saved in this browser. Previewing a version leaves your current work in place.</p>
-        {rewriteHistory.length === 0 ? (
-          <p className="text-neutral-600">Completed rewrites and edits will appear here.</p>
-        ) : (
-          <div className="max-h-52 overflow-y-auto border border-neutral-200 rounded-lg divide-y divide-neutral-100" aria-label="Saved versions">
-            {rewriteHistory.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                aria-pressed={selectedId === entry.id}
-                onClick={() => { setSelectedId(entry.id); setMessage(''); }}
-                className={`w-full text-left px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-neutral-900 ${selectedId === entry.id ? 'bg-neutral-100' : 'hover:bg-neutral-50'}`}
-              >
-                <span className="flex flex-wrap justify-between gap-1 font-medium text-neutral-800">
-                  <span>{revisionLabel(entry)}{entry.id === rewriteResult?.id ? ' · Current' : ''}</span>
-                  <time dateTime={entry.createdAt} className="text-[11px] text-neutral-600">{versionDate(entry.createdAt)}</time>
-                </span>
-                <span className="block mt-1 text-[11px] text-neutral-600">{entry.profileName || 'Voice not recorded'} · {entry.writingModelUsed || entry.modelUsed || 'Writer not recorded'}</span>
-                <span className="block mt-1 truncate text-neutral-600">{entry.rewrittenText}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        {selected && (
-          <section aria-label="Version preview" className="space-y-3 border-t border-neutral-200 pt-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold text-neutral-900">Version preview · {revisionLabel(selected)}</h2>
-              <button type="button" onClick={() => setSelectedId(null)} className="underline text-neutral-700">Close preview</button>
-            </div>
-            <div tabIndex={0} aria-label="Saved draft text" className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border border-neutral-200 p-3 leading-relaxed text-neutral-900">{selected.rewrittenText}</div>
-            <RewriteVersionDetails version={selected}/>
-            {selected.review ? (
-              <WritingReviewPanel key={selected.id} review={selected.review} sourceText={selected.originalText} projectBrief={selected.projectBrief} rewrittenText={selected.rewrittenText} />
-            ) : <p className="text-neutral-600">No separate review is saved for this version. Any legacy score is an unverified historical assessment.</p>}
-            <p className="text-neutral-600">Continue with this version’s original draft, saved brief, reader and purpose, and standing preferences for follow-up edits. Your current voice, model, and editing controls apply. Draft &amp; Brief inputs stay as they are; your current result stays in history.</p>
-            <button
-              id="btn-restore-version"
-              type="button"
-              disabled={isRewriting || isPlanning || isLearningFeedback || (selected.id === rewriteResult?.id && !onContinue)}
-              onClick={() => {
-                restoreRewriteVersion(selected.id);
-                onContinue?.();
-                setMessage('Saved rewrite opened. Your previous result is in history.');
-              }}
-              className="rounded-lg bg-neutral-900 text-white px-3 py-2 font-medium disabled:opacity-40"
-            >{selected.id === rewriteResult?.id ? 'Open this rewrite' : 'Continue from this version'}</button>
-          </section>
-        )}
-        <p role="status" className="text-neutral-700">{message}</p>
-      </div>
-    </details>
+    <div id="rewrite-history" className="studio-history">
+      <p className="studio-panel-description">The last {REWRITE_HISTORY_LIMIT} versions are kept in this browser.</p>
+      {rewriteHistory.length === 0 ? (
+        <p className="studio-panel-description">Completed rewrites and edits will appear here.</p>
+      ) : (
+        <ul className="studio-history-list" aria-label="Saved versions">
+          {rewriteHistory.map((entry) => {
+            const current = entry.id === rewriteResult?.id;
+            return <li key={entry.id} className={`studio-history-row${current ? ' is-current' : ''}`}>
+              <div className="studio-history-text">
+                <p className="studio-history-name">{revisionLabel(entry)}{current ? <span className="studio-note-state"> · Open</span> : null}</p>
+                <p className="studio-history-meta"><time dateTime={entry.createdAt}>{versionDate(entry.createdAt)}</time> · {entry.profileName || 'Voice not recorded'} · {entry.writingModelUsed || entry.modelUsed || 'Writer not recorded'}</p>
+              </div>
+              <div className="studio-history-actions">
+                {!current && <button type="button" className="studio-text-button" disabled={busy} onClick={() => { restoreRewriteVersion(entry.id); onOpen(); }}>Open</button>}
+                <button type="button" className="studio-text-button" disabled={busy} onClick={() => remove(entry)}>Delete</button>
+              </div>
+            </li>;
+          })}
+        </ul>
+      )}
+      <p role="status" className="studio-panel-description">{message}</p>
+    </div>
   );
 };
 

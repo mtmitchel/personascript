@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UploadModal } from './UploadModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { StepFooter } from './StepFooter';
 import { WritingSample } from '../types';
 
 export const SamplesView: React.FC = () => {
@@ -36,6 +37,7 @@ export const SamplesView: React.FC = () => {
   const [sampleToDelete, setSampleToDelete] = useState<WritingSample | null>(null);
   const [deleteToast, setDeleteToast] = useState<{ title: string; id: string } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   const activeSample = samples.find((s) => s.id === activeSampleId) || samples[0];
   const activeSamplesCount = samples.filter((s) => s.enabled).length;
@@ -93,6 +95,22 @@ export const SamplesView: React.FC = () => {
         </div>
       )}
 
+      {successNotice && (
+        <div
+          id="banner-sample-success"
+          className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs flex items-center justify-between"
+        >
+          <span>{successNotice}</span>
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className="text-emerald-800 hover:text-emerald-950 font-medium underline ml-4 cursor-pointer"
+          >
+            Open Voice Blueprint
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-200">
         <div>
@@ -100,50 +118,48 @@ export const SamplesView: React.FC = () => {
           <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
             Writing Samples
           </h1>
-          <p className="mt-2 text-sm text-neutral-600">Add your writing and analyze its voice. Next, review the voice blueprint.</p>
+          <p className="mt-2 text-sm text-neutral-600">Add your writing, then build the voice blueprint from the samples you enable.</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            id="btn-open-upload-modal"
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add samples</span>
-          </button>
-
           <button
             id="btn-synthesize-profile"
             type="button"
             onClick={async () => {
               setErrorBanner(null);
+              setSuccessNotice(null);
               try {
                 await synthesizeProfileFromActiveSamples();
-                setActiveTab('profile');
+                setSuccessNotice(`Voice blueprint built from ${activeSamplesCount} ${activeSamplesCount === 1 ? 'sample' : 'samples'}.`);
               } catch (e: any) {
-                setErrorBanner(e.message || 'Failed to synthesize profile');
+                setErrorBanner(e.message || 'Failed to build voice blueprint');
               }
             }}
             disabled={isSynthesizingProfile || activeSamplesCount === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title={activeSamplesCount === 0 ? 'Enable at least one sample first' : undefined}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSynthesizingProfile ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Analyzing voice...</span>
+                <span>Building blueprint…</span>
               </>
             ) : (
               <>
-                <Sliders className="w-3.5 h-3.5 text-neutral-600" />
-                <span>Analyze Voice Profile ({activeSamplesCount})</span>
+                <Sliders className="w-3.5 h-3.5 text-neutral-300" />
+                <span>Build voice blueprint ({activeSamplesCount})</span>
               </>
             )}
           </button>
-          <button id="btn-samples-to-profile" type="button" onClick={() => setActiveTab('profile')}
-            className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-medium text-white hover:bg-neutral-800">
-            Continue to Voice Blueprint <ArrowRight className="h-3.5 w-3.5" />
+
+          <button
+            id="btn-open-upload-modal"
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add samples</span>
           </button>
         </div>
       </div>
@@ -243,6 +259,7 @@ export const SamplesView: React.FC = () => {
                             setSampleToDelete(sample);
                           }}
                           className="p-1 text-neutral-400 hover:text-neutral-900 rounded transition"
+                          aria-label={`Delete ${sample.title}`}
                           title={`Delete sample "${sample.title}"`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -578,18 +595,11 @@ export const SamplesView: React.FC = () => {
                         </div>
                       )}
 
-                    {/* Bottom Navigation */}
+                    {/* Active in voice blueprint notice */}
                     <div className="pt-4 border-t border-neutral-100 flex items-center justify-between">
                       <span className="text-xs text-neutral-400">
                         Active in voice blueprint
                       </span>
-                      <button
-                        onClick={() => setActiveTab('profile')}
-                        className="flex items-center gap-1.5 text-xs font-medium text-neutral-900 hover:text-neutral-700"
-                      >
-                        <span>Continue to Voice Blueprint</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   </div>
                 ) : (
@@ -615,6 +625,12 @@ export const SamplesView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <StepFooter
+        label="Next: Voice Blueprint →"
+        id="btn-samples-to-profile"
+        onClick={() => setActiveTab('profile')}
+      />
 
       <UploadModal
         isOpen={isModalOpen}

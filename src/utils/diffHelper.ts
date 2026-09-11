@@ -42,9 +42,9 @@ export interface ParagraphBlock {
   rewrittenEnd: number;
 }
 
-interface LocatedParagraph { text: string; start: number; end: number }
+export interface LocatedParagraph { text: string; start: number; end: number }
 
-function locateParagraphs(text: string): LocatedParagraph[] {
+export function locateParagraphs(text: string): LocatedParagraph[] {
   const paragraphs: LocatedParagraph[] = [];
   const separator = /\n[ \t]*\n+/g;
   let start = 0;

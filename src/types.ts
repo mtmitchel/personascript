@@ -145,8 +145,14 @@ export interface EditorialPlan {
    * Older saved plans remain readable. Version 2 anchors each item to one
    * paragraph and carries conflicts per item; version 3 plans by section
    * (a contiguous paragraph range) and lists conflicts once, at the top.
+   * Version 4 keeps version 3's shape but plans by passage inside each
+   * section: one item per distinct claim or idea that needs its own treatment
+   * or its own limit; `limit` is required for any passage that carries a
+   * claim about results, user behaviour, causality, ownership, comparative
+   * importance, intention, or degree. Sections are derived from the draft's
+   * headings at display time, not stored.
    */
-  version?: 2 | 3;
+  version?: 2 | 3 | 4;
   openingJob: string;
   items: {
     /** Version 2: the single paragraph this item anchors to. */

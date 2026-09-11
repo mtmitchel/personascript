@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { ToneSlidersControl } from './ToneSlidersControl';
-import { StyleProfile } from '../types';
+import { StepFooter } from './StepFooter';
+import { hasFreshProfileGuidance } from '../writingPipeline';
 import {
   Sliders,
   Sparkles,
-  Edit3,
-  Save,
   CheckCircle2,
   XCircle,
-  ArrowRight,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
@@ -20,61 +20,63 @@ export const ProfileView: React.FC = () => {
     toneAdjustments,
     setToneAdjustments,
     resetToneAdjustments,
+    samples,
+    synthesizeProfileFromActiveSamples,
+    isSynthesizingProfile,
   } = useWritingAssistant();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [profileForm, setProfileForm] = useState<StyleProfile>(activeProfile);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-  const handleSave = () => {
-    updateActiveProfile(profileForm);
-    setIsEditing(false);
-  };
+  const enabledSamples = (samples || []).filter(s => s.enabled);
+  const activeSamplesCount = enabledSamples.length;
+  const isFresh = hasFreshProfileGuidance(activeProfile, enabledSamples);
 
   const metricItems = [
     {
-      key: 'formality',
+      key: 'formality' as const,
       label: 'Formality',
       value: activeProfile.metrics.formality,
       minLabel: 'Conversational',
       maxLabel: 'Academic',
     },
     {
-      key: 'warmth',
+      key: 'warmth' as const,
       label: 'Warmth',
       value: activeProfile.metrics.warmth,
       minLabel: 'Clinical',
       maxLabel: 'Empathetic',
     },
     {
-      key: 'directness',
+      key: 'directness' as const,
       label: 'Directness',
       value: activeProfile.metrics.directness,
       minLabel: 'Nuanced',
       maxLabel: 'Direct',
     },
     {
-      key: 'sentenceLengthVariance',
+      key: 'sentenceLengthVariance' as const,
       label: 'Sentence variety',
       value: activeProfile.metrics.sentenceLengthVariance,
       minLabel: 'Uniform',
       maxLabel: 'Rhythmic',
     },
     {
-      key: 'activeVoiceRatio',
+      key: 'activeVoiceRatio' as const,
       label: 'Active voice',
       value: activeProfile.metrics.activeVoiceRatio,
       minLabel: 'Passive',
       maxLabel: 'Active',
     },
     {
-      key: 'lexicalSophistication',
+      key: 'lexicalSophistication' as const,
       label: 'Vocabulary depth',
       value: activeProfile.metrics.lexicalSophistication,
       minLabel: 'Accessible',
       maxLabel: 'Technical',
     },
     {
-      key: 'metaphorDensity',
+      key: 'metaphorDensity' as const,
       label: 'Metaphors & analogies',
       value: activeProfile.metrics.metaphorDensity,
       minLabel: 'Literal',
@@ -98,46 +100,76 @@ export const ProfileView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            id="btn-toggle-edit-profile"
+            id="btn-rebuild-profile"
             type="button"
-            onClick={() => {
-              if (isEditing) {
-                handleSave();
-              } else {
-                setProfileForm(activeProfile);
-                setIsEditing(true);
+            onClick={async () => {
+              setErrorBanner(null);
+              setSuccessNotice(null);
+              try {
+                await synthesizeProfileFromActiveSamples();
+                setSuccessNotice(`Blueprint rebuilt from ${activeSamplesCount} ${activeSamplesCount === 1 ? 'sample' : 'samples'}.`);
+              } catch (e: any) {
+                setErrorBanner(e.message || 'Failed to rebuild blueprint');
               }
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-              isEditing
-                ? 'bg-neutral-900 text-white'
-                : 'border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-            }`}
+            disabled={isSynthesizingProfile || activeSamplesCount === 0}
+            title={activeSamplesCount === 0 ? 'Enable at least one sample first' : undefined}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isEditing ? (
+            {isSynthesizingProfile ? (
               <>
-                <Save className="w-3.5 h-3.5" />
-                <span>Save</span>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Rebuilding blueprint…</span>
               </>
             ) : (
               <>
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Adjust</span>
+                <RefreshCw className="w-3.5 h-3.5 text-neutral-600" />
+                <span>Rebuild from samples</span>
               </>
             )}
           </button>
-
-          <button
-            id="btn-profile-to-draft-brief"
-            type="button"
-            onClick={() => setActiveTab('draft-brief')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
-          >
-            <span>Continue to Draft &amp; Brief</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
+
+      {errorBanner && (
+        <div
+          id="banner-profile-error"
+          className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+            <span>{errorBanner}</span>
+          </div>
+          <button
+            onClick={() => setErrorBanner(null)}
+            className="text-rose-600 hover:text-rose-800 text-xs ml-4 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {successNotice && (
+        <div
+          id="banner-profile-success"
+          className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs flex items-center justify-between"
+        >
+          <span>{successNotice}</span>
+          <button
+            onClick={() => setSuccessNotice(null)}
+            className="text-emerald-700 hover:text-emerald-900 text-xs ml-4 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Stale samples notice */}
+      {!isFresh && (
+        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-xs leading-relaxed studio-inline-notice">
+          Your writing samples changed after this blueprint was built. Rebuild it so the writer follows your current samples.
+        </div>
+      )}
 
       {/* Voice Axiom */}
       {activeProfile.voiceManifesto && (
@@ -167,36 +199,27 @@ export const ProfileView: React.FC = () => {
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-neutral-900">{metric.label}</span>
                 <span className="font-mono text-neutral-500">
-                  {isEditing ? (profileForm.metrics as any)[metric.key] : metric.value}/100
+                  {metric.value}/100
                 </span>
               </div>
 
-              {isEditing ? (
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={(profileForm.metrics as any)[metric.key]}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setProfileForm({
-                      ...profileForm,
-                      metrics: {
-                        ...profileForm.metrics,
-                        [metric.key]: val,
-                      },
-                    });
-                  }}
-                  className="w-full accent-neutral-900 cursor-pointer"
-                />
-              ) : (
-                <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-neutral-900 rounded-full"
-                    style={{ width: `${metric.value}%` }}
-                  />
-                </div>
-              )}
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={metric.value}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  updateActiveProfile({
+                    ...activeProfile,
+                    metrics: {
+                      ...activeProfile.metrics,
+                      [metric.key]: val,
+                    },
+                  });
+                }}
+                className="w-full accent-neutral-900 cursor-pointer"
+              />
 
               <div className="flex items-center justify-between text-[10px] text-neutral-400">
                 <span>{metric.minLabel}</span>
@@ -205,6 +228,7 @@ export const ProfileView: React.FC = () => {
             </div>
           ))}
         </div>
+        <p className="text-xs text-neutral-400">Saved automatically.</p>
       </div>
 
       {/* Tone adjustments applied at write time */}
@@ -318,22 +342,19 @@ export const ProfileView: React.FC = () => {
           placeholder="e.g. Keep sentences concise. Avoid marketing buzzwords."
           className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-400"
         />
-        <div className="flex items-center justify-between pt-1">
+        <div className="pt-1">
           <span className="text-xs text-neutral-400">
             Saved automatically
           </span>
-          <div className="flex gap-2">
-            <button
-              id="btn-profile-next-draft-brief"
-              type="button"
-              onClick={() => setActiveTab('draft-brief')}
-              className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition"
-            >
-              Continue to Draft &amp; Brief
-            </button>
-          </div>
         </div>
       </div>
+
+      {/* Step Footer */}
+      <StepFooter
+        label="Next: Draft & Brief →"
+        id="btn-profile-to-draft"
+        onClick={() => setActiveTab('draft-brief')}
+      />
     </div>
   );
 };

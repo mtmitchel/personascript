@@ -7,6 +7,7 @@ import { transform } from 'esbuild';
 import * as editorial from '../src/editorialPlan';
 import { generateExternalContent } from '../src/aiProvider';
 import { parseModelChoice } from '../src/modelChoice';
+import { normalizeDomainExpertise, validateDomainExpertiseInput } from '../src/writingPipeline';
 
 // Exercise the actual planning route and provider transport with a controlled
 // clock and local response. No app server or external model request is needed.
@@ -17,7 +18,7 @@ assert.ok(start >= 0 && end > start);
 const route = (await transform(server.slice(start, end), { loader: 'ts' })).code;
 const draft = 'The team clarified the next step in the account setup flow.';
 const plan = {
-  version: 3, openingJob: 'Explain the decision and its purpose.',
+  version: 4, openingJob: 'Explain the decision and its purpose.',
   items: [{ paragraphRange: { from: 1, to: 1 }, idea: 'Keep the documented decision.', sourcePhrase: draft,
     decision: 'keep', limit: 'Preserve the team attribution.' }],
   conflicts: [],
@@ -45,7 +46,7 @@ function harness(t: TestContext) {
     json(body: unknown) { this.body = body; return this; },
   });
   runInNewContext(route, {
-    ...editorial, AbortController, DOMException, parseModelChoice,
+    ...editorial, AbortController, DOMException, parseModelChoice, normalizeDomainExpertise, validateDomainExpertiseInput,
     app: { post: (_path: string, fn: any) => { handler = fn; } },
     requireObject: (value: unknown) => value, optionalText: (value: unknown) => value,
     validateControlInputs() {}, statusForError: () => 500,

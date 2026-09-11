@@ -72,6 +72,8 @@ interface WritingAssistantContextType {
   workspaceSaveError: string | null;
   downloadWorkingCopy: () => void;
   restoreRewriteVersion: (id: string) => void;
+  /** Remove a saved version from history. Deleting the open version clears the current result. */
+  deleteRewriteVersion: (id: string) => void;
   /** Replace the current version's text with an author edit made in the app; no model is called. */
   updateRewrittenText: (text: string) => void;
   isSynthesizingProfile: boolean;
@@ -803,6 +805,17 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     });
   };
 
+  // Deleting the open version returns the Studio to the original draft; nothing else is touched.
+  const deleteRewriteVersion = (id: string) => {
+    if (writingOperationLock.current || feedbackSaveLock.current) return;
+    setRewriteHistory((prev) => prev.filter((entry) => entry.id !== id));
+    if (rewriteResult?.id === id) {
+      setRewriteResult(null);
+      setFeedbackItems((prev) => prev.filter((item) => item.saveStatus));
+      setUsingSavedVersionContext(false);
+    }
+  };
+
   const restoreRewriteVersion = (id: string) => {
     if (writingOperationLock.current || feedbackSaveLock.current) return;
     const saved = rewriteHistory.find((entry) => entry.id === id);
@@ -831,7 +844,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     try {
       const res = await fetch('/api/plan-draft', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...sources, model: modelSettings.analysisModel, reasoningLevel: modelSettings.analysisReasoningLevel }),
+        body: JSON.stringify({ ...sources, domainExpertise, model: modelSettings.analysisModel, reasoningLevel: modelSettings.analysisReasoningLevel }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Could not propose editorial decisions.');
@@ -1213,6 +1226,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         workspaceSaveError,
         downloadWorkingCopy,
         restoreRewriteVersion,
+        deleteRewriteVersion,
         updateRewrittenText,
         isSynthesizingProfile,
         activeSampleId,

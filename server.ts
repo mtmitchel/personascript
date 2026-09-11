@@ -3,7 +3,7 @@ import { connectProvider, disconnectProvider, ConnectionError, requireLocalConne
 import { isReasoningLevelChoice, knownModelReasoning, parseModelChoice, validateModelReasoning } from './src/modelChoice';
 import { validateFeedbackUpdate } from './src/utils/voiceFeedback';
 import { buildEditorialPlanPrompt, EDITORIAL_PLAN_SCHEMA, PLAN_SYSTEM_INSTRUCTION, validatePlanSources, validateApprovedPlan, validateGeneratedPlan } from './src/editorialPlan';
-import type { EditorialPlan, ReasoningLevelChoice } from './src/types';
+import type { DomainExpertise, EditorialPlan, ReasoningLevelChoice } from './src/types';
 import {
   buildPlanSourceAuditPrompt,
   PLAN_SOURCE_AUDIT_SCHEMA,
@@ -1332,16 +1332,19 @@ app.post('/api/plan-draft', async (req: Request, res: Response) => {
   const timeout = setTimeout(() => controller.abort(new DOMException('Editorial planning timed out.', 'TimeoutError')), 600_000);
   try {
     const body = requireObject(req.body, 'Request');
-    if (Object.keys(body).some(key => !['draft', 'projectBrief', 'readerPurpose', 'editorialPreferences', 'customInstructions', 'model', 'reasoningLevel'].includes(key))) {
-      throw new RequestValidationError('Planning accepts only the draft, brief, reader and purpose, writing instructions, preferences, and model settings.');
+    if (Object.keys(body).some(key => !['draft', 'projectBrief', 'readerPurpose', 'editorialPreferences', 'customInstructions', 'domainExpertise', 'model', 'reasoningLevel'].includes(key))) {
+      throw new RequestValidationError('Planning accepts only the draft, brief, reader and purpose, writing instructions, preferences, domain settings, and model settings.');
     }
     const sources = validatePlanSources(body.draft, body.projectBrief, body.readerPurpose, body.editorialPreferences, body.customInstructions);
+    const domainInput = body.domainExpertise === undefined ? undefined : requireObject(body.domainExpertise, 'domainExpertise');
+    validateDomainExpertiseInput(domainInput);
+    const domain = domainInput === undefined ? undefined : normalizeDomainExpertise(domainInput as unknown as DomainExpertise);
     validateControlInputs({ model: body.model, reasoningLevel: body.reasoningLevel });
     const model = optionalText(body.model, 'model') || 'gemini-3.1-pro-preview';
     try { parseModelChoice(model); } catch (error) { throw new RequestValidationError(error instanceof Error ? error.message : 'Model choice is invalid.'); }
     const response = await generateContentWithRetry({
       endpoint: '/api/plan-draft',
-      contents: buildEditorialPlanPrompt(sources),
+      contents: buildEditorialPlanPrompt(sources, domain),
       preferredModel: model,
       reasoningLevel: body.reasoningLevel as any,
       allowFallback: false,
@@ -1602,7 +1605,6 @@ Generate an updated StyleProfile object, along with a clear summary of what was 
                   },
                   required: ['doList', 'dontList', 'signatureHabits', 'vocabularyPreferences', 'pacingGuide'],
                 },
-                customDirectives: { type: Type.STRING },
               },
               required: ['name', 'voiceManifesto', 'metrics', 'synthesizedGuidelines'],
             },
@@ -1616,11 +1618,13 @@ Generate an updated StyleProfile object, along with a clear summary of what was 
     const parsed = JSON.parse(response.text || '{}');
     validateFeedbackUpdate(parsed);
 
-    // Preserve IDs and samples while merging updated fields
+    // Preserve IDs, samples, and the author's own choices while merging updated fields
     const updatedFullProfile = {
       ...profile,
       ...parsed.updatedProfile,
       id: profile.id,
+      name: profile.name,
+      customDirectives: profile.customDirectives,
       sampleIds: profile.sampleIds,
       domainExpertise: profile.domainExpertise,
       updatedAt: new Date().toISOString(),

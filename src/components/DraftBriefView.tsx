@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { EDITORIAL_PREFERENCES_MAX_CHARS, PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS } from '../writingPipeline';
-import { FileText, Sparkles, UploadCloud, ArrowRight } from 'lucide-react';
+import { FileText, Sparkles, UploadCloud } from 'lucide-react';
+import { StepFooter } from './StepFooter';
 
 export const DraftBriefView: React.FC = () => {
   const {
@@ -44,18 +45,6 @@ export const DraftBriefView: React.FC = () => {
             Add your draft, factual brief, and reader guidance. Next, review the domain and product knowledge for this draft.
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            id="btn-draft-brief-to-domain"
-            type="button"
-            onClick={() => setActiveTab('domain')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
-          >
-            <span>Continue to Domain Knowledge</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
       </div>
 
       {/* Main Form Cards */}
@@ -75,31 +64,31 @@ export const DraftBriefView: React.FC = () => {
                 id="btn-load-sample-draft"
                 onClick={loadSampleDraft}
                 disabled={isUploadingDraft || isRewriting}
-                className="text-xs text-neutral-600 hover:text-neutral-900"
+                className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Load sample
               </button>
-              <span className="text-neutral-300">•</span>
               <button
                 type="button"
                 id="btn-upload-draft-file"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploadingDraft || isRewriting}
-                className="text-xs text-neutral-600 hover:text-neutral-900 flex items-center gap-1"
+                className="px-2.5 py-1 rounded-md border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <UploadCloud className="w-3.5 h-3.5" />
                 <span>{isUploadingDraft ? 'Uploading…' : 'Upload'}</span>
               </button>
-              <span className="text-neutral-300">•</span>
-              <button
-                type="button"
-                id="btn-clear-draft"
-                onClick={() => setDraftText('')}
-                disabled={!draftText.length || isRewriting || isUploadingDraft}
-                className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Clear
-              </button>
+              {draftText.length > 0 && (
+                <button
+                  type="button"
+                  id="btn-clear-draft"
+                  onClick={() => setDraftText('')}
+                  disabled={isRewriting || isUploadingDraft}
+                  className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Clear
+                </button>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -131,8 +120,7 @@ export const DraftBriefView: React.FC = () => {
             <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">{draftUploadError}</p>
           )}
           <div className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
-            <span>{wordCountOriginal} words</span>
-            <span>{draftText.length} chars</span>
+            <span>{wordCountOriginal} words · {draftText.length} characters</span>
           </div>
         </div>
 
@@ -206,7 +194,7 @@ export const DraftBriefView: React.FC = () => {
 
           <div id="project-brief-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
             <span>{wordCountBrief} words</span>
-            <span>{projectBrief.length} chars</span>
+            <span>{projectBrief.length} / {PROJECT_BRIEF_MAX_CHARS}</span>
           </div>
         </div>
 
@@ -254,7 +242,7 @@ export const DraftBriefView: React.FC = () => {
 
           <div id="reader-purpose-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
             <span>{wordCountReaderPurpose} words</span>
-            <span>{readerPurpose.length} chars</span>
+            <span>{readerPurpose.length} / {READER_PURPOSE_MAX_CHARS}</span>
           </div>
         </div>
 
@@ -301,25 +289,15 @@ export const DraftBriefView: React.FC = () => {
 
           <div id="standing-preferences-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
             <span>{editorialPreferences.trim() ? editorialPreferences.trim().split(/\s+/).length : 0} words</span>
-            <span>{editorialPreferences.length} chars</span>
+            <span>{editorialPreferences.length} / {EDITORIAL_PREFERENCES_MAX_CHARS}</span>
           </div>
         </div>
 
-        {/* Progression Footer */}
-        <div className="flex items-center justify-between pt-2">
-          <span className="text-xs text-neutral-400">
-            Saved in this browser. Next, check the context the rewrite will use.
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('domain')}
-              className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
-            >
-              Continue to Domain Knowledge
-            </button>
-          </div>
-        </div>
+        <StepFooter
+          label="Next: Domain Knowledge →"
+          id="btn-draft-brief-to-domain"
+          onClick={() => setActiveTab('domain')}
+        />
       </div>
     </div>
   );

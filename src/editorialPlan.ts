@@ -1,6 +1,6 @@
-import type { EditorialConflict, EditorialPlan, EditorialPlanState, EditorialRequest } from './types';
+import type { DomainExpertise, EditorialConflict, EditorialPlan, EditorialPlanState, EditorialRequest } from './types';
 import { cleanSourceText, getDraftParagraphs, isHeadingParagraph, sourceContainsPhrase } from './sourceText';
-import { ValidationError, PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS, validateProjectBrief, validateReaderPurpose, validateEditorialPreferences, EDITORIAL_PREFERENCES_MAX_CHARS, editorialPreferencesBlock } from './writingPipeline';
+import { ValidationError, PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS, validateProjectBrief, validateReaderPurpose, validateEditorialPreferences, EDITORIAL_PREFERENCES_MAX_CHARS, editorialPreferencesBlock, domainBlock } from './writingPipeline';
 
 export const PLAN_DRAFT_MAX_CHARS = 100_000;
 export const PLAN_MAX_ITEMS = 200;
@@ -25,8 +25,8 @@ export const EDITORIAL_PLAN_SCHEMA = {
           decision: { type: 'STRING', enum: ['keep', 'shorten', 'cut'] },
           idea: { type: 'STRING' }, reason: { type: 'STRING' }, sourcePhrase: { type: 'STRING' }, limit: { type: 'STRING' },
         },
-        // idea and reason are required so structured output always emits them; keeps send them empty.
-        required: ['paragraphRange', 'decision', 'idea', 'reason', 'sourcePhrase'],
+        // idea, reason and limit are required so structured output always emits them; keep items send them empty.
+        required: ['paragraphRange', 'decision', 'idea', 'reason', 'sourcePhrase', 'limit'],
       },
     },
     conflicts: {
@@ -81,13 +81,13 @@ function isRequest(value: unknown): value is EditorialRequest {
 export function isEditorialPlan(value: unknown): value is EditorialPlan {
   const plan = value as EditorialPlan;
   return Boolean(plan && typeof plan === 'object' && !Array.isArray(plan)
-    && (plan.version === undefined || plan.version === 2 || plan.version === 3)
+    && (plan.version === undefined || plan.version === 2 || plan.version === 3 || plan.version === 4)
     && typeof plan.openingJob === 'string' && plan.openingJob.length <= PLAN_FIELD_LIMITS.openingJob
     && Array.isArray(plan.items) && plan.items.length <= PLAN_MAX_ITEMS
     && plan.items.every(item => item && typeof item === 'object'
       && (item.paragraphId === undefined || (Number.isInteger(item.paragraphId) && item.paragraphId > 0))
       && (item.paragraphRange === undefined || isRange(item.paragraphRange))
-      && (plan.version !== 3 || item.paragraphRange !== undefined)
+      && (plan.version !== 3 && plan.version !== 4 || item.paragraphRange !== undefined)
       && ['keep', 'shorten', 'cut'].includes(item.decision)
       && (item.response === undefined || ['accepted', 'rejected', 'ignored'].includes(item.response))
       && (item.reason === undefined || (typeof item.reason === 'string' && item.reason.length <= PLAN_FIELD_LIMITS.idea))
@@ -144,9 +144,14 @@ export interface EditorialPlanValidationOptions {
    * and suggestions saved before reasons existed remain approvable.
    */
   requireReasons?: boolean;
+  /**
+   * Generated suggestions must state how far a figure-bearing passage may be
+   * taken. Generation only; approval trusts the author.
+   */
+  requireClaimLimits?: boolean;
 }
 
-/** Version 3: decisions cover contiguous paragraph ranges; conflicts are listed once. */
+/** Version 3 and 4: decisions cover contiguous paragraph ranges; conflicts are listed once. */
 function validateSectionPlan(value: EditorialPlan, sources: EditorialPlanState['sources'], options: EditorialPlanValidationOptions): EditorialPlan {
   const paragraphs = getDraftParagraphs(sources.draft);
   const rangeText = (range: { from: number; to: number }) => paragraphs.slice(range.from - 1, range.to).map(paragraph => paragraph.text).join('\n');
@@ -154,6 +159,11 @@ function validateSectionPlan(value: EditorialPlan, sources: EditorialPlanState['
     const range = item.paragraphRange!;
     if (range.to > paragraphs.length) throw new ValidationError(`Suggestion ${index + 1} refers to paragraph ${range.to}, but the draft has ${paragraphs.length}.`);
     if (!item.sourcePhrase.trim() || !sourceContainsPhrase(rangeText(range), item.sourcePhrase)) throw new ValidationError(`Suggestion ${index + 1} needs an exact phrase from draft paragraphs ${range.from}–${range.to}.`);
+    // A passage that carries a figure carries a claim; the planner must state
+    // how far the writer may take it. Generation only; approval trusts the author.
+    if (options.requireClaimLimits && /\d/.test(rangeText(range)) && !item.limit.trim()) {
+      throw new ValidationError(`Suggestion ${index + 1} covers a figure; say in limit how far the writer may take that claim.`);
+    }
     // A rejected or ignored suggestion is executed as keep; the author's answer is final.
     if (item.response === 'rejected' || item.response === 'ignored') return { paragraphRange: { from: range.from, to: range.to }, idea: '', reason: '', sourcePhrase: item.sourcePhrase, decision: 'keep' as const, limit: item.limit };
     if (item.decision !== 'keep' && !item.idea.trim()) throw new ValidationError(`Suggestion ${index + 1} needs to say what changes.`);
@@ -180,13 +190,13 @@ function validateSectionPlan(value: EditorialPlan, sources: EditorialPlanState['
     if (!request.instruction.trim()) throw new ValidationError(`Say what should change in your request ${index + 1}.`);
     return { paragraphRange: { ...request.paragraphRange }, sourcePhrase: request.sourcePhrase, instruction: request.instruction };
   });
-  return { version: 3, openingJob: value.openingJob, items, conflicts, ...(requests.length ? { requests } : {}) };
+  return { version: value.version, openingJob: value.openingJob, items, conflicts, ...(requests.length ? { requests } : {}) };
 }
 
 export function validateEditorialPlan(value: unknown, sources: EditorialPlanState['sources'], options: EditorialPlanValidationOptions = {}): EditorialPlan {
   if (!isEditorialPlan(value)) throw new ValidationError('The editorial decisions have an invalid format or exceed their size limits.');
   if (!value.openingJob.trim() || !value.items.length) throw new ValidationError('Add the opening’s job and at least one editorial decision.');
-  if (value.version === 3) return validateSectionPlan(value, sources, options);
+  if (value.version === 3 || value.version === 4) return validateSectionPlan(value, sources, options);
   const paragraphs = getDraftParagraphs(sources.draft);
   const items = value.items.map((rawItem, index) => {
     let item = rawItem;
@@ -237,24 +247,24 @@ export function validateGeneratedPlan(text: string | undefined, response: any, s
   if (reason !== 'STOP' || response?.promptFeedback?.blockReason) throw new Error('The planning model did not finish. Your previous decisions are still available; try again.');
   try {
     const parsed = JSON.parse(text || '');
-    if (parsed?.version !== 3) throw new ValidationError('The proposal is missing its required section format.');
+    if (parsed?.version !== 4) throw new ValidationError('The proposal is missing its required format.');
     // Optional text fields arrive absent or null; the contract stores strings.
     const normalized = { ...parsed, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [],
       items: Array.isArray(parsed.items) ? parsed.items.map((item: any) => ({ ...item, idea: item?.idea ?? '', reason: item?.reason ?? '', limit: item?.limit ?? '' })) : parsed.items };
-    return validateEditorialPlan(normalized, sources, { allowPendingConflictEvidence: true, requireReasons: true });
+    return validateEditorialPlan(normalized, sources, { allowPendingConflictEvidence: true, requireReasons: true, requireClaimLimits: true });
   } catch (error) {
     throw new Error(`The planning model returned unusable decisions. ${error instanceof ValidationError ? error.message : 'Try again.'}`);
   }
 }
 
-export function buildEditorialPlanPrompt(sources: EditorialPlanState['sources']): string {
+export function buildEditorialPlanPrompt(sources: EditorialPlanState['sources'], domain?: DomainExpertise | null): string {
   sources = { ...sources, draft: cleanSourceText(sources.draft), projectBrief: cleanSourceText(sources.projectBrief) };
   const paragraphs = getDraftParagraphs(sources.draft);
   return `You are this draft's editor. Propose what the rewrite should change, section by section, for the intended reader. Each proposal is a suggestion the author will accept, reject, or ignore, so each one must say what changes and why. The author will read the list in under a minute; the writer will execute what the author accepts.
 
-Read the whole draft and brief. Apply the standing editorial preferences when supplied; they guide choices, not source facts. Plan by section, not by paragraph. A section is a contiguous run of numbered paragraphs, normally one heading and the paragraphs under it; paragraphs marked as headings below start a section. Use the draft's own sections to organise the plan. A piece of this length normally needs about five to ten suggestions. Split a section only when part of it genuinely needs a different treatment. Never write one decision per paragraph.
+Read the whole draft and brief. Apply the standing editorial preferences when supplied; they guide choices, not source facts. Plan by passage inside each section. A section is a contiguous run of numbered paragraphs, normally one heading and the paragraphs under it; paragraphs marked as headings below start a section. Inside a section, write one suggestion for each distinct claim or idea that needs its own treatment or its own limit. Ideas that share a treatment and carry no claim may share one suggestion spanning their paragraphs. Never write one suggestion per sentence. Always write a separate suggestion for a passage that carries a measured result, a claim about user behaviour, a cause, an attribution of work or ownership, a comparative rank such as "a key part" or "the main", a purpose such as "was to", or a degree such as "often" or "some". A piece of this length normally needs fifteen to thirty suggestions.
 
-For each section choose one decision:
+For each suggestion choose one decision:
 - keep: the rewrite retains its substance; wording may change.
 - shorten: preserve the useful substance in less space; say what must survive and what can go.
 - cut: remove it entirely, including paraphrases; say briefly why this reader does not need it.
@@ -267,17 +277,21 @@ Each suggestion has these fields:
 - idea: for shorten or cut, one sentence saying exactly what changes and what survives, for example "Drop the second example; keep the two-situation framing." For keep, leave it empty unless the section has no heading, in which case name its content in a few words.
 - reason: for shorten or cut, one sentence saying why this reader is better off, grounded in the draft or brief, for example "The reader already knows these controls; the paragraph delays the decision." Never empty for shorten or cut. Empty for keep.
 - sourcePhrase: one exact, contiguous quotation copied from inside the range, with no ellipsis, long enough to locate the passage.
-- limit: usually empty. Write one sentence of at most 25 words only when this passage carries a specific qualification, attribution, or boundary that the writer could plausibly lose and the standing preferences do not already state. Do not restate general rules.
+- limit: required whenever the passage carries a claim of the kinds listed above; otherwise empty. One sentence of at most 40 words that applies the standing preferences to this passage's own words: quote the operative words and say how far the writer may take them, for example \`Keep "a key part" as one part among several; not the centrepiece.\` or \`The 12% and €1.2M belong to the Monetization team's program, not to the author.\` Do not copy the general rules; state only what is specific to this passage. Any suggestion whose paragraphs contain a number, percentage, currency amount, date, or duration must carry a limit, even a short one stating what the figure describes, for example \`The 5 MB and 20 MB figures describe this historical screen's offer, not current plans.\`
 
-openingJob: exactly one sentence of at most 30 words saying what the opening must establish for this reader. Not a drafted opening and not a list of what the piece covers.
+openingJob: exactly one sentence of at most 30 words saying what the opening must establish for this reader, drawn only from what the draft's opening already states. Do not introduce a diagnosis, a gap, a contrast, or a cause the draft does not make. Not a drafted opening and not a list of what the piece covers.
 
 conflicts: if the draft and the brief make two explicit, incompatible statements about the same fact, add one entry with draftQuote copied verbatim from the draft, briefQuote copied verbatim from the brief, and question: one plain question the author can answer by choosing a source, for example "Was the lift 12% or 9.8%?". Both quotations are checked against their source. Silence, a generic mention elsewhere, an asset filename, or an inference is not a conflict. Do not mention the disagreement in any other field; the author answers it. Return an empty array when there is none.
 
 Write for the author, not for a machine. Use plain words; avoid jargon such as anchor, semantic status, narrative arc, or rhetorical scaffolding. Never shorten or paraphrase a quotation.
 
-Return JSON matching the schema with version: 3. Use at most ${PLAN_MAX_ITEMS} suggestions and ${PLAN_MAX_CONFLICTS} conflicts; openingJob at most ${PLAN_FIELD_LIMITS.openingJob} characters; each idea and reason at most ${PLAN_FIELD_LIMITS.idea}, sourcePhrase ${PLAN_FIELD_LIMITS.sourcePhrase}, and limit ${PLAN_FIELD_LIMITS.limit} characters.
+Return JSON matching the schema with version: 4. Use at most ${PLAN_MAX_ITEMS} suggestions and ${PLAN_MAX_CONFLICTS} conflicts; openingJob at most ${PLAN_FIELD_LIMITS.openingJob} characters; each idea and reason at most ${PLAN_FIELD_LIMITS.idea}, sourcePhrase ${PLAN_FIELD_LIMITS.sourcePhrase}, and limit ${PLAN_FIELD_LIMITS.limit} characters.
 
 ${editorialPreferencesBlock(sources.editorialPreferences)}
+
+DOMAIN CONTEXT (interpretation only):
+${domainBlock(domain)}
+Use it to recognise a named principle, method, or trade-off the draft already demonstrates, and to judge whether this reader needs it kept or shortened. It adds no facts, requires no terminology, and is not evidence that the author performed work or achieved results.
 
 Rewrite request (editorial guidance, subordinate to source facts and specific preservation locks):
 ${sources.customInstructions || 'No additional request.'}

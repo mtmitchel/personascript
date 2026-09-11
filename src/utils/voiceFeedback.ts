@@ -29,7 +29,8 @@ export function persistFeedbackProfile(
   const updated = data.updatedProfile;
   const next: StyleProfile = {
     ...profile, ...updated,
-    id: profile.id, sampleIds: profile.sampleIds, domainExpertise: profile.domainExpertise,
+    id: profile.id, name: profile.name, customDirectives: profile.customDirectives,
+    sampleIds: profile.sampleIds, domainExpertise: profile.domainExpertise,
     retiredFeedbackIds: profile.retiredFeedbackIds,
     appliedFeedbackIds: [...new Set([...(profile.appliedFeedbackIds || []), itemId])],
   };

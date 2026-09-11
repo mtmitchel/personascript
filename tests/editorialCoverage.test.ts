@@ -36,10 +36,10 @@ test('planner plans by section, tags headings, and includes the rewrite request'
   assert.doesNotMatch(prompt, /No additional limits\./);
   assert.doesNotMatch(prompt, /paragraphId/);
   assert.doesNotMatch(prompt, /Split a paragraph/);
-  assert.ok(prompt.includes('Plan by section, not by paragraph.'));
-  assert.ok(prompt.includes('Never write one decision per paragraph.'));
+  assert.ok(prompt.includes('Plan by passage inside each section.'));
+  assert.ok(prompt.includes('Never write one suggestion per sentence.'));
   assert.ok(prompt.includes('paragraphRange: { from, to }'));
-  assert.ok(prompt.includes('version: 3'));
+  assert.ok(prompt.includes('version: 4'));
   assert.ok(prompt.includes('conflicts:'));
   assert.ok(prompt.includes('Return an empty array when there is none.'));
   assert.ok(prompt.includes('Rewrite request (editorial guidance'));

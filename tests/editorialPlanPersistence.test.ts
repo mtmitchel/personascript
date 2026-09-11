@@ -264,6 +264,29 @@ test('isEditorialPlan and isEditorialPlanState accept saved v2 and v3 plans, and
   assert.equal(isEditorialPlan(v3Plan), true);
   assert.equal(isEditorialPlanState(v3State), true);
 
+  const v4Plan: EditorialPlan = {
+    version: 4,
+    openingJob: 'Establish the project.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 1 },
+        idea: '',
+        sourcePhrase: sourceA.draft,
+        decision: 'keep',
+        limit: 'Keep the figure attributed to the program, not the author.',
+      },
+    ],
+    conflicts: [],
+  };
+  const v4State: EditorialPlanState = {
+    plan: v4Plan,
+    sources: sourceA,
+    approved: true,
+  };
+
+  assert.equal(isEditorialPlan(v4Plan), true);
+  assert.equal(isEditorialPlanState(v4State), true);
+
   // Reject a v3 item without paragraphRange
   const v3MissingRange: EditorialPlan = {
     version: 3,

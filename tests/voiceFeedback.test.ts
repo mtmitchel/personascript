@@ -31,6 +31,19 @@ test('pending and failed notes survive validation; legacy status remains unknown
   assert.equal(isRewriteFeedback([{ ...item, saveStatus: 'saved' }]), false);
 });
 
+test('learning never changes the profile name or the author’s written directive', () => {
+  const profile = { ...structuredClone(DEFAULT_PROFILE), name: 'My voice', customDirectives: 'Never use the passive voice.' };
+  const learned = { ...response(), updatedProfile: { ...structuredClone(DEFAULT_PROFILE), name: 'Rewritten name', customDirectives: 'Use a formal register.', synthesizedGuidelines: { ...DEFAULT_PROFILE.synthesizedGuidelines, doList: ['Lead with the outcome.'] } } };
+  let stored = '';
+  const next = persistFeedbackProfile(learned, profile, 'note-2', value => { stored = JSON.stringify(value); });
+
+  assert.equal(next.name, 'My voice');
+  assert.equal(next.customDirectives, 'Never use the passive voice.');
+  assert.deepEqual(next.synthesizedGuidelines.doList, ['Lead with the outcome.']);
+  assert.equal(JSON.parse(stored).name, 'My voice');
+  assert.equal(JSON.parse(stored).customDirectives, 'Never use the passive voice.');
+});
+
 test('dismissing earlier notes preserves every profile preference and hides stale history cards', () => {
   const original = { ...structuredClone(DEFAULT_PROFILE), appliedFeedbackIds: ['saved-note'] };
   let stored = '';

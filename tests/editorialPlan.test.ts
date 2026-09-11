@@ -14,7 +14,7 @@ import {
   validateGeneratedPlan,
   validatePlanSources,
 } from '../src/editorialPlan';
-import type { EditorialPlan, EditorialPlanState } from '../src/types';
+import type { DomainExpertise, EditorialPlan, EditorialPlanState } from '../src/types';
 import { PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS } from '../src/writingPipeline';
 
 const sources: EditorialPlanState['sources'] = {
@@ -55,7 +55,7 @@ test('validates a complete plan and retains all editorial decisions', () => {
   assert.deepEqual(validated, completePlan);
   assert.deepEqual(validated.items.map((item) => item.decision), ['keep', 'shorten', 'cut']);
   assert.deepEqual(EDITORIAL_PLAN_SCHEMA.required, ['version', 'openingJob', 'items', 'conflicts']);
-  assert.deepEqual(EDITORIAL_PLAN_SCHEMA.properties.items.items.required, ['paragraphRange', 'decision', 'idea', 'reason', 'sourcePhrase']);
+  assert.deepEqual(EDITORIAL_PLAN_SCHEMA.properties.items.items.required, ['paragraphRange', 'decision', 'idea', 'reason', 'sourcePhrase', 'limit']);
 });
 
 test('rejects malformed shapes, unsupported decisions, empty content, and oversized plans', () => {
@@ -178,14 +178,15 @@ const v3Sources: EditorialPlanState['sources'] = {
 
 test('generated plans reject truncated, blocked, and invalid JSON responses', () => {
   const completeResponse = { candidates: [{ finishReason: 'STOP' }] };
-  const v3Generated = {
-    version: 3,
+  const v4Generated = {
+    version: 4,
     openingJob: completePlan.openingJob,
     items: [
       {
         paragraphRange: { from: 1, to: 1 },
         sourcePhrase: 'The opening frames the tension.',
         decision: 'keep',
+        limit: '',
       },
       {
         paragraphRange: { from: 2, to: 2 },
@@ -193,11 +194,12 @@ test('generated plans reject truncated, blocked, and invalid JSON responses', ()
         reason: 'The reader needs the example, not the build-up around it.',
         sourcePhrase: 'The “quiet” handoff kept people oriented.',
         decision: 'shorten',
+        limit: '',
       },
     ],
   };
-  const validated = validateGeneratedPlan(JSON.stringify(v3Generated), completeResponse, v3Sources);
-  assert.equal(validated.version, 3);
+  const validated = validateGeneratedPlan(JSON.stringify(v4Generated), completeResponse, v3Sources);
+  assert.equal(validated.version, 4);
   assert.equal(validated.items.length, 2);
   assert.deepEqual(validated.conflicts, []);
   assert.equal(validated.items[0].idea, '');
@@ -206,24 +208,43 @@ test('generated plans reject truncated, blocked, and invalid JSON responses', ()
   assert.equal(validated.items[1].reason, 'The reader needs the example, not the build-up around it.');
 
   // Every suggested change carries its reason; the model may not propose a change without one.
-  const unreasoned = { ...v3Generated, items: [v3Generated.items[0], { ...v3Generated.items[1], reason: '' }] };
+  const unreasoned = { ...v4Generated, items: [v4Generated.items[0], { ...v4Generated.items[1], reason: '' }] };
   assert.throws(
     () => validateGeneratedPlan(JSON.stringify(unreasoned), completeResponse, v3Sources),
     /Suggestion 2 needs a reason\./,
   );
 
+  // Generation requires a limit on every figure-bearing passage, so the model
+  // must say how far the writer may take that claim.
+  const figureSources = { ...v3Sources, draft: 'The opening frames the tension.\n\nThe 12% lift held.' };
+  const unlimited = { ...v4Generated, items: [
+    v4Generated.items[0],
+    { ...v4Generated.items[1], sourcePhrase: 'The 12% lift held.' },
+  ] };
+  assert.throws(
+    () => validateGeneratedPlan(JSON.stringify(unlimited), completeResponse, figureSources),
+    /covers a figure/,
+  );
+  assert.doesNotThrow(() => validateGeneratedPlan(JSON.stringify({ ...unlimited, items: [unlimited.items[0], { ...unlimited.items[1], limit: 'The 12% belongs to the program, not the author.' }] }), completeResponse, figureSources));
+
+  const v3Generated = { ...v4Generated, version: 3 };
+  assert.throws(
+    () => validateGeneratedPlan(JSON.stringify(v3Generated), completeResponse, v3Sources),
+    /The planning model returned unusable decisions\. The proposal is missing its required format\./,
+  );
+
   const v2Plan = { ...completePlan, version: 2, items: completePlan.items.slice(0, 2).map(item => ({ ...item, paragraphId: 1 })) };
   assert.throws(
     () => validateGeneratedPlan(JSON.stringify(v2Plan), completeResponse, v3Sources),
-    /The planning model returned unusable decisions\. The proposal is missing its required section format\./,
+    /The planning model returned unusable decisions\. The proposal is missing its required format\./,
   );
 
   assert.throws(
-    () => validateGeneratedPlan(JSON.stringify(v3Generated), { candidates: [{ finishReason: 'MAX_TOKENS' }] }, v3Sources),
+    () => validateGeneratedPlan(JSON.stringify(v4Generated), { candidates: [{ finishReason: 'MAX_TOKENS' }] }, v3Sources),
     /did not finish|complete/i,
   );
   assert.throws(
-    () => validateGeneratedPlan(JSON.stringify(v3Generated), { promptFeedback: { blockReason: 'SAFETY' }, candidates: [{ finishReason: 'STOP' }] }, v3Sources),
+    () => validateGeneratedPlan(JSON.stringify(v4Generated), { promptFeedback: { blockReason: 'SAFETY' }, candidates: [{ finishReason: 'STOP' }] }, v3Sources),
     /did not finish|blocked/i,
   );
   assert.throws(
@@ -307,6 +328,38 @@ test('validates version 3 section plans with paragraph ranges and field constrai
     }, v3Sources),
     /Suggestion 2 needs an exact phrase from draft paragraphs 2–2\./,
   );
+});
+
+test('section plans keep their own version and generation can require claim limits', () => {
+  const v4Plan: EditorialPlan = {
+    version: 4,
+    openingJob: 'Establish the core tension.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 2 },
+        decision: 'keep',
+        idea: '',
+        sourcePhrase: 'The opening frames the tension.',
+        limit: 'Keep the framing as the author’s own reading, not a measured result.',
+      },
+    ],
+    conflicts: [],
+  };
+
+  assert.equal(validateEditorialPlan(v4Plan, v3Sources).version, 4);
+  assert.equal(validateEditorialPlan({ ...v4Plan, version: 3 }, v3Sources).version, 3);
+  assert.deepEqual(validateEditorialPlan({ ...v4Plan, version: 3 }, v3Sources).items, validateEditorialPlan(v4Plan, v3Sources).items);
+
+  // Generation requires a limit wherever the passage carries a figure; approval
+  // trusts the author, so a saved v4 suggestion without one still validates.
+  const figureSources = { ...v3Sources, draft: 'The 12% lift held after the handoff.' };
+  const figurePlan: EditorialPlan = { ...v4Plan, items: [{ ...v4Plan.items[0], paragraphRange: { from: 1, to: 1 }, sourcePhrase: figureSources.draft, limit: '' }] };
+  assert.doesNotThrow(() => validateEditorialPlan(figurePlan, figureSources));
+  assert.throws(
+    () => validateEditorialPlan(figurePlan, figureSources, { requireClaimLimits: true }),
+    /Suggestion 1 covers a figure; say in limit how far the writer may take that claim\./,
+  );
+  assert.doesNotThrow(() => validateEditorialPlan({ ...figurePlan, items: [{ ...figurePlan.items[0], limit: 'The 12% belongs to the program, not the author.' }] }, figureSources, { requireClaimLimits: true }));
 });
 
 test('the author’s answer to a suggestion decides how it is executed', () => {
@@ -410,4 +463,36 @@ test('planning prompt includes complete source inputs without corpus or profile 
   // Every suggested change must come with its reason; the author reads it before answering.
   assert.match(prompt, /- reason: for shorten or cut/);
   assert.match(prompt, /accept, reject, or ignore/);
+  // Version 4 plans by claim inside each section, and the opening may not invent a diagnosis.
+  assert.ok(prompt.includes('one suggestion for each distinct claim'));
+  assert.ok(prompt.includes('Do not introduce a diagnosis'));
+  assert.ok(prompt.includes('version: 4'));
+  assert.equal(prompt.includes('five to ten'), false);
+  // The prompt states the same figure rule the generation validator enforces, so a
+  // plan that follows the prompt is never rejected for a bare number.
+  assert.ok(prompt.includes('contain a number, percentage, currency amount, date, or duration must carry a limit'));
+  assert.match(prompt, /For each suggestion choose one decision:/);
+  assert.doesNotMatch(prompt, /For each section choose/);
+});
+
+test('the planning prompt carries enabled domain context as interpretation only', () => {
+  const domain: DomainExpertise = {
+    enabled: true,
+    field: 'Product design',
+    disciplines: ['Information architecture'],
+    topics: [{ id: 'hierarchy', name: 'Information hierarchy', keyTerminology: ['Progressive disclosure'], conventions: [], enabled: true }],
+    keyTerminology: [],
+    conventions: [],
+    audienceContext: '',
+  };
+
+  const withDomain = buildEditorialPlanPrompt(sources, domain);
+  assert.ok(withDomain.includes('DOMAIN CONTEXT'));
+  assert.ok(withDomain.includes('Information hierarchy'));
+  assert.ok(withDomain.includes('adds no facts'));
+
+  // No settings supplied still names the block, so the planner is never told a
+  // partial story.
+  assert.ok(buildEditorialPlanPrompt(sources).includes('No domain settings are enabled.'));
+  assert.ok(buildEditorialPlanPrompt(sources, { ...domain, enabled: false }).includes('No domain settings are enabled.'));
 });

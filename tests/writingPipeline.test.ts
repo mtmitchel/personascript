@@ -20,7 +20,7 @@ import {
   validateReaderPurpose,
   validateWritingCorpus,
 } from '../src/writingPipeline';
-import type { EditorialPlan } from '../src/types';
+import type { DomainExpertise, EditorialPlan } from '../src/types';
 
 const profile = {
   id: 'profile-1',
@@ -753,4 +753,82 @@ test('editorialPlanBlock formats version 3 plans omitting empty fields, formatti
       authorDecision: 'Use the brief statement.',
     },
   ]);
+});
+
+test('editorialPlanBlock sends version 4 limits the writer must not exceed', () => {
+  const v4Plan: EditorialPlan = {
+    version: 4,
+    openingJob: 'Establish the core thesis.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 1 },
+        decision: 'shorten',
+        sourcePhrase: 'The 12% lift held.',
+        idea: 'Keep the measured result.',
+        reason: 'The reader needs the outcome.',
+        limit: 'The 12% belongs to the program, not the author.',
+      },
+      {
+        paragraphRange: { from: 2, to: 2 },
+        decision: 'keep',
+        sourcePhrase: 'The handoff stayed quiet.',
+        idea: '',
+        reason: '',
+        limit: '',
+      },
+    ],
+  };
+
+  const block = editorialPlanBlock(v4Plan);
+  const parsed = JSON.parse(block.split('<editorial-decisions>')[1].split('</editorial-decisions>')[0].trim());
+  assert.equal(parsed.items[0].limit, 'The 12% belongs to the program, not the author.');
+  assert.equal('limit' in parsed.items[1], false);
+
+  // The guidance tells the writer what a limit means.
+  const prompt = buildRewritePrompt({
+    draft: 'The 12% lift held.\n\nThe handoff stayed quiet.',
+    samples,
+    editorialPlan: v4Plan,
+  });
+  assert.ok(prompt.includes('do not exceed it'));
+});
+
+test('an approved plan with enabled domain settings keeps concept recognition', () => {
+  const domain: DomainExpertise = {
+    enabled: true,
+    field: 'Product design',
+    disciplines: [],
+    topics: [{ id: 'hierarchy', name: 'Information hierarchy', keyTerminology: [], conventions: [], enabled: true }],
+    keyTerminology: [],
+    conventions: [],
+    audienceContext: '',
+  };
+  const plan: EditorialPlan = {
+    version: 4,
+    openingJob: 'Establish the decision.',
+    items: [{ paragraphRange: { from: 1, to: 1 }, decision: 'keep', sourcePhrase: 'Opening thesis.', idea: '', reason: '', limit: '' }],
+  };
+
+  const withDomain = buildRewritePrompt({ draft: 'Opening thesis.', samples, editorialPlan: plan, domainExpertise: domain });
+  assert.ok(withDomain.includes('Concept recognition'));
+  // It is interpretation guidance only: no new claims and no compulsory terms.
+  assert.ok(withDomain.includes('DOMAIN CONTEXT (interpretation only; no new claims or compulsory terminology)'));
+  assert.ok(withDomain.includes('never fabricate', ) || withDomain.includes('Never fabricate'));
+
+  const withoutDomain = buildRewritePrompt({ draft: 'Opening thesis.', samples, editorialPlan: plan });
+  assert.equal(withoutDomain.includes('Concept recognition'), false);
+});
+
+test('brief caveats bound claim strength without becoming sentences to add', () => {
+  const plan: EditorialPlan = {
+    version: 4,
+    openingJob: 'Establish the decision.',
+    items: [{ paragraphRange: { from: 1, to: 1 }, decision: 'keep', sourcePhrase: 'Opening thesis.', idea: '', reason: '', limit: '' }],
+  };
+  const writer = buildRewritePrompt({ draft: 'Opening thesis.', samples, editorialPlan: plan, projectBrief: 'The screen was a designed direction.' });
+  assert.ok(writer.includes('It is not a sentence to add.'));
+  assert.ok(writer.includes('bounds the strength of your claims'));
+
+  const review = buildReviewPrompt({ sourceText: 'Opening thesis.', finalText: 'Opening thesis.', projectBrief: 'The screen was a designed direction.' });
+  assert.ok(review.includes("brief's own caveat"));
 });

@@ -8,3 +8,5 @@ coverage/
 !.env.example
 # Node diagnostic reports (crash dumps; contain environment)
 report.*.json
+# Browser partial downloads
+*.crdownload*

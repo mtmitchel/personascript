@@ -32,18 +32,22 @@ localStorage                                     src/aiProvider.ts
   view reads and writes through `useWritingAssistant()`. It loads and saves
   each `localStorage` key, runs every API call, and holds the operation locks
   (`isRewriting`, `isPlanning`, …) that keep concurrent writes out.
-- Views: `SamplesView`, `ProfileView`, `DraftBriefView`, `DomainView` +
-  `DomainExpertiseEditor`, `StudioView`. Studio composes `EditorialDecisions`
-  (suggestions), `StudioDraftControls` (strength and locks, source side only),
-  `RewriteFeedbackManager` (post-rewrite request), `DiffViewer` (track
-  changes), `WritingReviewPanel`, `RewriteHistory`.
+- Views: `SamplesView`, `ProfileView`, `DraftBriefView`, `DomainView` (split
+  into `DomainTopicsSection` and `DomainProductsSection`), `StudioView`. Views
+  share `StepFooter`. Studio composes `SelectionToolbar` (floating selection
+  affordance), `EditorialDecisions` (suggestions), `StudioDraftControls`
+  (strength and locks, source side only), `RewriteFeedbackManager` (post-rewrite
+  request), `DiffViewer` (track changes), `WritingReviewPanel`, `RewriteHistory`.
 - Shared modules imported by both client and server: `src/types.ts`,
   `src/editorialPlan.ts`, `src/writingPipeline.ts`, `src/planAssertionReview.ts`,
   `src/sourceText.ts`, `src/domainGeneration.ts`, `src/modelChoice.ts`. They
   contain no DOM or Node-only code so the same validators run on both sides.
 - `src/utils/` — pure helpers: `editorialSummary` (what the rail shows),
-  `diffHelper` (paragraph alignment for track changes), `rewriteHistory`,
-  `studioWorkspace`, `reviewEvidence`, `voiceFeedback`, `stylePreference`.
+  `diffHelper` (paragraph alignment for track changes), `richText` (Markdown
+  rendered as formatting; `plainText` for comparing and quoting),
+  `passageSelection` (a DOM selection located in the saved text),
+  `rewriteHistory`, `studioWorkspace`, `reviewEvidence`, `voiceFeedback`,
+  `stylePreference`.
 
 ### Browser storage keys
 
@@ -97,11 +101,15 @@ regenerated implicitly.
    `DEFAULT_EDITORIAL_PREFERENCES`). All four feed planning; all four feed
    writing; draft and brief feed the audit and review.
 4. **Domain Knowledge** → `DomainExpertise` on the profile. Feeds the writer
-   and reviewer as interpretive background, never as factual authority.
+   and reviewer as interpretive background, never as factual authority; the
+   planner also receives it as interpretation context. It is deliberately
+   outside `EditorialPlanState.sources`, so toggling a topic does not make an
+   approved plan stale.
 5. **Rewrite Studio** — three model calls in order, each gated by the last:
    - **Plan** (`/api/plan-draft`, `buildEditorialPlanPrompt`) reads draft,
-     brief, reader & purpose, standing preferences, and the rewrite request.
-     Returns an `EditorialPlan` (below). Validated by `validateGeneratedPlan`.
+     brief, reader & purpose, standing preferences, the rewrite request, and
+     the domain block (interpretation only, optional). Returns an
+     `EditorialPlan` (below). Validated by `validateGeneratedPlan`.
    - **Approve** (client, `approveEditorialPlan`) re-validates the plan
      against the exact current sources (`validateSectionPlan`) and freezes a
      snapshot `{ plan, sources, approved: true }`. The server re-validates the
@@ -119,39 +127,49 @@ regenerated implicitly.
      the current version with the same locks and the saved plan context, then
      review again. **Keep original / Restore / Remove** in track changes edit
      the text locally (`updateRewrittenText`) with no model call and drop the
-     stale review.
+     stale review. **Delete** in History removes a version from
+     `personascript_history_v2` (`deleteRewriteVersion`); deleting the open
+     version clears `rewriteResult`, so the Studio shows the original draft.
 
-### The editorial plan contract (version 3)
+### The editorial plan contract (version 4)
 
 Defined in `src/types.ts` (`EditorialPlan`), validated in `src/editorialPlan.ts`.
 
-- `openingJob` — one sentence on what the opening must do.
-- `items[]` — one per section (a contiguous `paragraphRange`, inclusive,
-  1-based over `getDraftParagraphs(draft)`). Ranges must cover every paragraph
-  with no gaps. Each item: `decision` keep | shorten | cut; `idea` (what
-  changes; required unless keep); `reason` (why; required at generation);
-  `sourcePhrase` (verbatim, must occur inside the range); `limit` (a
-  passage-specific qualification, empty when the standing preferences already
-  say it); `response` (author's answer: accepted | rejected | ignored).
-  Rejected and ignored items are normalised to keep at approval.
+- `openingJob` — one sentence on what the opening must do, drawn only from what
+  the draft's opening already states.
+- `items[]` — one per claim inside a section (a contiguous `paragraphRange`,
+  inclusive, 1-based over `getDraftParagraphs(draft)`). A passage that needs its
+  own treatment or its own limit gets its own item; ideas that share a treatment
+  and carry no claim may share one. Ranges must cover every paragraph with no
+  gaps. Each item: `decision` keep | shorten | cut; `idea` (what changes;
+  required unless keep); `reason` (why; required at generation);
+  `sourcePhrase` (verbatim, must occur inside the range); `limit` (how far this
+  passage's claim may go; required at generation whenever the range contains a
+  figure, empty otherwise); `response` (author's answer: accepted | rejected |
+  ignored). Rejected and ignored items are normalised to keep at approval.
 - `conflicts[]` — every evidenced draft/brief contradiction, asked once at the
   top with both quotations verbatim; `resolution` must be set before approval.
 - `requests[]` — the author's own passage requests: `paragraphRange`,
   verbatim `sourcePhrase`, `instruction`. They outrank the item covering that
   passage.
 
-The rail shows a summary of this (`sectionPlan()`); the writer and reviewer
-receive the whole thing. Version 2 plans (one item per paragraph, per-item
-conflicts) still load and display as a notice; they cannot be approved.
+Sections are not stored. The rail derives them from the draft's headings at
+display time (`sectionPlan()`): a section runs from a heading, or paragraph 1,
+to the paragraph before the next heading. The writer and reviewer receive the
+whole plan. Version 3 plans (one item per section) still load, display in the
+same section grouping, and remain approvable; version 2 plans (one item per
+paragraph, per-item conflicts) still load and display as a notice, and are
+replaced rather than approved (`planNeedsReplacement`), approved or not.
 `PLAN_FIELD_LIMITS` and `PLAN_MAX_ITEMS` are ceilings on saved data and must
 not shrink without a normaliser.
 
 ### Where the rules live
 
 Fidelity and attribution rules are stated once, in `WRITING_SYSTEM_INSTRUCTION`
-and `DEFAULT_EDITORIAL_PREFERENCES`. The planner is told not to restate them as
-per-item limits; the reviewer is told they apply. If a rule needs to change,
-change it there, not in a prompt that quotes it.
+and `DEFAULT_EDITORIAL_PREFERENCES`. The planner applies them per passage in
+`limit`, quoting the passage's own words; it does not copy the rule text. The
+reviewer is told they apply. If a rule needs to change, change it there, not in
+a prompt that quotes it.
 
 ## Invariants
 
