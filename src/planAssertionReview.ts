@@ -98,7 +98,7 @@ SOURCE AND PLAN BOUNDARY:
 - The approved plan is the object being audited. Its keep/shorten/cut choice and reader-facing rationale are editorial decisions; factual claims inside its idea, sourcePhrase, or limit still need source support.
 - Do not inspect a final draft. Do not use a writing corpus, voice profile, reader and purpose guidance, product guidance, or any other context.
 
-Return exactly one result with itemIndex 0 for the openingJob and one result for every plan item, using its one-based position. Cover every item, including legacy plans whose items have no paragraphId. The opening job is also an approved plan assertion: audit any factual claims it makes rather than treating it as a preference judgment.
+Return exactly one result with itemIndex 0 for the openingJob and one result for every plan item, using its one-based position. Cover every item, including legacy plans whose items have no paragraphId. An item may carry a paragraphRange instead; then paragraphId in your result, if given, must fall inside that range. The opening job is also an approved plan assertion: audit any factual claims it makes rather than treating it as a preference judgment.
 
 Use these statuses:
 - supported: the item's factual assertions are supported by one or more explicit statements in the draft or brief.
@@ -221,12 +221,15 @@ export function validatePlanSourceAudit(
     }
 
     const planItem = itemIndex === 0 ? undefined : input.editorialPlan.items[itemIndex - 1];
-    const paragraphId = raw.paragraphId === undefined
+    // The opening job has no paragraph; a paragraphId on its result is dropped, not an error.
+    const paragraphId = raw.paragraphId === undefined || itemIndex === 0
       ? undefined
       : typeof raw.paragraphId === 'number' ? raw.paragraphId : NaN;
+    // A section plan's item spans a range; any paragraph inside it is a valid reference.
+    const inRange = (id: number) => !planItem?.paragraphRange || (id >= planItem.paragraphRange.from && id <= planItem.paragraphRange.to);
     if (paragraphId !== undefined && (!Number.isInteger(paragraphId) || paragraphId <= 0
-      || !planItem || (planItem.paragraphId !== undefined && paragraphId !== planItem.paragraphId))) {
-      throw new Error(`The plan source audit returned the wrong paragraph for ${itemIndex === 0 ? 'the opening job' : `decision ${itemIndex}`}.`);
+      || !planItem || (planItem.paragraphId !== undefined && paragraphId !== planItem.paragraphId) || !inRange(paragraphId))) {
+      throw new Error(`The plan source audit returned the wrong paragraph for decision ${itemIndex}.`);
     }
     items.push({ itemIndex, ...(paragraphId === undefined ? {} : { paragraphId }), status: status as PlanAssertionStatus, assertion, detail, evidence });
   });

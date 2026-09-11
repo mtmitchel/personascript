@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+# Node diagnostic reports (crash dumps; contain environment)
+report.*.json

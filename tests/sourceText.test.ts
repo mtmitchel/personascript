@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cleanPdfPages, cleanSourceText, sourceContainsPhrase } from '../src/sourceText';
+import { cleanPdfPages, cleanSourceText, headingText, isHeadingParagraph, sourceContainsPhrase } from '../src/sourceText';
 import { validatePlanSources, planMatchesSources } from '../src/editorialPlan';
 import { buildRewritePrompt, runLocalPreservationChecks } from '../src/writingPipeline';
 
@@ -56,4 +56,10 @@ test('preserves standalone body numbers without page-label evidence', () => {
   const text = 'Section heading\nThe measured count was\n1';
   assert.equal(cleanPdfPages([text]), text);
   assert.equal(cleanPdfPages(['Page 1\nThe measured count was 1.']), 'The measured count was 1.');
+});
+
+test('detects heading paragraphs and extracts heading text', () => {
+  assert.equal(isHeadingParagraph('## Title'), true);
+  assert.equal(isHeadingParagraph('This is an ordinary body paragraph with several words and sentences.'), false);
+  assert.equal(headingText('## Title'), 'Title');
 });

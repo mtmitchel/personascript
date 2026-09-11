@@ -1,11 +1,8 @@
-import type { EditorialPlan, EditorialPlanState } from '../types';
+import type { EditorialConflict, EditorialPlan, EditorialPlanState } from '../types';
 import { validateEditorialPlan } from '../editorialPlan';
-import { cleanSourceText, getDraftParagraphs, sourceContainsPhrase } from '../sourceText';
+import { cleanSourceText, getDraftParagraphs, headingText, isHeadingParagraph, sourceContainsPhrase } from '../sourceText';
 
 type PlanItem = EditorialPlan['items'][number];
-
-/** One displayed plan row: a decision, or identical repeats shown together. */
-export interface PlanRow { item: PlanItem; indices: number[] }
 
 /** Presentation only: never shorten the saved plan or the writer's instructions. */
 export function compactPlanText(text: string): string {
@@ -19,12 +16,6 @@ export function planPreview(text: string, length = 180): string {
   return clean.slice(0, end > length / 2 ? end : length).trimEnd() + '…';
 }
 
-/** The part of a limit that adds information beyond the idea itself. */
-export function extraLimitText(item: PlanItem): string {
-  const limit = compactPlanText(item.limit);
-  return limit && limit !== 'No additional limits.' && limit !== compactPlanText(item.idea) ? limit : '';
-}
-
 /** Name the exact inputs that changed so the stale notice can say what to re-check. */
 export function planStaleReasons(state: EditorialPlanState, sources: EditorialPlanState['sources']): string[] {
   const reasons: string[] = [];
@@ -36,49 +27,75 @@ export function planStaleReasons(state: EditorialPlanState, sources: EditorialPl
   return reasons;
 }
 
+/** One decision as the author reads it: the section's own name, then what changes. */
+export interface PlanSection {
+  /** Position in plan.items, for edits. */
+  index: number;
+  item: PlanItem;
+  name: string;
+  from: number;
+  to: number;
+}
+
 /**
- * Display grouping only; the stored plan keeps every item unchanged.
- * Identical decisions (same treatment, idea, and limit) show once with all
- * their source references. Conflicts are never grouped: each carries its own
- * quotations. Plain keeps collapse; keeps with a distinctive claim limit stay
- * visible as changes because the limit is part of the choice.
+ * The plan as an editor's note. Sections are named by the draft's own
+ * heading when the range starts with one; otherwise by the planner's label
+ * for a keep, or by paragraph numbers. Order follows the draft. Grouping is
+ * display only; the stored plan is unchanged.
  */
-export function summarizeEditorialPlan(plan: EditorialPlan) {
-  const counts = { keep: 0, shorten: 0, cut: 0 };
-  const conflicts: PlanRow[] = [];
-  const changes: PlanRow[] = [];
-  const plainKeeps: PlanRow[] = [];
-  const groups = new Map<string, PlanRow>();
-  plan.items.forEach((item, index) => {
-    counts[item.decision]++;
-    if (item.sourceConflict) {
-      conflicts.push({ item, indices: [index] });
-      return;
-    }
-    const bucket = item.decision === 'keep' && !extraLimitText(item) ? plainKeeps : changes;
-    const key = JSON.stringify([item.decision, compactPlanText(item.idea), compactPlanText(item.limit)]);
-    const existing = groups.get(key);
-    if (existing) existing.indices.push(index);
-    else {
-      const row: PlanRow = { item, indices: [index] };
-      groups.set(key, row);
-      bucket.push(row);
-    }
-  });
-  return { counts, conflicts, changes, plainKeeps, keptCount: plainKeeps.reduce((total, row) => total + row.indices.length, 0) };
+export function sectionPlan(plan: EditorialPlan, draft: string) {
+  const paragraphs = getDraftParagraphs(draft);
+  const sections: PlanSection[] = plan.items.map((item, index) => {
+    const from = item.paragraphRange?.from ?? item.paragraphId ?? 0;
+    const to = item.paragraphRange?.to ?? item.paragraphId ?? 0;
+    const first = paragraphs[from - 1];
+    const heading = first && isHeadingParagraph(first.text) ? headingText(first.text) : '';
+    const label = item.decision === 'keep' ? compactPlanText(item.idea) : '';
+    const numbers = from && to ? (from === to ? `Paragraph ${from}` : `Paragraphs ${from}–${to}`) : 'Untitled section';
+    return { index, item, name: heading || label || numbers, from, to };
+  }).sort((a, b) => a.from - b.from || a.to - b.to);
+  const conflicts: EditorialConflict[] = plan.conflicts || [];
+  const changes = sections.filter(section => section.item.decision !== 'keep');
+  return {
+    cuts: changes.filter(section => section.item.decision === 'cut'),
+    tightens: changes.filter(section => section.item.decision === 'shorten'),
+    keeps: sections.filter(section => section.item.decision === 'keep'),
+    /** Suggestions the author has not yet accepted, rejected, or ignored. */
+    pending: changes.filter(section => !section.item.response).length,
+    requests: plan.requests || [],
+    conflicts,
+    unresolvedConflicts: conflicts.filter(conflict => !conflict.resolution).length,
+  };
+}
+
+/**
+ * Paragraph numbers no decision covers. Version-2 plans anchor by paragraph
+ * number, version-3 plans by range; legacy plans anchor by phrase alone, so
+ * they cannot be checked this way and report nothing.
+ */
+export function uncoveredParagraphRefs(plan: EditorialPlan, draft: string): number[] {
+  if (plan.version !== 2 && plan.version !== 3) return [];
+  return getDraftParagraphs(draft)
+    .filter(paragraph => !plan.items.some(item => item.paragraphRange
+      ? paragraph.id >= item.paragraphRange.from && paragraph.id <= item.paragraphRange.to
+      : item.paragraphId === paragraph.id))
+    .map(paragraph => paragraph.id);
 }
 
 /** Identify repairable rows, then use the real approval validator for the gate. */
 export function planReadiness(plan: EditorialPlan, draft: string, projectBrief = '') {
   const paragraphs = getDraftParagraphs(draft);
   const incomplete = plan.items.flatMap((item, index) => {
-    const anchored = plan.version === 2
-      ? paragraphs.some(p => p.id === item.paragraphId && sourceContainsPhrase(p.text, item.sourcePhrase))
-      : sourceContainsPhrase(draft, item.sourcePhrase) || sourceContainsPhrase(projectBrief, item.sourcePhrase);
+    const anchored = plan.version === 3
+      ? Boolean(item.paragraphRange) && sourceContainsPhrase(paragraphs.slice(item.paragraphRange!.from - 1, item.paragraphRange!.to).map(p => p.text).join('\n'), item.sourcePhrase)
+      : plan.version === 2
+        ? paragraphs.some(p => p.id === item.paragraphId && sourceContainsPhrase(p.text, item.sourcePhrase))
+        : sourceContainsPhrase(draft, item.sourcePhrase) || sourceContainsPhrase(projectBrief, item.sourcePhrase);
     const conflictValid = !item.sourceConflict || (
       sourceContainsPhrase(draft, item.sourceConflict.draftQuote) && sourceContainsPhrase(projectBrief, item.sourceConflict.briefQuote)
     );
-    return !item.idea.trim() || !item.limit.trim() || !anchored || !conflictValid ? [index] : [];
+    const complete = plan.version === 3 ? item.decision === 'keep' || Boolean(item.response) || item.idea.trim() : item.idea.trim() && item.limit.trim();
+    return !complete || !anchored || !conflictValid ? [index] : [];
   });
   let error: string | null = null;
   try { validateEditorialPlan(plan, { draft, projectBrief, readerPurpose: '' }); }

@@ -8,6 +8,7 @@ import {
   buildRewritePrompt,
   buildSelectionPrompt,
   domainBlock,
+  editorialPlanBlock,
   extractNumbers,
   hasFreshProfileGuidance,
   normalizeDomainExpertise,
@@ -19,6 +20,7 @@ import {
   validateReaderPurpose,
   validateWritingCorpus,
 } from '../src/writingPipeline';
+import type { EditorialPlan } from '../src/types';
 
 const profile = {
   id: 'profile-1',
@@ -655,4 +657,100 @@ test('new reviews reject voice grading while legacy history retains its own read
   assert.throws(() => validateGeneratedReview(JSON.stringify({ summary: 'Style.', findings: [], voiceObservations: ['Shorter sentences.'] })), /malformed review/);
   const prompt = buildReviewPrompt({ sourceText: 'Source.', finalText: 'Final.' });
   assert.ok(prompt.indexOf('Approved decisions are the editorial checklist') < prompt.indexOf('Editorial relevance and explicit user instructions'));
+});
+
+test('editorialPlanBlock formats version 3 plans omitting empty fields, formatting ranges, and including resolved conflicts', () => {
+  const v3Plan: EditorialPlan = {
+    version: 3,
+    openingJob: 'Establish the core thesis.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 2 },
+        decision: 'keep',
+        sourcePhrase: 'Opening thesis.',
+        idea: '',
+        limit: '',
+      },
+      {
+        paragraphRange: { from: 3, to: 5 },
+        decision: 'shorten',
+        sourcePhrase: 'Supporting evidence.',
+        idea: 'Compress data points.',
+        reason: 'The reader wants the outcome, not the method.',
+        limit: 'Do not extrapolate.',
+        response: 'accepted',
+      },
+    ],
+    requests: [
+      { paragraphRange: { from: 4, to: 4 }, sourcePhrase: 'Supporting evidence.', instruction: 'Name the data source.' },
+    ],
+    conflicts: [
+      {
+        draftQuote: 'Lift was 12%.',
+        briefQuote: 'Lift was 9.8%.',
+        question: 'Which lift number?',
+        resolution: 'draft',
+      },
+      {
+        draftQuote: 'Unresolved quote A.',
+        briefQuote: 'Unresolved quote B.',
+        question: 'Which statement?',
+      },
+      {
+        draftQuote: 'Launch was in May.',
+        briefQuote: 'Launch was in June.',
+        question: 'Which launch month?',
+        resolution: 'brief',
+      },
+    ],
+  };
+
+  const block = editorialPlanBlock(v3Plan);
+  assert.match(block, /APPROVED EDITORIAL DECISIONS:/);
+  const parsed = JSON.parse(block.split('<editorial-decisions>')[1].split('</editorial-decisions>')[0].trim());
+
+  assert.equal(parsed.openingJob, 'Establish the core thesis.');
+  assert.equal(parsed.items.length, 2);
+
+  // Item 1: empty idea and limit omitted, paragraphs formatted as "1-2"
+  assert.deepEqual(parsed.items[0], {
+    paragraphs: '1-2',
+    decision: 'keep',
+    sourcePhrase: 'Opening thesis.',
+  });
+  assert.equal('idea' in parsed.items[0], false);
+  assert.equal('reason' in parsed.items[0], false);
+  assert.equal('limit' in parsed.items[0], false);
+
+  // Item 2: idea, reason, and limit included; the author's response is not the writer's business
+  assert.deepEqual(parsed.items[1], {
+    paragraphs: '3-5',
+    decision: 'shorten',
+    sourcePhrase: 'Supporting evidence.',
+    idea: 'Compress data points.',
+    reason: 'The reader wants the outcome, not the method.',
+    limit: 'Do not extrapolate.',
+  });
+
+  // The author's own requests reach the writer with their passage and paragraphs
+  assert.deepEqual(parsed.authorRequests, [
+    { paragraphs: '4-4', passage: 'Supporting evidence.', instruction: 'Name the data source.' },
+  ]);
+  assert.equal('authorRequests' in JSON.parse(editorialPlanBlock({ ...v3Plan, requests: [] }).split('<editorial-decisions>')[1].split('</editorial-decisions>')[0].trim()), false);
+
+  // Resolved conflicts included with authorDecision, unresolved omitted
+  assert.deepEqual(parsed.resolvedConflicts, [
+    {
+      question: 'Which lift number?',
+      draftQuote: 'Lift was 12%.',
+      briefQuote: 'Lift was 9.8%.',
+      authorDecision: 'Use the draft statement.',
+    },
+    {
+      question: 'Which launch month?',
+      draftQuote: 'Launch was in May.',
+      briefQuote: 'Launch was in June.',
+      authorDecision: 'Use the brief statement.',
+    },
+  ]);
 });

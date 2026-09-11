@@ -200,3 +200,85 @@ test('the audit covers the maximum allowed decisions plus the opening', () => {
     { candidates: [{ finishReason: 'STOP' }] }, input);
   assert.equal(result.items.length, PLAN_MAX_ITEMS + 1);
 });
+
+test('version 3 audit accepts paragraphId inside range and throws when outside range', () => {
+  const v3Input: PlanSourceAuditInput = {
+    draft: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.\n\nParagraph four.',
+    projectBrief: 'Brief background.',
+    editorialPlan: {
+      version: 3,
+      openingJob: 'Establish context.',
+      items: [
+        {
+          paragraphRange: { from: 2, to: 4 },
+          idea: 'Keep body section.',
+          sourcePhrase: 'Paragraph three.',
+          decision: 'keep',
+          limit: '',
+        },
+      ],
+      conflicts: [],
+    },
+  };
+
+  const auditWithParagraphId = (paragraphId?: number) => validatePlanSourceAudit(
+    JSON.stringify({
+      summary: 'Audited v3 item.',
+      items: [
+        {
+          itemIndex: 0,
+          status: 'editorial',
+          assertion: 'Establish context.',
+          detail: 'Opening job.',
+          evidence: [{ source: 'draft', quote: 'Paragraph one.' }],
+        },
+        {
+          itemIndex: 1,
+          ...(paragraphId !== undefined ? { paragraphId } : {}),
+          status: 'supported',
+          assertion: 'Body section statement.',
+          detail: 'Supported by paragraph three.',
+          evidence: [{ source: 'draft', quote: 'Paragraph three.' }],
+        },
+      ],
+    }),
+    { candidates: [{ finishReason: 'STOP' }] },
+    v3Input,
+  );
+
+  assert.equal(auditWithParagraphId(2).items[1].paragraphId, 2);
+  assert.equal(auditWithParagraphId(3).items[1].paragraphId, 3);
+  assert.equal(auditWithParagraphId(4).items[1].paragraphId, 4);
+
+  assert.throws(
+    () => auditWithParagraphId(1),
+    /The plan source audit returned the wrong paragraph for decision 1\./,
+  );
+  assert.throws(
+    () => auditWithParagraphId(5),
+    /The plan source audit returned the wrong paragraph for decision 1\./,
+  );
+});
+
+test('a paragraphId on the opening-job result is dropped instead of failing the audit', () => {
+  const result = validatePlanSourceAudit(
+    JSON.stringify({ summary: 'Audited.', items: [
+      { ...openingAudit, paragraphId: 1 },
+      {
+        itemIndex: 1, paragraphId: 1, status: 'supported',
+        assertion: 'The allowance is shown in an in-page indicator.', detail: 'Stated directly.',
+        evidence: [{ source: 'draft', quote: 'The allowance appeared in an in-page indicator.' }],
+      },
+      {
+        itemIndex: 2, paragraphId: 2, status: 'editorial',
+        assertion: 'The planned explanation should be shortened.', detail: 'Compression choice.',
+        evidence: [{ source: 'draft', quote: 'The team planned to explain the reset state.' }],
+      },
+    ] }),
+    { candidates: [{ finishReason: 'STOP' }] },
+    sourceInput,
+  );
+  assert.equal(result.items[0].itemIndex, 0);
+  assert.equal(result.items[0].paragraphId, undefined);
+  assert.equal(result.items[1].paragraphId, 1);
+});

@@ -54,8 +54,8 @@ test('validates a complete plan and retains all editorial decisions', () => {
 
   assert.deepEqual(validated, completePlan);
   assert.deepEqual(validated.items.map((item) => item.decision), ['keep', 'shorten', 'cut']);
-  assert.deepEqual(EDITORIAL_PLAN_SCHEMA.required, ['version', 'openingJob', 'items']);
-  assert.deepEqual(EDITORIAL_PLAN_SCHEMA.properties.items.items.required, ['paragraphId', 'idea', 'sourcePhrase', 'decision', 'limit']);
+  assert.deepEqual(EDITORIAL_PLAN_SCHEMA.required, ['version', 'openingJob', 'items', 'conflicts']);
+  assert.deepEqual(EDITORIAL_PLAN_SCHEMA.properties.items.items.required, ['paragraphRange', 'decision', 'idea', 'reason', 'sourcePhrase']);
 });
 
 test('rejects malformed shapes, unsupported decisions, empty content, and oversized plans', () => {
@@ -171,22 +171,206 @@ test('shape validation preserves incomplete user edits while approval validation
   );
 });
 
+const v3Sources: EditorialPlanState['sources'] = {
+  ...sources,
+  draft: 'The opening frames the tension.\n\nThe “quiet” handoff kept people oriented.',
+};
+
 test('generated plans reject truncated, blocked, and invalid JSON responses', () => {
   const completeResponse = { candidates: [{ finishReason: 'STOP' }] };
-  const newPlan = { ...completePlan, version: 2, items: completePlan.items.slice(0, 2).map(item => ({ ...item, paragraphId: 1 })) };
-  assert.deepEqual(validateGeneratedPlan(JSON.stringify(newPlan), completeResponse, sources), newPlan);
+  const v3Generated = {
+    version: 3,
+    openingJob: completePlan.openingJob,
+    items: [
+      {
+        paragraphRange: { from: 1, to: 1 },
+        sourcePhrase: 'The opening frames the tension.',
+        decision: 'keep',
+      },
+      {
+        paragraphRange: { from: 2, to: 2 },
+        idea: 'Keep the concrete handoff example while tightening it.',
+        reason: 'The reader needs the example, not the build-up around it.',
+        sourcePhrase: 'The “quiet” handoff kept people oriented.',
+        decision: 'shorten',
+      },
+    ],
+  };
+  const validated = validateGeneratedPlan(JSON.stringify(v3Generated), completeResponse, v3Sources);
+  assert.equal(validated.version, 3);
+  assert.equal(validated.items.length, 2);
+  assert.deepEqual(validated.conflicts, []);
+  assert.equal(validated.items[0].idea, '');
+  assert.equal(validated.items[0].reason, '');
+  assert.equal(validated.items[0].limit, '');
+  assert.equal(validated.items[1].reason, 'The reader needs the example, not the build-up around it.');
+
+  // Every suggested change carries its reason; the model may not propose a change without one.
+  const unreasoned = { ...v3Generated, items: [v3Generated.items[0], { ...v3Generated.items[1], reason: '' }] };
+  assert.throws(
+    () => validateGeneratedPlan(JSON.stringify(unreasoned), completeResponse, v3Sources),
+    /Suggestion 2 needs a reason\./,
+  );
+
+  const v2Plan = { ...completePlan, version: 2, items: completePlan.items.slice(0, 2).map(item => ({ ...item, paragraphId: 1 })) };
+  assert.throws(
+    () => validateGeneratedPlan(JSON.stringify(v2Plan), completeResponse, v3Sources),
+    /The planning model returned unusable decisions\. The proposal is missing its required section format\./,
+  );
 
   assert.throws(
-    () => validateGeneratedPlan(JSON.stringify(completePlan), { candidates: [{ finishReason: 'MAX_TOKENS' }] }, sources),
+    () => validateGeneratedPlan(JSON.stringify(v3Generated), { candidates: [{ finishReason: 'MAX_TOKENS' }] }, v3Sources),
     /did not finish|complete/i,
   );
   assert.throws(
-    () => validateGeneratedPlan(JSON.stringify(completePlan), { promptFeedback: { blockReason: 'SAFETY' }, candidates: [{ finishReason: 'STOP' }] }, sources),
+    () => validateGeneratedPlan(JSON.stringify(v3Generated), { promptFeedback: { blockReason: 'SAFETY' }, candidates: [{ finishReason: 'STOP' }] }, v3Sources),
     /did not finish|blocked/i,
   );
   assert.throws(
-    () => validateGeneratedPlan('{"openingJob":', completeResponse, sources),
+    () => validateGeneratedPlan('{"openingJob":', completeResponse, v3Sources),
     /unusable|malformed|JSON/i,
+  );
+});
+
+test('validates version 3 section plans with paragraph ranges and field constraints', () => {
+  const v3Plan: EditorialPlan = {
+    version: 3,
+    openingJob: 'Establish the core tension.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 2 },
+        decision: 'keep',
+        idea: '',
+        sourcePhrase: 'The opening frames the tension.',
+        limit: '',
+      },
+    ],
+    conflicts: [],
+  };
+
+  const normalized = validateEditorialPlan(v3Plan, v3Sources);
+  assert.deepEqual(normalized, {
+    version: 3,
+    openingJob: 'Establish the core tension.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 2 },
+        idea: '',
+        reason: '',
+        sourcePhrase: 'The opening frames the tension.',
+        decision: 'keep',
+        limit: '',
+      },
+    ],
+    conflicts: [],
+  });
+
+  assert.throws(
+    () => validateEditorialPlan({
+      ...v3Plan,
+      items: [{ ...v3Plan.items[0], paragraphRange: { from: 1, to: 1 } }],
+    }, v3Sources),
+    /Add suggestions covering draft paragraphs 2\. Every paragraph needs a decision, including paragraphs to cut\./,
+  );
+
+  assert.throws(
+    () => validateEditorialPlan({
+      ...v3Plan,
+      items: [{ ...v3Plan.items[0], decision: 'shorten', idea: '' }],
+    }, v3Sources),
+    /Suggestion 1 needs to say what changes\./,
+  );
+
+  // Approval does not demand a reason; only generation does, so suggestions
+  // saved before reasons existed can still be approved.
+  assert.doesNotThrow(() => validateEditorialPlan({
+    ...v3Plan,
+    items: [{ ...v3Plan.items[0], decision: 'shorten', idea: 'Cut the build-up.' }],
+  }, v3Sources));
+  assert.throws(
+    () => validateEditorialPlan({
+      ...v3Plan,
+      items: [{ ...v3Plan.items[0], decision: 'shorten', idea: 'Cut the build-up.' }],
+    }, v3Sources, { requireReasons: true }),
+    /Suggestion 1 needs a reason\./,
+  );
+
+  assert.doesNotThrow(() => validateEditorialPlan(v3Plan, v3Sources));
+
+  assert.throws(
+    () => validateEditorialPlan({
+      ...v3Plan,
+      items: [
+        { paragraphRange: { from: 1, to: 1 }, decision: 'keep', idea: '', sourcePhrase: 'The opening frames the tension.', limit: '' },
+        { paragraphRange: { from: 2, to: 2 }, decision: 'keep', idea: '', sourcePhrase: 'The opening frames the tension.', limit: '' },
+      ],
+    }, v3Sources),
+    /Suggestion 2 needs an exact phrase from draft paragraphs 2–2\./,
+  );
+});
+
+test('the author’s answer to a suggestion decides how it is executed', () => {
+  const suggestion: EditorialPlan['items'][number] = {
+    paragraphRange: { from: 1, to: 2 },
+    decision: 'cut',
+    idea: 'Drop the framing paragraph.',
+    reason: 'The reader already knows the tension from the title.',
+    sourcePhrase: 'The opening frames the tension.',
+    limit: '',
+  };
+  const plan = (response?: 'accepted' | 'rejected' | 'ignored'): EditorialPlan => ({
+    version: 3,
+    openingJob: 'Establish the core tension.',
+    items: [response ? { ...suggestion, response } : suggestion],
+    conflicts: [],
+  });
+
+  // Pending and accepted suggestions are executed as written.
+  assert.equal(validateEditorialPlan(plan(), v3Sources).items[0].decision, 'cut');
+  const accepted = validateEditorialPlan(plan('accepted'), v3Sources).items[0];
+  assert.equal(accepted.decision, 'cut');
+  assert.equal(accepted.response, 'accepted');
+
+  // Rejected and ignored suggestions become keep, with the suggestion text removed.
+  for (const response of ['rejected', 'ignored'] as const) {
+    const kept = validateEditorialPlan(plan(response), v3Sources).items[0];
+    assert.deepEqual(kept, { paragraphRange: { from: 1, to: 2 }, idea: '', reason: '', sourcePhrase: 'The opening frames the tension.', decision: 'keep', limit: '' });
+  }
+
+  // A rejected suggestion never needs a reason, even where reasons are required.
+  assert.doesNotThrow(() => validateEditorialPlan({ ...plan('rejected'), items: [{ ...suggestion, reason: '', response: 'rejected' }] }, v3Sources, { requireReasons: true }));
+  assert.throws(() => validateEditorialPlan({ ...plan(), items: [{ ...suggestion, response: 'maybe' as never }] }, v3Sources), /invalid format/);
+});
+
+test('author requests attach to an exact passage inside their paragraph range', () => {
+  const base: EditorialPlan = {
+    version: 3,
+    openingJob: 'Establish the core tension.',
+    items: [{ paragraphRange: { from: 1, to: 2 }, decision: 'keep', idea: '', sourcePhrase: 'The opening frames the tension.', limit: '' }],
+    conflicts: [],
+  };
+  const request = { paragraphRange: { from: 2, to: 2 }, sourcePhrase: 'kept people oriented', instruction: 'Say who was kept oriented; the reader is a hiring manager.' };
+
+  const validated = validateEditorialPlan({ ...base, requests: [request] }, v3Sources);
+  assert.deepEqual(validated.requests, [request]);
+  assert.equal('requests' in validateEditorialPlan(base, v3Sources), false);
+  assert.equal('requests' in validateEditorialPlan({ ...base, requests: [] }, v3Sources), false);
+
+  assert.throws(
+    () => validateEditorialPlan({ ...base, requests: [{ ...request, paragraphRange: { from: 1, to: 1 } }] }, v3Sources),
+    /Your request 1 no longer matches the draft\. Remove it or select the passage again\./,
+  );
+  assert.throws(
+    () => validateEditorialPlan({ ...base, requests: [{ ...request, sourcePhrase: 'kept people confused' }] }, v3Sources),
+    /Your request 1 no longer matches the draft/,
+  );
+  assert.throws(
+    () => validateEditorialPlan({ ...base, requests: [{ ...request, instruction: '   ' }] }, v3Sources),
+    /Say what should change in your request 1\./,
+  );
+  assert.throws(
+    () => validateEditorialPlan({ ...base, requests: [{ ...request, paragraphRange: { from: 2, to: 9 } }] }, v3Sources),
+    /Your request 1 no longer matches the draft/,
   );
 });
 
@@ -223,4 +407,7 @@ test('planning prompt includes complete source inputs without corpus or profile 
   assert.match(prompt, /<draft>[\s\S]*<\/draft>/);
   assert.doesNotMatch(prompt, /<writing-sample>|<profile>|<style-profile>|<corpus>/i);
   assert.doesNotMatch(prompt, /The Architecture of Unhurried Thought|Authentic Craftsman and Essayist/);
+  // Every suggested change must come with its reason; the author reads it before answering.
+  assert.match(prompt, /- reason: for shorten or cut/);
+  assert.match(prompt, /accept, reject, or ignore/);
 });

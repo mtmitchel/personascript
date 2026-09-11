@@ -29,15 +29,28 @@ test('PDF hard wraps recover smaller passages while preserving all substantive t
   assert.deepEqual(getDraftParagraphs(wrapped), paragraphs);
 });
 
-test('planner sees paragraph IDs, the smallest-useful-choice requirement, and the rewrite request', () => {
+test('planner plans by section, tags headings, and includes the rewrite request', () => {
   const prompt = buildEditorialPlanPrompt(sources);
-  assert.match(prompt, /smallest useful set/);
-  assert.match(prompt, /one item per paragraph/);
-  assert.match(prompt, /EVERY paragraph/);
-  assert.match(prompt, /No additional limits\./);
+  assert.doesNotMatch(prompt, /one item per paragraph/);
+  assert.doesNotMatch(prompt, /EVERY paragraph/);
+  assert.doesNotMatch(prompt, /No additional limits\./);
+  assert.doesNotMatch(prompt, /paragraphId/);
+  assert.doesNotMatch(prompt, /Split a paragraph/);
+  assert.ok(prompt.includes('Plan by section, not by paragraph.'));
+  assert.ok(prompt.includes('Never write one decision per paragraph.'));
+  assert.ok(prompt.includes('paragraphRange: { from, to }'));
+  assert.ok(prompt.includes('version: 3'));
+  assert.ok(prompt.includes('conflicts:'));
+  assert.ok(prompt.includes('Return an empty array when there is none.'));
   assert.ok(prompt.includes('Rewrite request (editorial guidance'));
   assert.ok(prompt.includes('No additional request.'));
-  for (const paragraph of getDraftParagraphs(draft)) assert.ok(prompt.includes(`<paragraph id="${paragraph.id}">\n${paragraph.text}`));
+  assert.match(prompt, /<reader-and-purpose>/);
+  assert.match(prompt, /<project-brief>/);
+  assert.ok(prompt.includes('<paragraph id="1" kind="heading">\nProject title'));
+  assert.ok(prompt.includes('<paragraph id="2">\nA first claim. An example makes it concrete.'));
+  assert.ok(prompt.includes('<paragraph id="3">\nA second claim retains its qualification.'));
+  const withPrefs = buildEditorialPlanPrompt({ ...sources, editorialPreferences: 'Cut all adverbs.' });
+  assert.ok(withPrefs.includes('Cut all adverbs.'));
   const requested = buildEditorialPlanPrompt({ ...sources, customInstructions: 'Keep it under 500 words.' });
   assert.ok(requested.includes('Keep it under 500 words.'));
 });

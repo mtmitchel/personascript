@@ -141,17 +141,60 @@ export interface StyleProfile {
 export type RewriteIntensity = 'polish' | 'faithful' | 'transform';
 
 export interface EditorialPlan {
-  /** Older saved plans remain readable; new proposals use the evidenced contract. */
-  version?: 2;
+  /**
+   * Older saved plans remain readable. Version 2 anchors each item to one
+   * paragraph and carries conflicts per item; version 3 plans by section
+   * (a contiguous paragraph range) and lists conflicts once, at the top.
+   */
+  version?: 2 | 3;
   openingJob: string;
   items: {
+    /** Version 2: the single paragraph this item anchors to. */
     paragraphId?: number;
+    /** Version 3: the contiguous paragraphs this decision covers, inclusive. */
+    paragraphRange?: { from: number; to: number };
     idea: string;
+    /** Version 3: why this reader is better off; required for shorten and cut. */
+    reason?: string;
     sourcePhrase: string;
     decision: 'keep' | 'shorten' | 'cut';
+    /** Version 3 leaves this empty when the standing rules already cover the passage. */
     limit: string;
+    /** Version 2 only. */
     sourceConflict?: { draftQuote: string; briefQuote: string };
+    /**
+     * Version 3: the author's answer to this suggestion. Accepted and pending
+     * suggestions are executed as written; rejected and ignored ones as keep.
+     */
+    response?: 'accepted' | 'rejected' | 'ignored';
   }[];
+  /**
+   * Version 3: every evidenced draft/brief contradiction, asked once. The
+   * author answers before approval; the writer receives the answer as a
+   * decision, never as a silent preference.
+   */
+  conflicts?: EditorialConflict[];
+  /**
+   * Version 3: the author's own instructions for selected passages. They take
+   * precedence over the decision covering that passage.
+   */
+  requests?: EditorialRequest[];
+}
+
+export interface EditorialRequest {
+  paragraphRange: { from: number; to: number };
+  /** The passage the author selected, verbatim. */
+  sourcePhrase: string;
+  /** What should change, and why, in the author's words. */
+  instruction: string;
+}
+
+export interface EditorialConflict {
+  draftQuote: string;
+  briefQuote: string;
+  /** One plain question the author can answer with either source. */
+  question: string;
+  resolution?: 'draft' | 'brief';
 }
 
 /** The exact source context reviewed by the user; edits require approval again. */

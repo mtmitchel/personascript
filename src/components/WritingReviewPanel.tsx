@@ -131,7 +131,7 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
   };
 
   const status = unavailable
-    ? 'Review unavailable. Your draft is still available.'
+    ? 'The review failed. The rewrite itself is complete; read it yourself or run another edit to get a new review.'
     : actionableCount > 0
       ? `${actionableCount} possible ${actionableCount === 1 ? 'issue' : 'issues'}. Check the passages before editing.`
       : failedChecks.length > 0

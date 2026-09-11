@@ -12,7 +12,7 @@ The mood is **disciplined, unhurried, and precise**. Density is high but the typ
 
 Notably, the primary action color is **black, not a brand hue**. There is no accent color in the system at all. The result is sober, non-promotional, and slightly institutional — closer to a good code editor or a print layout tool than to a consumer app.
 
-Elevation is nearly absent. Depth is implied by hairline borders and background tints rather than shadows, which keeps 100-plus-item lists calm and flat. Corners are gently curved, never sharp and never fully rounded except on small status pills.
+Elevation is nearly absent. Depth is implied by hairline borders and background tints rather than shadows, which keeps long lists calm and flat. Corners are gently curved, never sharp and never fully rounded except on small status pills.
 
 ## 2. Color Palette & Roles
 
@@ -52,9 +52,9 @@ The neutral ramp is **perfectly achromatic** — zero chroma at every step. That
 
 Role discipline: **amber = attention required**, **rose = destructive or failed**, **emerald = verified or complete**. No other hue appears anywhere in the product.
 
-### Named ambiguity worth resolving
+### Ownership of the three hues in Studio
 
-Rose is currently doing double duty: it marks both a *failed* state and a *conflicting-source* state, which is closer to "attention required" than to "error". The distinction between amber and rose is therefore not fully principled. Pick one owner per condition before extending the palette.
+Amber owns *attention required*: the draft/brief disagreement question, the highlighted source paragraphs a suggestion points at, and the left rule on a changed passage in track changes. Rose owns *failed or removed*: errors, and deleted text in track changes. Emerald owns *verified or added*: confirmations, accepted states, and inserted text in track changes. Rose no longer marks a conflicting source; that condition is attention, not failure.
 
 ## 3. Typography Rules
 
@@ -84,9 +84,9 @@ Weight is the primary hierarchy tool: `400` for guidance, `500` for actions, `60
 
 **Buttons.** Three ranks. *Primary* is a solid near-black (`#171717`) fill with white text and an 8px radius, lightening one step on hover — one per screen, never repeated. *Secondary* is white with a `#D4D4D4` hairline and a `#F5F5F5` hover wash. *Inline text actions* are unadorned `#525252` text that underlines on hover; these carry most in-context actions and are deliberately weightless so they never compete with content. Minimum touch height is 40px on primary and secondary, 30–36px on inline actions.
 
-**Segmented controls.** A single hairline-bordered container with 8px outer radius holding evenly divided segments. The **selected state is a quiet neutral fill with a heavier weight** — outlined, not filled. Reserve a strong fill (dark surface, white text) for controls with only two or three options at large size. Repeated per-row selection controls — the treatment choice on rewrite-plan rows — use the quiet selected state (`#F5F5F5` tinted fill, `#171717` border, weight 600); a dark fill there would multiply into a field of heavy blocks down a long list.
+**Segmented controls.** A single hairline-bordered container with 8px outer radius holding evenly divided segments. The **selected state is a quiet neutral fill with a heavier weight** — outlined, not filled. Reserve a strong fill (dark surface, white text) for controls with only two or three options at large size. Repeated selection controls inside a list use the quiet selected state (`#F5F5F5` tinted fill, `#171717` border, weight 600); a dark fill there would multiply into a field of heavy blocks down a long list.
 
-**Status pills.** Truncated to `rounded-full`, 11px, weight 600, padding 2px 8px, tinted background with matched deep text. Roles are color-coded (amber attention, rose conflict, emerald verified). Neutral pills (`#F5F5F5` ground, `#525252` text) carry recorded state such as the Keep / Shorten / Cut treatment on plan rows. They must stay small and light — they are annotations, not buttons.
+**Status pills.** Truncated to `rounded-full`, 11px, weight 600, padding 2px 8px, tinted background with matched deep text. Roles are color-coded (amber attention, rose conflict, emerald verified). Neutral pills (`#F5F5F5` ground, `#525252` text) carry recorded state. They must stay small and light — they are annotations, not buttons. The suggestions rail uses none: its state is carried by weight and one word.
 
 **Cards and containers.** White or near-white ground, `#E5E5E5` hairline border, 8px radius for in-panel objects and 12px for the top-level pane containers. **No shadow.** Panels are delineated by their border and a slightly lighter page background behind them.
 
@@ -129,3 +129,7 @@ Taken from the repository rather than a Stitch project, so there is no Project I
 4. No component library. All styling is utility classes plus one hand-written stylesheet.
 
 **One resolved question.** Selected states in repeated controls were once drawn as heavy dark fills, which turned a long list into a column of near-black blocks. The rewrite-plan rebuild resolved it: repeated selection controls use a tinted fill at `#F5F5F5` with a `#171717` border and weight 600, and the dark fill stays reserved for the one primary action per screen.
+
+**Track changes read like a marked-up page, not a diff tool.** The *Changes* view keeps the reading surface's 16px / 1.85 setting and 72-character measure. Unchanged paragraphs are plain. A changed passage carries a 2px amber rule in the left margin (`#FFD230`), inserted words sit on an emerald wash (`#ECFDF5`, ink `#004F3B`), deleted words on a rose wash (`#FFF1F2`, ink `#C70036`) with a strike; a passage the author has accepted drops its colour and its rule turns to hairline grey. Its answers — **Accept**, **Keep original** (or **Restore** / **Remove**), **Revise** — are 12px text actions on one baseline under the passage, never buttons. One 13px line above the page counts what is left to look at and offers **Undo**. The rail beside it holds the request field and one dark primary action, and nothing else: settings that governed the rewrite are not repeated after it.
+
+**Suggestions read as an editor's note, not a form.** The rail titled *Suggested changes* reads top to bottom as prose the author can answer in seconds: one sentence for the opening, then `Cut`, `Tighten`, and `Unchanged` as small uppercase group labels in `#737373`, each section named by the draft's own heading in semibold `#171717`, followed by one plain sentence saying what changes and, on a second 12px line in `#525252`, why. No pills, borders, counts, paragraph numbers, or field labels; hierarchy comes from weight and space alone, and hovering a suggestion washes its paragraphs in the source preview with the amber `#FEF3C7`. Each suggestion's answers — **Accept**, **Reject**, **Ignore** — are underlined text actions at 12px in `#404040` at the end of the row; an answered row shows its state in semibold 12px (`Accepted` in emerald, otherwise `#525252`) with one **Undo**, and rejected or ignored rows fade to `#A3A3A3` with the rejected sentence struck through. Selecting a passage in the source preview opens one request form above the list: a dark hairline on the left, the quotation clamped to three lines, a single field asking *What should change, and why?*, and a bordered **Add request** with a text **Cancel**. A draft/brief disagreement is one amber-edged question above the suggestions with two radio choices; the selected choice takes a white fill and a hairline. Strength and locks collapse to one grey summary line with a **Change** text action. The dark fill stays reserved for the one primary action in the rail footer.

@@ -72,6 +72,8 @@ interface WritingAssistantContextType {
   workspaceSaveError: string | null;
   downloadWorkingCopy: () => void;
   restoreRewriteVersion: (id: string) => void;
+  /** Replace the current version's text with an author edit made in the app; no model is called. */
+  updateRewrittenText: (text: string) => void;
   isSynthesizingProfile: boolean;
   activeSampleId: string | null;
   setActiveSampleId: (id: string | null) => void;
@@ -791,6 +793,16 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     setFeedbackItems(unappliedFeedback(result.feedbackItems || [], profileRef.current));
   };
 
+  const updateRewrittenText = (text: string) => {
+    if (writingOperationLock.current || feedbackSaveLock.current) return;
+    setRewriteResult((current) => {
+      if (!current || current.rewrittenText === text) return current;
+      // The saved review described the previous text, so it no longer applies.
+      const { review: _stale, ...rest } = current;
+      return { ...rest, rewrittenText: text, wordCountRewritten: text.trim().split(/\s+/).filter(Boolean).length };
+    });
+  };
+
   const restoreRewriteVersion = (id: string) => {
     if (writingOperationLock.current || feedbackSaveLock.current) return;
     const saved = rewriteHistory.find((entry) => entry.id === id);
@@ -1201,6 +1213,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         workspaceSaveError,
         downloadWorkingCopy,
         restoreRewriteVersion,
+        updateRewrittenText,
         isSynthesizingProfile,
         activeSampleId,
         setActiveSampleId,

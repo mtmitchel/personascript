@@ -49,6 +49,26 @@
 .studio-document-fact + .studio-document-fact::before { content: '·'; margin-right: 10px; }
 .studio-prose-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 32px 40px; border-radius: 0 0 12px 12px; }
 .studio-prose { max-width: 72ch; margin: 0 auto; font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
+.studio-source-paragraph { white-space: pre-wrap; margin: 0 0 1.15em; transition: background-color .15s ease; }
+.studio-source-paragraph:last-child { margin-bottom: 0; }
+.studio-source-paragraph.is-plan-target { background: var(--color-amber-100); border-radius: 4px; box-shadow: 0 0 0 4px var(--color-amber-100); }
+/* Track changes: the rewritten draft in reading measure, with each changed
+   passage marked and answered in place. Unchanged paragraphs read as plain
+   text; a changed passage shows insertions in green and deletions struck in
+   rose, with its three answers on a quiet line beneath. */
+.studio-changes { max-width: 72ch; margin: 0 auto; font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
+.studio-changes-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; font-size: 13px; color: var(--color-neutral-600); }
+.studio-changes-summary .studio-text-button { min-height: 28px; font-size: 12px; color: var(--color-neutral-700); text-decoration: underline; }
+.studio-change { margin: 0 -12px 1.15em; padding: 4px 12px 6px; border-left: 2px solid var(--color-amber-300); border-radius: 0 6px 6px 0; }
+.studio-change.is-accepted { border-left-color: var(--color-neutral-200); }
+.studio-change-text p { white-space: pre-wrap; margin: 0 0 1.15em; }
+.studio-change-text p:last-child { margin-bottom: 0; }
+.studio-change-added { background: var(--color-emerald-50); color: var(--color-emerald-900); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+.studio-change-removed { background: var(--color-rose-50); color: var(--color-rose-700); text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+.studio-change-actions { display: flex; align-items: baseline; gap: 14px; margin-top: 4px; font-size: 12px; }
+.studio-change-actions .studio-text-button { min-height: 26px; font-size: 12px; color: var(--color-neutral-700); }
+.studio-change-actions .studio-text-button:hover { color: var(--color-neutral-900); text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .studio-source-paragraph { transition: none; } }
 .studio-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
 .studio-compare > div + div { border-left: 1px solid var(--color-neutral-200); padding-left: 24px; }
 .studio-compare h2 { font-size: 12px; font-weight: 600; color: var(--color-neutral-600); margin-bottom: 20px; }
@@ -73,35 +93,54 @@
 .studio-inspector details[open] > summary::after { content: " −"; }
 .studio-inspector summary::-webkit-details-marker { display: none; }
 
-/* The plan is one flat list in draft order; a row expands in place for editing. */
-.studio-plan { display: grid; gap: 16px; font-size: 13px; line-height: 1.7; }
-.studio-plan h3 { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
-.studio-plan-rows { min-width: 0; }
-.studio-plan-row { padding: 12px 0; min-width: 0; }
-.studio-plan-rows > .studio-plan-row + .studio-plan-row { border-top: 1px solid var(--color-neutral-200); }
-.studio-plan-row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
-.studio-plan-idea { flex: 1 1 200px; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.55; color: var(--color-neutral-900); }
-.studio-plan-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; line-height: 1.6; background: var(--color-neutral-100); color: var(--color-neutral-600); }
-.studio-plan-chip.is-conflict { background: var(--color-rose-100); color: var(--color-rose-900); }
-.studio-plan-chip.is-attention { background: var(--color-amber-100); color: var(--color-amber-950); }
-.studio-plan-refs { font-size: 12px; color: var(--color-neutral-500); }
-.studio-plan-row-head .studio-text-button { margin-left: auto; min-height: 28px; font-size: 12px; color: var(--color-neutral-600); }
-.studio-plan-limit { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--color-neutral-200); font-size: 12px; line-height: 1.65; color: var(--color-neutral-600); }
-.studio-plan-row .studio-conflict { margin-top: 10px; }
-.studio-plan-editor { margin-top: 12px; padding: 14px; border: 1px solid var(--color-neutral-200); border-radius: 8px; background: var(--color-neutral-50); }
-.studio-plan-occurrences { display: grid; gap: 10px; min-width: 0; }
-.studio-plan-occurrences li { padding-top: 8px; border-top: 1px solid var(--color-neutral-200); }
-.studio-plan-occurrence-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.studio-plan-occurrences blockquote, .studio-conflict blockquote { white-space: pre-wrap; padding-left: 12px; border-left: 2px solid var(--color-neutral-200); color: var(--color-neutral-700); margin-top: 6px; }
-.studio-kept > summary { font-size: 13px; font-weight: 500; color: var(--color-neutral-700); }
-.studio-treatment-options { display: flex; gap: 6px; }
-.studio-treatment-option { position: relative; min-width: 0; }
-.studio-treatment-option > span { display: flex; align-items: center; justify-content: center; min-height: 32px; padding: 4px 14px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: white; font-size: 12px; font-weight: 500; color: var(--color-neutral-600); cursor: pointer; }
-.studio-treatment-option > span:hover { background: var(--color-neutral-100); }
-.studio-treatment-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.studio-treatment-option input:focus-visible + span { outline: 2px solid var(--color-neutral-900); outline-offset: 2px; }
-.studio-treatment-option.is-selected > span { border-color: var(--color-neutral-900); background: var(--color-neutral-100); font-weight: 600; color: var(--color-neutral-900); }
-.studio-plan-edit-actions { display: flex; align-items: center; gap: 20px; }
+/* The plan reads as an editor's note: one direction, then what is cut,
+   tightened, and kept, named by the draft's own headings. Emphasis comes
+   from weight and space, not chips or borders. */
+.studio-note { display: grid; gap: 18px; font-size: 13px; line-height: 1.7; color: var(--color-neutral-800); }
+.studio-note.is-saved { gap: 12px; margin-top: 8px; }
+.studio-note-opening { font-size: 14px; line-height: 1.6; color: var(--color-neutral-900); }
+.studio-note-group { display: grid; gap: 6px; }
+.studio-note-heading { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-500); }
+.studio-note-group ul { display: grid; gap: 4px; }
+/* Each suggestion reads as: where — what changes, then why. The author's
+   answer (Accept, Reject, Ignore) sits at the end of the row; an answered
+   row shows its state and one Undo. Rejected and ignored rows fade. */
+.studio-note-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 -8px; padding: 6px 8px; min-width: 0; border-radius: 6px; }
+.studio-note-row:hover { background: var(--color-amber-50); }
+.studio-note-row-text { margin: 0; min-width: 0; display: grid; gap: 2px; }
+.studio-note-row-text p { margin: 0; }
+.studio-note-name { font-weight: 600; color: var(--color-neutral-900); }
+.studio-note-reason { font-size: 12px; line-height: 1.6; color: var(--color-neutral-600); }
+.studio-note-actions { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; }
+.studio-note-actions .studio-text-button { min-height: 28px; font-size: 12px; color: var(--color-neutral-700); }
+.studio-note-actions .studio-text-button:hover { color: var(--color-neutral-900); text-decoration: underline; }
+.studio-note-state { font-size: 12px; font-weight: 600; color: var(--color-neutral-600); }
+.studio-note-row.is-accepted .studio-note-state { color: var(--color-emerald-700, #047857); }
+.studio-note-row.is-rejected .studio-note-row-text,
+.studio-note-row.is-ignored .studio-note-row-text { color: var(--color-neutral-400); }
+.studio-note-row.is-rejected .studio-note-row-text > p:first-child { text-decoration: line-through; }
+.studio-note-row.is-rejected .studio-note-name,
+.studio-note-row.is-ignored .studio-note-name { color: var(--color-neutral-500); }
+.studio-note-row.is-rejected .studio-note-reason,
+.studio-note-row.is-ignored .studio-note-reason { color: var(--color-neutral-400); }
+.studio-note-kept { color: var(--color-neutral-700); }
+.studio-note-kept > span:not([aria-hidden]) { border-radius: 4px; }
+.studio-note-kept > span:not([aria-hidden]):hover { background: var(--color-amber-50); }
+/* Selecting a passage in the draft opens one request form above the suggestions. */
+.studio-request-form { display: grid; gap: 8px; padding: 12px; border-radius: 8px; border-left: 2px solid var(--color-neutral-900); background: var(--color-neutral-50); }
+.studio-request-quote { margin: 0; padding-left: 10px; border-left: 2px solid var(--color-neutral-300); font-size: 13px; line-height: 1.6; color: var(--color-neutral-700); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.studio-request-form textarea { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; background: white; font: inherit; font-size: 13px; line-height: 1.6; resize: vertical; }
+.studio-request-actions { display: flex; align-items: center; gap: 12px; }
+.studio-request-actions .studio-secondary { min-height: 32px; padding: 6px 12px; font-size: 12px; }
+/* A draft/brief disagreement is one question above the plan. */
+.studio-note-questions { display: grid; gap: 12px; }
+.studio-conflict-question { display: grid; gap: 8px; margin: 0; padding: 12px; border: 0; border-left: 2px solid var(--color-amber-300); background: var(--color-amber-50); min-width: 0; }
+.studio-conflict-question legend { float: left; width: 100%; margin-bottom: 8px; padding: 0; font-weight: 600; color: var(--color-neutral-900); }
+.studio-conflict-choice { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.studio-conflict-choice:hover { background: white; }
+.studio-conflict-choice.is-selected { background: white; box-shadow: inset 0 0 0 1px var(--color-neutral-300); }
+.studio-conflict-choice input { margin-top: 5px; accent-color: var(--color-neutral-900); }
+.studio-conflict-choice strong { font-weight: 600; }
 .studio-notice { padding: 12px; border-radius: 8px; background: var(--color-neutral-50); border: 1px solid var(--color-neutral-200); font-size: 13px; line-height: 1.6; color: var(--color-neutral-700); }
 .studio-notice.is-warning { background: var(--color-amber-50); border-color: var(--color-amber-200); color: var(--color-amber-950); }
 .studio-notice.is-error { background: var(--color-rose-50); border-color: var(--color-rose-200); color: var(--color-rose-800); }
@@ -111,14 +150,11 @@
 .studio-checkbox { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.6; color: var(--color-neutral-800); }
 .studio-checkbox input { margin-top: 4px; accent-color: var(--color-neutral-900); }
 .studio-rewrite-request textarea { width: 100%; min-height: 64px; padding: 9px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; line-height: 1.7; background: white; color: var(--color-neutral-900); field-sizing: content; }
-.studio-detail-fields, .studio-settings-fields { display: grid; gap: 16px; min-width: 0; }
+.studio-settings-fields { display: grid; gap: 16px; min-width: 0; }
 .studio-settings-fields :is(select, textarea) { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; background: white; color: var(--color-neutral-900); }
 .studio-settings-fields textarea { field-sizing: content; min-height: 90px; line-height: 1.7; }
 .studio-tone-range { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-neutral-600); }
 .studio-settings-fields input[type="range"] { width: 100%; accent-color: var(--color-neutral-900); }
-.studio-conflict { display: grid; gap: 12px; padding: 12px; border-left: 2px solid var(--color-amber-300); background: var(--color-amber-50); }
-.studio-decision-button { font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; color: var(--color-neutral-600); }
-.studio-decision-button.is-danger { color: var(--color-rose-700); }
 
 .studio-notes { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-neutral-200); font-size: 13px; line-height: 1.7; }
 .studio-notes summary { font-weight: 500; }
@@ -162,12 +198,13 @@
 .studio-work-action p { margin-bottom: 10px; font-size: 12px; line-height: 1.6; color: var(--color-neutral-600); }
 .studio-work-action p[role="alert"] { color: var(--color-rose-700); }
 .studio-work-action .studio-primary { width: 100%; }
-.studio-writing-settings { margin-top: 16px; padding: 16px 0; border-block: 1px solid var(--color-neutral-200); font-size: 13px; }
+.studio-writing-settings { margin-top: 16px; padding: 16px 0; border-block: 1px solid var(--color-neutral-200); font-size: 13px; display: grid; gap: 12px; }
+.studio-settings-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0; color: var(--color-neutral-700); }
+.studio-settings-summary .studio-text-button { flex-shrink: 0; min-height: 28px; font-size: 12px; color: var(--color-neutral-600); }
 .studio-protect-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .studio-settings-fields textarea.studio-locks { min-height: 60px; }
 .studio-protect-add { min-height: 30px; font-size: 12px; color: var(--color-neutral-600); justify-self: start; }
 .studio-writing-settings .underline { text-decoration: underline; text-underline-offset: 3px; color: var(--color-neutral-700); }
-.studio-voice-preference { padding-top: 20px; }
 .studio-selection { margin-bottom: 22px; font-size: 13px; }
 .studio-selection blockquote { margin-top: 12px; max-height: 120px; overflow-y: auto; padding-left: 12px; border-left: 2px solid var(--color-neutral-300); white-space: pre-wrap; line-height: 1.7; color: var(--color-neutral-600); }
 .studio-voice-status { margin-top: 20px; padding: 12px; border: 1px solid var(--color-neutral-300); border-radius: 8px; font-size: 12px; line-height: 1.7; }
@@ -179,5 +216,3 @@
 .studio-document-actions button.has-attention { color: var(--color-amber-900); background: var(--color-amber-50); }
 .studio-document-actions button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--color-neutral-400); }
 
-.studio-document-actions .studio-open-saved { align-items: flex-start; flex-direction: column; gap: 1px; margin-right: 10px; }
-.studio-saved-date { font-size: 10px; color: var(--color-neutral-500); }

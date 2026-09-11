@@ -83,3 +83,70 @@ test('a fully evidenced generated conflict is retained unchanged', () => {
     sourceConflict: { draftQuote: sources.draft, briefQuote: conflicting.projectBrief } }] };
   assert.deepEqual(validateEditorialPlan(evidenced, conflicting, { allowPendingConflictEvidence: true }), evidenced);
 });
+
+test('version 3 conflict lifecycle: generation accepts verbatim quotes and drops unevidenced entries; approval requires resolution and throws on unevidenced entries', () => {
+  const conflictingSources = {
+    draft: 'The allowance appeared in an in-page indicator.',
+    projectBrief: 'The allowance appeared in a modal.',
+    readerPurpose: '',
+  };
+  const v3PlanWithConflict: EditorialPlan = {
+    version: 3,
+    openingJob: 'Establish the decision.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 1 },
+        decision: 'keep',
+        sourcePhrase: conflictingSources.draft,
+        idea: '',
+        limit: '',
+      },
+    ],
+    conflicts: [
+      {
+        draftQuote: conflictingSources.draft,
+        briefQuote: conflictingSources.projectBrief,
+        question: 'Did the allowance appear in an indicator or a modal?',
+      },
+    ],
+  };
+
+  // Validates at generation without resolution
+  const atGeneration = validateEditorialPlan(v3PlanWithConflict, conflictingSources, { allowPendingConflictEvidence: true });
+  assert.equal(atGeneration.conflicts?.length, 1);
+  assert.equal(atGeneration.conflicts?.[0].question, 'Did the allowance appear in an indicator or a modal?');
+
+  // Approval without resolution throws "Answer the draft and brief question before rewriting."
+  assert.throws(
+    () => validateEditorialPlan(v3PlanWithConflict, conflictingSources),
+    /Answer the draft and brief question before rewriting\./,
+  );
+
+  // Approval with resolution is accepted
+  const resolvedPlan: EditorialPlan = {
+    ...v3PlanWithConflict,
+    conflicts: [{ ...v3PlanWithConflict.conflicts![0], resolution: 'draft' }],
+  };
+  const atApproval = validateEditorialPlan(resolvedPlan, conflictingSources);
+  assert.equal(atApproval.conflicts?.[0].resolution, 'draft');
+
+  // Unevidenced conflict is dropped at generation
+  const unevidencedPlan: EditorialPlan = {
+    ...v3PlanWithConflict,
+    conflicts: [
+      {
+        draftQuote: 'not in draft',
+        briefQuote: 'not in brief',
+        question: 'Which presentation was used?',
+      },
+    ],
+  };
+  const droppedAtGeneration = validateEditorialPlan(unevidencedPlan, conflictingSources, { allowPendingConflictEvidence: true });
+  assert.deepEqual(droppedAtGeneration.conflicts, []);
+
+  // Unevidenced conflict throws at approval
+  assert.throws(
+    () => validateEditorialPlan(unevidencedPlan, conflictingSources),
+    /Conflict 1 needs a verbatim quotation from the draft and one from the brief, and a question\. Both statements must exist; a missing statement is not a contradiction\./,
+  );
+});

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { EditorialPlanState, RewriteResult } from '../src/types';
-import { validateApprovedPlan } from '../src/editorialPlan';
+import type { EditorialPlan, EditorialPlanState, RewriteResult } from '../src/types';
+import { isEditorialPlan, isEditorialPlanState, validateApprovedPlan } from '../src/editorialPlan';
 import {
   EMPTY_STUDIO_WORKSPACE,
   parseStudioWorkspace,
@@ -210,4 +210,74 @@ test('quota save failure retains the previous working copy, including its plan',
   fail = false;
   assert.equal(saveStudioWorkspace(storage, next), null);
   assert.deepEqual(parseStudioWorkspace(saved), next);
+});
+
+test('isEditorialPlan and isEditorialPlanState accept saved v2 and v3 plans, and reject a v3 item without paragraphRange', () => {
+  const v2Plan: EditorialPlan = {
+    version: 2,
+    openingJob: 'Establish the project.',
+    items: [
+      {
+        paragraphId: 1,
+        idea: 'Keep idea.',
+        sourcePhrase: sourceA.draft,
+        decision: 'keep',
+        limit: 'Retain.',
+      },
+    ],
+  };
+  const v2State: EditorialPlanState = {
+    plan: v2Plan,
+    sources: sourceA,
+    approved: true,
+  };
+
+  assert.equal(isEditorialPlan(v2Plan), true);
+  assert.equal(isEditorialPlanState(v2State), true);
+
+  const v3Plan: EditorialPlan = {
+    version: 3,
+    openingJob: 'Establish the project.',
+    items: [
+      {
+        paragraphRange: { from: 1, to: 1 },
+        idea: 'Keep idea.',
+        sourcePhrase: sourceA.draft,
+        decision: 'keep',
+        limit: '',
+      },
+    ],
+    conflicts: [
+      {
+        draftQuote: sourceA.draft,
+        briefQuote: sourceA.projectBrief,
+        question: 'Which source is correct?',
+      },
+    ],
+  };
+  const v3State: EditorialPlanState = {
+    plan: v3Plan,
+    sources: sourceA,
+    approved: true,
+  };
+
+  assert.equal(isEditorialPlan(v3Plan), true);
+  assert.equal(isEditorialPlanState(v3State), true);
+
+  // Reject a v3 item without paragraphRange
+  const v3MissingRange: EditorialPlan = {
+    version: 3,
+    openingJob: 'Establish the project.',
+    items: [
+      {
+        paragraphId: 1,
+        idea: 'Keep idea.',
+        sourcePhrase: sourceA.draft,
+        decision: 'keep',
+        limit: '',
+      },
+    ],
+  };
+  assert.equal(isEditorialPlan(v3MissingRange), false);
+  assert.equal(isEditorialPlanState({ ...v3State, plan: v3MissingRange }), false);
 });

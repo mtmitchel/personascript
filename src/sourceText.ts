@@ -71,3 +71,16 @@ export function getDraftParagraphs(text: string): { id: number; text: string }[]
   }
   return paragraphs.map((text, index) => ({ id: index + 1, text }));
 }
+
+/** A paragraph that names the section it starts: a Markdown heading or one short unpunctuated line. */
+export function isHeadingParagraph(text: string): boolean {
+  const line = text.trim();
+  if (!line || line.includes('\n')) return false;
+  if (/^#{1,6}\s+\S/.test(line)) return true;
+  return line.length <= 100 && !/[.!?;,]/.test(line) && (!line.includes(':') || line.endsWith(':'));
+}
+
+/** The heading as a reader would say it: no Markdown marks, no trailing colon. */
+export function headingText(text: string): string {
+  return text.trim().replace(/^#{1,6}\s+/, '').replace(/:$/, '').trim();
+}

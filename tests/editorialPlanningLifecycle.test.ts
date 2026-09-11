@@ -17,9 +17,10 @@ assert.ok(start >= 0 && end > start);
 const route = (await transform(server.slice(start, end), { loader: 'ts' })).code;
 const draft = 'The team clarified the next step in the account setup flow.';
 const plan = {
-  version: 2, openingJob: 'Explain the decision and its purpose.',
-  items: [{ paragraphId: 1, idea: 'Keep the documented decision.', sourcePhrase: draft,
+  version: 3, openingJob: 'Explain the decision and its purpose.',
+  items: [{ paragraphRange: { from: 1, to: 1 }, idea: 'Keep the documented decision.', sourcePhrase: draft,
     decision: 'keep', limit: 'Preserve the team attribution.' }],
+  conflicts: [],
 };
 
 function harness(t: TestContext) {
@@ -97,11 +98,10 @@ test('planning can complete after three minutes without changing the selected mo
 test('a generated conflict claim without structured quotations still returns an editable plan', async (t) => {
   const app = harness(t);
   const pending = app.run();
-  app.finish({ ...plan, items: [{ ...plan.items[0],
-    limit: 'Note the conflict: the draft and brief disagree about the next step. Leave it for the author.' }] });
+  app.finish({ ...plan, conflicts: [{ draftQuote: 'not in draft', briefQuote: 'not in brief', question: 'Which is it?' }] });
   await pending;
   assert.equal(app.res.statusCode, 200);
-  assert.deepEqual(app.res.body.plan.items[0].sourceConflict, { draftQuote: '', briefQuote: '' });
+  assert.deepEqual(app.res.body.plan.conflicts, []);
 });
 
 test('planning stops at ten minutes with a clear error and no replacement plan', async (t) => {

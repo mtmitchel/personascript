@@ -1199,10 +1199,15 @@ async function reviewWrittenText(input: {
       sourceAudit = validatePlanSourceAudit(auditResponse.text, auditResponse, auditInput);
       sourceAuditFindings = planSourceAuditFindings(sourceAudit);
     } catch (error) {
-      const unavailable = unavailableReview(error, localChecks);
-      unavailable.modelUsed = requestedAnalysisModel;
-      unavailable.durationMs = Date.now() - reviewStart;
-      return unavailable;
+      // An audit that could not run is reported, not allowed to take the
+      // prose review down with it. The reviewer then runs without audit context.
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[review] plan source audit failed:', message);
+      sourceAuditFindings = [{
+        category: 'editorial',
+        severity: 'warning',
+        detail: `The suggestions could not be checked against the draft and brief this time (${message}). Run the review again to retry.`,
+      }];
     }
   }
 
@@ -1257,6 +1262,7 @@ async function reviewWrittenText(input: {
       durationMs: Date.now() - reviewStart,
     };
   } catch (error) {
+    console.error('[review] draft review failed:', error instanceof Error ? error.message : error);
     const unavailable = unavailableReview(error, localChecks);
     // Preserve a successfully completed source audit even when the later
     // prose-compliance request is unavailable.
