@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
-import { revisionLabel, versionDate, REWRITE_HISTORY_LIMIT } from '../utils/rewriteHistory';
+import { revisionLabel, revisionExcerpt, versionDate, REWRITE_HISTORY_LIMIT } from '../utils/rewriteHistory';
 import { SavedEditorialDecisions } from './EditorialDecisions';
 import { RewriteResult } from '../types';
+import { ConfirmDialog } from './ConfirmDialog';
 
 /**
  * Saved versions, newest first. Each row names the version and offers Open and
@@ -11,14 +12,10 @@ import { RewriteResult } from '../types';
 export const RewriteHistory: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
   const { rewriteHistory, rewriteResult, restoreRewriteVersion, deleteRewriteVersion, isRewriting, isPlanning, isLearningFeedback } = useWritingAssistant();
   const [message, setMessage] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<RewriteResult | null>(null);
   const busy = isRewriting || isPlanning || isLearningFeedback;
   const remove = (entry: RewriteResult) => {
-    const current = entry.id === rewriteResult?.id;
-    if (!window.confirm(current
-      ? 'Delete the version you have open? The Studio returns to the original draft. This cannot be undone.'
-      : 'Delete this version? This cannot be undone.')) return;
-    deleteRewriteVersion(entry.id);
-    setMessage(current ? 'Version deleted. The original draft is open.' : 'Version deleted.');
+    setDeleteTarget(entry);
   };
   return (
     <div id="rewrite-history" className="studio-history">
@@ -32,6 +29,7 @@ export const RewriteHistory: React.FC<{ onOpen: () => void }> = ({ onOpen }) => 
             return <li key={entry.id} className={`studio-history-row${current ? ' is-current' : ''}`}>
               <div className="studio-history-text">
                 <p className="studio-history-name">{revisionLabel(entry)}{current ? <span className="studio-note-state"> · Open</span> : null}</p>
+                {revisionExcerpt(entry) && <p className="studio-history-meta">“{revisionExcerpt(entry)}”</p>}
                 <p className="studio-history-meta"><time dateTime={entry.createdAt}>{versionDate(entry.createdAt)}</time> · {entry.profileName || 'Voice not recorded'} · {entry.writingModelUsed || entry.modelUsed || 'Writer not recorded'}</p>
               </div>
               <div className="studio-history-actions">
@@ -43,6 +41,27 @@ export const RewriteHistory: React.FC<{ onOpen: () => void }> = ({ onOpen }) => 
         </ul>
       )}
       <p role="status" className="studio-panel-description">{message}</p>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTarget?.id === rewriteResult?.id ? 'Delete the open version?' : 'Delete this version?'}
+        confirmLabel="Delete version"
+        cancelLabel="Keep version"
+        destructive
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          const current = deleteTarget.id === rewriteResult?.id;
+          deleteRewriteVersion(deleteTarget.id);
+          setMessage(current ? 'Version deleted. The original draft is open.' : 'Version deleted.');
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      >
+        <p>
+          {deleteTarget?.id === rewriteResult?.id
+            ? 'The Studio returns to the original draft. This cannot be undone.'
+            : 'This cannot be undone.'}
+        </p>
+      </ConfirmDialog>
     </div>
   );
 };
@@ -61,7 +80,7 @@ export const RewriteVersionDetails: React.FC<{ version: RewriteResult }> = ({ ve
                 <p><strong>Additional instructions:</strong> {version.customInstructions || 'None recorded'}</p>
                 <p><strong>Writer:</strong> {version.writingModelUsed || version.modelUsed || 'Not recorded'} · Reasoning: {version.modelSettings?.writingReasoningLevel || 'Not recorded'}</p>
                 <p><strong>{version.review?.status === 'unavailable' ? 'Requested reviewer:' : 'Reviewer:'}</strong> {version.review?.modelUsed || version.analysisModelUsed || 'Not recorded'} · Reasoning: {version.modelSettings?.analysisReasoningLevel || 'Not recorded'}</p>
-                <p><strong>Intensity:</strong> {version.revision?.kind === 'refine' || version.revision?.kind === 'selection' ? 'Edit request with shared voice and preservation controls' : ({ polish: 'Light', faithful: 'Balanced', transform: 'Thorough' }[version.intensity] || 'Not recorded')}</p>
+                <p><strong>Intensity:</strong> {version.revision?.kind === 'refine' || version.revision?.kind === 'selection' ? 'Edit request' : ({ polish: 'Light', faithful: 'Balanced', transform: 'Thorough' }[version.intensity] || 'Not recorded')}</p>
                 {version.preservationSettings && <p><strong>Preservation:</strong> {[
                   version.preservationSettings.keepStructure && 'section order',
                   version.preservationSettings.headingTreatment === 'preserve_verbatim' && 'verbatim headings',
@@ -69,7 +88,7 @@ export const RewriteVersionDetails: React.FC<{ version: RewriteResult }> = ({ ve
                   version.preservationSettings.preserveQuotes && 'quotes',
                   version.preservationSettings.preserveTerms && 'names and terms',
                 ].filter(Boolean).join(', ') || 'Factual accuracy; no verbatim locks'}. {version.preservationSettings.customLocks}</p>}
-                {!version.revision && <p className="text-neutral-600">Older versions did not record the edit type or a separate edit timestamp.</p>}
+                {!version.revision && <p className="text-neutral-600">Edit type not recorded for this version.</p>}
               </div>
             </details>
   </div>

@@ -181,10 +181,10 @@ export const DomainView: React.FC = () => {
           <div className="text-sm font-semibold text-neutral-900 truncate">
             {(localExpertise.disciplines && localExpertise.disciplines.length > 0)
               ? localExpertise.disciplines.join(' & ')
-              : localExpertise.field || 'UX Copywriting & Content Design'}
+              : localExpertise.field || 'Not set'}
           </div>
-          <div className="text-[11px] text-neutral-400">
-            {localExpertise.disciplines?.length || 2} core field disciplines defined
+          <div className="text-[11px] text-neutral-500">
+            {(localExpertise.disciplines || []).length} core field {(localExpertise.disciplines || []).length === 1 ? 'discipline' : 'disciplines'}
           </div>
         </div>
 
@@ -195,7 +195,7 @@ export const DomainView: React.FC = () => {
           <div className="text-sm font-semibold text-neutral-900">
             {activeTopicCount} of {(localExpertise.topics || []).length} topics active
           </div>
-          <div className="text-[11px] text-neutral-400">
+          <div className="text-[11px] text-neutral-500">
             Concept recognition across enabled topics
           </div>
         </div>
@@ -207,7 +207,7 @@ export const DomainView: React.FC = () => {
           <div className="text-sm font-semibold text-neutral-900">
             {activeProductCount} of {(localExpertise.productKnowledge || []).length} products active
           </div>
-          <div className="text-[11px] text-neutral-400">
+          <div className="text-[11px] text-neutral-500">
             Factual reference background notes
           </div>
         </div>
@@ -217,9 +217,9 @@ export const DomainView: React.FC = () => {
             Target Audience
           </div>
           <div className="text-sm font-semibold text-neutral-900 truncate">
-            {localExpertise.audienceContext || 'Design Directors & Hiring Managers'}
+            {localExpertise.audienceContext || 'Not set'}
           </div>
-          <div className="text-[11px] text-neutral-400">
+          <div className="text-[11px] text-neutral-500">
             Tailors vocabulary and level of technical depth
           </div>
         </div>
@@ -242,26 +242,30 @@ export const DomainView: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* Disciplines Manager */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-neutral-800 block">
+            <label htmlFor="input-new-discipline" className="text-xs font-medium text-neutral-800 block">
               Core Disciplines
             </label>
             <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 bg-neutral-50 rounded-lg border border-neutral-200">
-              {(localExpertise.disciplines || ['UX Copywriting', 'Content Design']).map((disc) => (
-                <span
-                  key={disc}
-                  className="inline-flex items-center gap-1.5 text-xs bg-white border border-neutral-300 text-neutral-800 px-2.5 py-1 rounded-md shadow-2xs font-medium"
-                >
-                  <span>{disc}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveDiscipline(disc)}
-                    className="text-neutral-400 hover:text-neutral-700"
-                    title={`Remove ${disc}`}
+              {(localExpertise.disciplines || []).length === 0 ? (
+                <span className="text-xs text-neutral-500 p-1">No disciplines yet.</span>
+              ) : (
+                (localExpertise.disciplines || []).map((disc) => (
+                  <span
+                    key={disc}
+                    className="inline-flex items-center gap-1.5 text-xs bg-white border border-neutral-300 text-neutral-800 px-2.5 py-1 rounded-md shadow-2xs font-medium"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
+                    <span>{disc}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDiscipline(disc)}
+                      className="text-neutral-400 hover:text-neutral-700"
+                      title={`Remove ${disc}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -277,7 +281,7 @@ export const DomainView: React.FC = () => {
                   }
                 }}
                 placeholder="Add discipline (e.g. Design Systems, UX Research)"
-                className="flex-1 text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900"
+                className="flex-1 text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900 text-neutral-900"
               />
               <button
                 type="button"
@@ -294,7 +298,7 @@ export const DomainView: React.FC = () => {
 
           {/* Target Audience Context */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-neutral-800 block">
+            <label htmlFor="input-domain-audience" className="text-xs font-medium text-neutral-800 block">
               Portfolio Audience Context
             </label>
             <textarea
@@ -303,9 +307,9 @@ export const DomainView: React.FC = () => {
               value={localExpertise.audienceContext || ''}
               onChange={(e) => handleAudienceChange(e.target.value)}
               placeholder="e.g. Design directors, VP of Product, hiring managers, and design leads evaluating portfolio case studies."
-              className="w-full text-xs p-2.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 leading-relaxed"
+              className="w-full text-xs p-2.5 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900 text-neutral-900 leading-relaxed"
             />
-            <p className="text-[11px] text-neutral-400">
+            <p className="text-[11px] text-neutral-500">
               Who reads this portfolio case study and their expected depth of product understanding.
             </p>
           </div>
@@ -338,10 +342,12 @@ export const DomainView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-neutral-900">
-              Domain guidance
+              <label htmlFor="textarea-domain-guidelines" className="cursor-pointer">
+                Domain guidance
+              </label>
             </h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              Explain how to apply domain knowledge while keeping the draft’s facts and your voice intact.
+            <p id="domain-guidelines-description" className="text-xs text-neutral-500 mt-0.5">
+              Name relevant concepts when they clarify a decision already described in the draft. Explain them in accessible language alongside the example.
             </p>
           </div>
         </div>
@@ -349,10 +355,11 @@ export const DomainView: React.FC = () => {
         <textarea
           rows={5}
           id="textarea-domain-guidelines"
+          aria-describedby="domain-guidelines-description"
           value={guidelinesText}
           onChange={(e) => handleGuidelinesChange(e.target.value)}
-          placeholder="Name relevant concepts when they clarify a decision already described in the draft. Explain them in accessible language alongside the example."
-          className="w-full text-xs p-3.5 bg-neutral-50/50 rounded-xl border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-400 font-sans leading-relaxed resize-y"
+          placeholder="For example, name relevant concepts when they clarify a decision already described in the draft."
+          className="w-full text-xs p-3.5 bg-neutral-50/50 rounded-xl border border-neutral-200 focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-500 font-sans leading-relaxed resize-y"
         />
 
         <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-600 space-y-1">

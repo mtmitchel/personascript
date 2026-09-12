@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DomainExpertise, ProductReference } from '../types';
+import { ConfirmDialog } from './ConfirmDialog';
 import { Package, Plus } from 'lucide-react';
 
 interface DomainProductsSectionProps {
@@ -12,6 +13,23 @@ export const DomainProductsSection: React.FC<DomainProductsSectionProps> = ({
   saveExpertise,
 }) => {
   const [focusProductId, setFocusProductId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    isDestructive: boolean;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    confirmLabel: '',
+    cancelLabel: '',
+    isDestructive: false,
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     if (focusProductId) {
@@ -54,13 +72,21 @@ export const DomainProductsSection: React.FC<DomainProductsSectionProps> = ({
 
   const handleDeleteProduct = (id: string) => {
     const target = (localExpertise.productKnowledge || []).find((p) => p.id === id);
-    const label = target?.name ? ` "${target.name}"` : '';
-    if (!window.confirm(`Remove product${label}? This cannot be undone.`)) return;
-
-    const updated = (localExpertise.productKnowledge || []).filter((p) => p.id !== id);
-    saveExpertise({
-      ...localExpertise,
-      productKnowledge: updated,
+    const name = target?.name || '';
+    setConfirmDialog({
+      open: true,
+      title: `Remove “${name}”?`,
+      description: 'Its notes are removed. This cannot be undone.',
+      confirmLabel: 'Remove product',
+      cancelLabel: 'Keep product',
+      isDestructive: true,
+      onConfirm: () => {
+        const updated = (localExpertise.productKnowledge || []).filter((p) => p.id !== id);
+        saveExpertise({
+          ...localExpertise,
+          productKnowledge: updated,
+        });
+      },
     });
   };
 
@@ -112,7 +138,7 @@ export const DomainProductsSection: React.FC<DomainProductsSectionProps> = ({
           </p>
           <button
             type="button"
-            id="btn-add-product"
+            id="btn-add-product-empty"
             onClick={handleAddProduct}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-800 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition shadow-2xs"
           >
@@ -148,7 +174,7 @@ export const DomainProductsSection: React.FC<DomainProductsSectionProps> = ({
                     value={product.name}
                     onChange={(e) => handleUpdateProduct(product.id, { name: e.target.value })}
                     placeholder="e.g. DeepL Translator"
-                    className="text-xs font-semibold text-neutral-900 bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 focus:outline-none px-1 py-0.5 w-full max-w-sm"
+                    className="text-xs font-semibold text-neutral-900 bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 px-1 py-0.5 w-full max-w-sm"
                   />
                 </div>
 
@@ -175,13 +201,28 @@ export const DomainProductsSection: React.FC<DomainProductsSectionProps> = ({
                   value={product.notes}
                   onChange={(e) => handleUpdateProduct(product.id, { notes: e.target.value })}
                   placeholder="What does this product do? Add relevant features, naming, sources, and dates."
-                  className="w-full text-xs p-2 bg-neutral-50 rounded-lg border border-neutral-200 focus:bg-white focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-500 resize-y leading-relaxed"
+                  className="w-full text-xs p-2 bg-neutral-50 rounded-lg border border-neutral-200 focus:bg-white focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-500 resize-y leading-relaxed"
                 />
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        confirmLabel={confirmDialog.confirmLabel}
+        cancelLabel={confirmDialog.cancelLabel}
+        destructive={confirmDialog.isDestructive}
+        onConfirm={() => {
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          confirmDialog.onConfirm();
+        }}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      >
+        <p>{confirmDialog.description}</p>
+      </ConfirmDialog>
     </div>
   );
 };

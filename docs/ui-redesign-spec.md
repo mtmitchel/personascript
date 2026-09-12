@@ -1,3 +1,5 @@
+Superseded in part by docs/studio-mitigation-plan.md (2026-09-11).
+
 # PersonaScript UI redesign — implementation specification
 
 Status: approved for implementation by Mason (product owner). Written 2026-09-11 after a control-by-control inventory of every screen in `src/components/` and the state that drives them in `src/context/WritingAssistantContext.tsx`.

@@ -47,7 +47,7 @@ const ConnectionForm: React.FC<{ provider: AIProvider; configured?: boolean; onC
         onChange={(event) => { setKey(event.target.value); setError(''); setMessage(''); }}
         placeholder={configured ? 'Paste a replacement key' : 'Paste your API key'}
         aria-invalid={!!error} aria-describedby={error || message ? `${id}-status` : undefined}
-        className="h-10 min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-500 focus:ring-2 focus:ring-neutral-900/10 disabled:bg-neutral-50" />
+        className="h-10 min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900 disabled:bg-neutral-50" />
       <button type="submit" disabled={saving || removing || !key.trim()} className="rounded-lg bg-neutral-900 px-3 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-40">
         {saving ? 'Checking…' : configured ? 'Update' : 'Connect'}
       </button>

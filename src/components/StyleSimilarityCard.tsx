@@ -25,7 +25,7 @@ export const StyleSimilarityCard: React.FC<StyleSimilarityCardProps> = ({ score,
               <h4 className="text-sm font-semibold text-neutral-900">
                 Voice match score
               </h4>
-              <span className="text-[11px] text-neutral-400">
+              <span className="text-[11px] text-neutral-500">
                 {profileName}
               </span>
             </div>
@@ -50,7 +50,7 @@ export const StyleSimilarityCard: React.FC<StyleSimilarityCardProps> = ({ score,
         <div>
           <p>{score.explanation}</p>
           {score.deviationsNote && (
-            <p className="mt-1 text-neutral-400 text-[11px]">
+            <p className="mt-1 text-neutral-500 text-[11px]">
               Note: {score.deviationsNote}
             </p>
           )}

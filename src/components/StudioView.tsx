@@ -15,13 +15,15 @@ import { planMatchesSources } from '../editorialPlan';
 import { RewriteResult, SelectionRange } from '../types';
 import { actionableReviewIssueCount } from '../utils/reviewEvidence';
 import { suggestionsStatus } from '../utils/studioStatus';
-import { Copy, Check, Download, History, Loader2, X } from 'lucide-react';
+import { Copy, Check, Download, History, Loader2, RefreshCw, X } from 'lucide-react';
 import { SelectionToolbar } from './SelectionToolbar';
+import { ConfirmDialog } from './ConfirmDialog';
+import { modelDisplayName } from '../modelChoice';
 
 /** A passage the author selected in the draft to write a request about. */
 type SourceSelection = { text: string; from: number; to: number };
 
-type RailTab = 'suggestions' | 'change' | 'review';
+type RailTab = 'suggestions' | 'review' | 'change' | 'settings';
 type DocView = 'original' | 'rewrite' | 'changes';
 type DocPanel = 'history' | 'details' | null;
 
@@ -36,10 +38,10 @@ function reviewNeedsAttention(result: RewriteResult | null): boolean {
 
 export const StudioView: React.FC = () => {
   const {
-    draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives, setCustomDirectives,
+    draftText, projectBrief, readerPurpose, editorialPreferences, customDirectives,
     isUploadingDraft, isUploadingBrief, performRewrite, generateEditorialPlan, approveEditorialPlan,
     editEditorialPlan, isLearningFeedback, isRewriting, isPlanning, editorialPlan, rewriteResult,
-    setActiveTab, openModelSettings, updateRewrittenText,
+    setActiveTab, openModelSettings, updateRewrittenText, setReviewFindingIgnored,
   } = useWritingAssistant();
 
   // A saved rewrite opens on its changes and review, the same as when a rewrite arrives.
@@ -53,7 +55,7 @@ export const StudioView: React.FC = () => {
   const [textHistory, setTextHistory] = useState<string[]>([]);
   const previousResultId = useRef(rewriteResult?.id);
   const [editRequest, setEditRequest] = useState({ text: '', sequence: 0, resultId: rewriteResult?.id });
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [selectedHighlight, setSelectedHighlight] = useState('');
   const [selectedRange, setSelectedRange] = useState<SelectionRange | undefined>();
@@ -67,6 +69,7 @@ export const StudioView: React.FC = () => {
 
   const hasDraft = draftText.trim() !== '';
   const hasRewrite = Boolean(rewriteResult);
+  const draftDiffers = hasRewrite && rewriteResult!.originalText !== draftText;
   const busy = isRewriting || isPlanning || isLearningFeedback || isUploadingDraft || isUploadingBrief;
   const planSources = { draft: draftText, projectBrief, readerPurpose, editorialPreferences, customInstructions: customDirectives };
   const plan = editorialPlan;
@@ -77,6 +80,10 @@ export const StudioView: React.FC = () => {
   const staleReasons = plan ? planStaleReasons(plan, planSources) : [];
   const pending = plan && needsApproval && (plan.plan.version === 3 || plan.plan.version === 4) ? sectionPlan(plan.plan, draftText).pending : 0;
   const canRequest = Boolean(plan && (plan.plan.version === 3 || plan.plan.version === 4) && !plan.approved && !planStale);
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const hasPlanWork = Boolean(plan && !plan.approved && (plan.plan.items.some(item => item.response) || (plan.plan.requests || []).length > 0));
+  const answeredCount = plan?.plan.items.filter(i => i.response).length ?? 0;
+  const requestCount = plan?.plan.requests?.length ?? 0;
 
   const draftWords = draftText.trim() ? draftText.trim().split(/\s+/).length : 0;
   const review = rewriteResult?.review;
@@ -114,26 +121,23 @@ export const StudioView: React.FC = () => {
   };
 
   const handleSelectRailTab = (tab: RailTab) => {
-    if (tab === 'change' || tab === 'review') {
-      if (!hasRewrite) return;
-      if (docView === 'original' && hasRewrite) setDocView('changes');
-    } else if (tab === 'suggestions') {
-      if (hasRewrite && docView !== 'original') setDocView('original');
-    }
+    if ((tab === 'change' || tab === 'review') && !hasRewrite) return;
     setRailTab(tab);
   };
 
   const onTabKeyDown = (e: React.KeyboardEvent) => {
-    const tabs: RailTab[] = hasRewrite ? ['suggestions', 'change', 'review'] : ['suggestions'];
+    const tabs: RailTab[] = hasRewrite ? ['suggestions', 'review', 'change', 'settings'] : ['suggestions', 'settings'];
     const currentIndex = tabs.indexOf(railTab);
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       const nextTab = tabs[(currentIndex + 1) % tabs.length];
       handleSelectRailTab(nextTab);
+      document.getElementById('rail-tab-' + nextTab)?.focus();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
       const prevTab = tabs[(currentIndex - 1 + tabs.length) % tabs.length];
       handleSelectRailTab(prevTab);
+      document.getElementById('rail-tab-' + prevTab)?.focus();
     }
   };
 
@@ -174,11 +178,11 @@ export const StudioView: React.FC = () => {
     if (!rewriteResult) return;
     try {
       await navigator.clipboard.writeText(rewriteResult.rewrittenText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyState('copied');
     } catch {
-      setRewriteError('The draft could not be copied. Try exporting it instead.');
+      setCopyState('failed');
     }
+    setTimeout(() => setCopyState('idle'), 2500);
   };
 
   const download = (format: 'txt' | 'md') => {
@@ -256,28 +260,24 @@ export const StudioView: React.FC = () => {
   };
 
   if (!busy && !docPanel) {
-    if (docView === 'original' && !hasRewrite && canRequest) {
-      selectionEnabled = true;
-      selectionLabel = 'Request a change to this passage';
-      onSelectionAct = () => applyResolvedSelection({ type: 'source-request', draftText });
-    } else if (docView === 'original' && hasRewrite) {
-      selectionEnabled = true;
-      selectionLabel = 'Ask for a change about this passage';
-      onSelectionAct = () => applyResolvedSelection({ type: 'original-highlight' });
-    } else if (docView === 'rewrite' && rewriteResult) {
-      selectionEnabled = true;
-      selectionLabel = 'Ask for a change to this passage';
-      onSelectionAct = () => applyResolvedSelection({ type: 'rewrite-prose', rewrittenText: rewriteResult.rewrittenText });
-    } else if (docView === 'changes' && rewriteResult) {
-      if (selectionSide === 'rewrite') {
+    selectionLabel = 'Ask for a change';
+    if (docView === 'original' || !hasRewrite) {
+      if (canRequest) {
         selectionEnabled = true;
-        selectionLabel = 'Ask for a change to this passage';
-        onSelectionAct = () => applyResolvedSelection({ type: 'changes-rewrite', rewrittenText: rewriteResult.rewrittenText, blocks });
-      } else if (selectionSide === 'original') {
+        onSelectionAct = () => applyResolvedSelection({ type: 'source-request', draftText });
+      } else if (rewriteResult) {
         selectionEnabled = true;
-        selectionLabel = 'Ask for a change about this passage';
-        onSelectionAct = () => applyResolvedSelection({ type: 'changes-original' });
+        onSelectionAct = () => applyResolvedSelection({ type: 'original-highlight' });
       }
+    } else if (rewriteResult && docView === 'rewrite') {
+      selectionEnabled = true;
+      onSelectionAct = () => applyResolvedSelection({ type: 'rewrite-prose', rewrittenText: rewriteResult.rewrittenText });
+    } else if (rewriteResult && docView === 'changes' && selectionSide === 'rewrite') {
+      selectionEnabled = true;
+      onSelectionAct = () => applyResolvedSelection({ type: 'changes-rewrite', rewrittenText: rewriteResult.rewrittenText, blocks });
+    } else if (rewriteResult && docView === 'changes' && selectionSide === 'original') {
+      selectionEnabled = true;
+      onSelectionAct = () => applyResolvedSelection({ type: 'changes-original' });
     }
   }
 
@@ -292,8 +292,7 @@ export const StudioView: React.FC = () => {
     clearSelection();
   };
 
-  const handleGetSuggestions = async () => {
-    if (busy || !hasDraft) return;
+  const runGetSuggestions = async () => {
     setRewriteError(null);
     try {
       await generateEditorialPlan();
@@ -304,6 +303,23 @@ export const StudioView: React.FC = () => {
     } catch (failure) {
       setRewriteError(failure instanceof Error ? failure.message : 'Could not get suggestions. Your current work is still available.');
     }
+  };
+
+  const handleGetSuggestions = () => {
+    if (busy || !hasDraft) return;
+    if (hasPlanWork) {
+      setConfirmReplace(true);
+      return;
+    }
+    void runGetSuggestions();
+  };
+
+  const acceptAllPending = () => {
+    if (!plan) return;
+    editEditorialPlan({
+      ...plan.plan,
+      items: plan.plan.items.map(item => item.decision !== 'keep' && !item.response ? { ...item, response: 'accepted' as const } : item),
+    });
   };
 
   const handleRewrite = async () => {
@@ -329,11 +345,19 @@ export const StudioView: React.FC = () => {
     );
   };
 
+  const planModel = plan?.modelUsed ? modelDisplayName(plan.modelUsed) : '';
+  const provenanceLine = !plan
+    ? 'The review model reads your draft, brief, reader and purpose, and your instructions, then suggests what each section should keep, shorten, or cut. Answer the ones you disagree with; the rest are used when you rewrite.'
+    : plan.approved
+      ? `Prepared${planModel ? ` by ${planModel}` : ''}. The last rewrite followed them.`
+      : `Prepared${planModel ? ` by ${planModel}` : ''} from your draft, brief, reader and purpose, and instructions.`;
+
   const statusResult = suggestionsStatus({
     hasDraft,
     isPlanning,
     isRewriting,
     isUploading: isUploadingDraft || isUploadingBrief,
+    isSavingVoice: isLearningFeedback,
     rewriteError,
     hasPlan: Boolean(plan),
     planStale,
@@ -357,28 +381,31 @@ export const StudioView: React.FC = () => {
         >
           <div className="studio-document-toolbar">
             {hasRewrite ? (
-              <div className="studio-view-switcher" aria-label="Document view">
-                {(
-                  [
-                    { id: 'original', label: 'Original' },
-                    { id: 'rewrite', label: 'Rewrite' },
-                    { id: 'changes', label: 'Changes' },
-                  ] as const
-                ).map(view => (
-                  <button
-                    key={view.id}
-                    id={'view-mode-' + view.id}
-                    type="button"
-                    aria-pressed={docView === view.id}
-                    onClick={() => {
-                      setDocView(view.id);
-                      clearSelection();
-                      setDocPanel(null);
-                    }}
-                  >
-                    {view.label}
-                  </button>
-                ))}
+              <div className="studio-document-identity">
+                <div className="studio-view-switcher" role="group" aria-label="Document view">
+                  {(
+                    [
+                      { id: 'original', label: 'Original' },
+                      { id: 'rewrite', label: 'Rewrite' },
+                      { id: 'changes', label: 'Changes' },
+                    ] as const
+                  ).map(view => (
+                    <button
+                      key={view.id}
+                      id={'view-mode-' + view.id}
+                      type="button"
+                      aria-pressed={docView === view.id}
+                      onClick={() => {
+                        setDocView(view.id);
+                        clearSelection();
+                        setDocPanel(null);
+                      }}
+                    >
+                      {view.label}
+                    </button>
+                  ))}
+                </div>
+                {draftDiffers && <span className="studio-document-fact">Draft changed since this version</span>}
               </div>
             ) : (
               <div className="studio-document-identity">
@@ -400,13 +427,13 @@ export const StudioView: React.FC = () => {
               {hasRewrite && (
                 <>
                   <button id="btn-copy-rewritten" type="button" onClick={handleCopy}>
-                    {copied ? <Check size={15} /> : <Copy size={15} />}
-                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                    {copyState === 'copied' ? <Check size={15} /> : <Copy size={15} />}
+                    <span>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Could not copy — use Export' : 'Copy rewrite'}</span>
                   </button>
                   <details className="studio-export">
                     <summary>
                       <Download size={15} />
-                      <span>Export</span>
+                      <span>Export rewrite</span>
                     </summary>
                     <div>
                       <button id="btn-download-txt" type="button" onClick={() => download('txt')}>
@@ -417,6 +444,9 @@ export const StudioView: React.FC = () => {
                       </button>
                     </div>
                   </details>
+                  <span className="sr-only" role="status">
+                    {copyState === 'copied' ? 'Rewrite copied.' : copyState === 'failed' ? 'Could not copy. Use Export.' : ''}
+                  </span>
                   <button
                     ref={detailsButton}
                     type="button"
@@ -469,11 +499,11 @@ export const StudioView: React.FC = () => {
               ref={proseRef}
               tabIndex={0}
               aria-label={
-                hasRewrite
+                docView === 'changes'
                   ? 'Rewrite beside the original draft. Select text to ask for a change.'
-                  : canRequest
-                  ? 'Original draft. Select text to request a change.'
-                  : 'Original draft text'
+                  : docView === 'rewrite'
+                  ? 'Rewrite. Select text to ask for a change.'
+                  : 'Current draft. Select text to ask for a change.'
               }
               className="studio-prose-scroll"
             >
@@ -493,8 +523,6 @@ export const StudioView: React.FC = () => {
                 />
               ) : hasRewrite && rewriteResult && docView === 'rewrite' ? (
                 renderProse(rewriteResult.rewrittenText, 'rewrite')
-              ) : hasRewrite && rewriteResult ? (
-                renderProse(rewriteResult.originalText, 'original')
               ) : draftText.trim() ? (
                 renderProse(draftText, 'draft')
               ) : (
@@ -523,6 +551,7 @@ export const StudioView: React.FC = () => {
                 id="rail-tab-suggestions"
                 role="tab"
                 type="button"
+                tabIndex={railTab === 'suggestions' ? 0 : -1}
                 aria-selected={railTab === 'suggestions'}
                 aria-controls="rail-panel-suggestions"
                 onClick={() => handleSelectRailTab('suggestions')}
@@ -530,9 +559,23 @@ export const StudioView: React.FC = () => {
                 Suggestions
               </button>
               <button
+                id="rail-tab-review"
+                role="tab"
+                type="button"
+                tabIndex={railTab === 'review' ? 0 : -1}
+                aria-selected={railTab === 'review'}
+                aria-controls="rail-panel-review"
+                aria-disabled={!hasRewrite}
+                title={!hasRewrite ? 'Available after the first rewrite' : undefined}
+                onClick={() => handleSelectRailTab('review')}
+              >
+                {attentionCount > 0 ? `Possible issues (${attentionCount})` : 'Possible issues'}
+              </button>
+              <button
                 id="rail-tab-change"
                 role="tab"
                 type="button"
+                tabIndex={railTab === 'change' ? 0 : -1}
                 aria-selected={railTab === 'change'}
                 aria-controls="rail-panel-change"
                 aria-disabled={!hasRewrite}
@@ -542,20 +585,15 @@ export const StudioView: React.FC = () => {
                 Ask for a change
               </button>
               <button
-                id="rail-tab-review"
+                id="rail-tab-settings"
                 role="tab"
                 type="button"
-                aria-selected={railTab === 'review'}
-                aria-controls="rail-panel-review"
-                aria-disabled={!hasRewrite}
-                title={!hasRewrite ? 'Available after the first rewrite' : undefined}
-                onClick={() => handleSelectRailTab('review')}
+                tabIndex={railTab === 'settings' ? 0 : -1}
+                aria-selected={railTab === 'settings'}
+                aria-controls="rail-panel-settings"
+                onClick={() => handleSelectRailTab('settings')}
               >
-                {review?.status && review.status !== 'complete'
-                  ? 'Review · failed'
-                  : attentionCount > 0
-                  ? `Review (${attentionCount})`
-                  : 'Review'}
+                Rewrite settings
               </button>
             </div>
           </div>
@@ -568,72 +606,8 @@ export const StudioView: React.FC = () => {
             hidden={railTab !== 'suggestions'}
             className="studio-work-content"
           >
-            {/* Pinned Action Bar */}
-            <div className="studio-rail-actions">
-              <div>
-                <button
-                  id="btn-rewrite"
-                  type="button"
-                  disabled={busy || !hasDraft || !plan || planStale || Boolean(planIssue)}
-                  onClick={handleRewrite}
-                  className="studio-primary"
-                >
-                  {isRewriting && <Loader2 size={15} className="animate-spin" />}
-                  {isRewriting ? 'Rewriting…' : 'Rewrite'}
-                </button>
-                <button
-                  id="btn-get-suggestions"
-                  type="button"
-                  disabled={busy || !hasDraft}
-                  onClick={handleGetSuggestions}
-                  className="studio-secondary"
-                >
-                  {isPlanning && <Loader2 size={15} className="animate-spin" />}
-                  {isPlanning ? 'Reading your draft…' : !plan ? 'Get suggestions' : 'Get new suggestions'}
-                </button>
-              </div>
-              <p
-                role={statusResult.tone === 'alert' ? 'alert' : 'status'}
-                className={`studio-rail-status${statusResult.tone === 'alert' ? ' studio-error' : ''}`}
-              >
-                {statusResult.text}
-                {statusResult.action && (
-                  <button
-                    type="button"
-                    className="studio-text-button underline ml-1"
-                    onClick={() => setActiveTab(statusResult.action!.targetTab)}
-                  >
-                    {statusResult.action.label}
-                  </button>
-                )}
-              </p>
-            </div>
-
             {/* Scroll Region */}
             <div ref={scrollPanel} className="studio-inspector-scroll">
-              {hasDraft && (
-                <div className="studio-field mb-4">
-                  <label htmlFor="input-rewrite-instructions" className="studio-field-label">
-                    Anything the suggestions and the writer should take into account? (optional)
-                  </label>
-                  <textarea
-                    id="input-rewrite-instructions"
-                    rows={1}
-                    value={customDirectives}
-                    disabled={busy}
-                    onChange={e => setCustomDirectives(e.target.value)}
-                    placeholder="For example, keep it under 500 words."
-                    className="w-full min-h-[42px] p-2 border border-neutral-300 rounded text-xs leading-relaxed"
-                  />
-                </div>
-              )}
-
-              {hasDraft && (
-                <div className="mb-4">
-                  <StudioDraftControls disabled={busy} />
-                </div>
-              )}
-
               {sourceSelection && plan && (
                 <form
                   className="studio-request-form mb-4"
@@ -642,16 +616,16 @@ export const StudioView: React.FC = () => {
                     addRequest();
                   }}
                 >
-                  <p className="studio-field-label">Rewrite this passage</p>
+                  <p className="studio-field-label">Request for the next rewrite</p>
                   <blockquote className="studio-request-quote">{plainText(sourceSelection.text)}</blockquote>
+                  <label htmlFor="input-passage-request" className="studio-field-label">What should change, and why?</label>
                   <textarea
                     id="input-passage-request"
                     rows={2}
                     value={requestText}
                     disabled={busy}
                     autoFocus
-                    aria-label="What should change, and why?"
-                    placeholder="What should change, and why?"
+                    placeholder=""
                     onChange={event => setRequestText(event.target.value)}
                   />
                   <div className="studio-request-actions">
@@ -665,38 +639,82 @@ export const StudioView: React.FC = () => {
                 </form>
               )}
 
-              {plan && (
-                <div className="studio-decisions">
-                  <EditorialDecisions />
-                </div>
+              {hasDraft && (
+                <section className="studio-suggestions" aria-labelledby="suggestions-heading">
+                  <div className="studio-suggestions-header">
+                    <h2 id="suggestions-heading">Suggested changes</h2>
+                    <div className="studio-suggestions-actions">
+                      {plan && !plan.approved && pending > 0 && (
+                        <button type="button" className="studio-text-button" onClick={acceptAllPending}>Accept the rest</button>
+                      )}
+                      {plan && (
+                        <button id="btn-get-suggestions" type="button" className="studio-icon-button"
+                          disabled={busy} onClick={handleGetSuggestions}
+                          aria-label={isPlanning ? 'Getting suggestions…' : 'Get new suggestions'}
+                          title="Get new suggestions">
+                          {isPlanning ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="studio-suggestions-source">{provenanceLine}</p>
+                  {plan ? <EditorialDecisions /> : (
+                    <button id="btn-get-suggestions" type="button" className="studio-secondary" disabled={busy}
+                      onClick={handleGetSuggestions}>
+                      {isPlanning && <Loader2 size={15} className="animate-spin" />}
+                      {isPlanning ? 'Getting suggestions…' : 'Get suggestions'}
+                    </button>
+                  )}
+                </section>
               )}
 
-              {!plan && hasDraft && (
-                <p className="studio-panel-description">
-                  Suggestions show what the rewrite would keep, shorten, or cut, one passage at a time. You answer them
-                  before rewriting.
+              <ConfirmDialog
+                open={confirmReplace}
+                title="Replace these suggestions?"
+                confirmLabel="Replace suggestions"
+                cancelLabel="Keep current suggestions"
+                onConfirm={() => { setConfirmReplace(false); void runGetSuggestions(); }}
+                onCancel={() => setConfirmReplace(false)}
+              >
+                <p>Your {answeredCount} {answeredCount === 1 ? 'answer' : 'answers'} and {requestCount} {requestCount === 1 ? 'request' : 'requests'} will be removed. The draft is not changed.</p>
+              </ConfirmDialog>
+            </div>
+
+            {/* Pinned Action Bar */}
+            <div className="studio-rail-actions studio-rail-footer">
+              {statusResult.text && (
+                <p
+                  role={statusResult.tone === 'alert' ? 'alert' : 'status'}
+                  className={`studio-rail-status${statusResult.tone === 'alert' ? ' studio-error' : ''}`}
+                >
+                  {statusResult.text}
+                  {statusResult.action && (
+                    <button
+                      type="button"
+                      className="studio-text-button underline ml-1"
+                      onClick={() => setActiveTab(statusResult.action!.targetTab)}
+                    >
+                      {statusResult.action.label}
+                    </button>
+                  )}
                 </p>
               )}
+              {statusResult.detail && (
+                <details className="studio-status-detail"><summary>Details</summary><p>{statusResult.detail}</p></details>
+              )}
+              <div>
+                <button
+                  id="btn-rewrite"
+                  type="button"
+                  disabled={busy || !hasDraft || !plan || planStale || Boolean(planIssue)}
+                  onClick={handleRewrite}
+                  className="studio-primary"
+                >
+                  {isRewriting && <Loader2 size={15} className="animate-spin" />}
+                  {isRewriting ? 'Rewriting…' : 'Rewrite'}
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* Ask for a change Tab */}
-          <div
-            id="rail-panel-change"
-            role="tabpanel"
-            aria-labelledby="rail-tab-change"
-            hidden={railTab !== 'change'}
-            className="studio-work-content"
-          >
-            {hasRewrite && rewriteResult && (
-              <RewriteFeedbackManager
-                key={rewriteResult.id}
-                selectedText={selectedHighlight}
-                selectionRange={selectedRange}
-                onClearSelection={clearSelection}
-                editRequest={editRequest.resultId === rewriteResult.id ? editRequest : undefined}
-              />
-            )}
           </div>
 
           {/* Review Tab */}
@@ -723,6 +741,7 @@ export const StudioView: React.FC = () => {
                       setDocPanel(null);
                     }}
                     onRequestEdit={requestCorrection}
+                    onIgnore={setReviewFindingIgnored}
                     onConfigureReviewer={() => openModelSettings('analysis')}
                   />
                 ) : (
@@ -732,6 +751,38 @@ export const StudioView: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Ask for a change Tab */}
+          <div
+            id="rail-panel-change"
+            role="tabpanel"
+            aria-labelledby="rail-tab-change"
+            hidden={railTab !== 'change'}
+            className="studio-work-content"
+          >
+            {hasRewrite && rewriteResult && (
+              <RewriteFeedbackManager
+                key={rewriteResult.id}
+                selectedText={selectedHighlight}
+                selectionRange={selectedRange}
+                onClearSelection={clearSelection}
+                editRequest={editRequest.resultId === rewriteResult.id ? editRequest : undefined}
+              />
+            )}
+          </div>
+
+          {/* Rewrite settings Tab */}
+          <div
+            id="rail-panel-settings"
+            role="tabpanel"
+            aria-labelledby="rail-tab-settings"
+            hidden={railTab !== 'settings'}
+            className="studio-work-content"
+          >
+            <div className="studio-inspector-scroll">
+              <StudioDraftControls disabled={busy} />
+            </div>
           </div>
         </aside>
       </div>

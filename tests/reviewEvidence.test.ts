@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   actionableReviewIssueCount,
   dedupeReviewFindings,
+  findingKey,
+  isFindingIgnored,
   pairReviewEvidence,
   reviewEvidence,
 } from '../src/utils/reviewEvidence';
@@ -68,4 +70,23 @@ test('deduplicates repeated findings but keeps different concerns on shared pass
   assert.equal(deduped[1].category, 'claim');
   assert.equal(deduped[2].category, 'preservation');
   assert.equal(actionableReviewIssueCount({ findings }, source, rewritten), 4);
+});
+
+test('ignored findings are excluded from actionableReviewIssueCount and checked by isFindingIgnored', () => {
+  const source = 'The source text.';
+  const rewritten = 'The rewritten text.';
+  const firstFinding = { category: 'claim' as const, severity: 'warning' as const, detail: 'Claim is unverified.', evidence: 'The rewritten text.' };
+  const secondFinding = { category: 'editorial' as const, severity: 'warning' as const, detail: 'Tone differs.', evidence: 'The rewritten text.' };
+  const findings = [firstFinding, secondFinding];
+  const firstKey = findingKey(firstFinding);
+
+  const review = {
+    findings,
+    ignoredFindings: [firstKey],
+  };
+
+  assert.equal(actionableReviewIssueCount(review, source, rewritten), 1);
+  assert.equal(isFindingIgnored(review, firstFinding), true);
+  assert.equal(isFindingIgnored(review, secondFinding), false);
+  assert.equal(isFindingIgnored({ ignoredFindings: undefined }, firstFinding), false);
 });

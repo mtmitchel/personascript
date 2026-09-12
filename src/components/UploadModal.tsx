@@ -3,6 +3,9 @@ import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { UploadCloud, FileText, X, AlertCircle, Check, Trash2, Plus, RefreshCw, Globe } from 'lucide-react';
 import { FileType } from '../types';
 import { WebImportTab } from './WebImportTab';
+import { SUPPORTED_SAMPLE_EXTENSIONS } from '../utils/sampleFiles';
+
+export { SUPPORTED_SAMPLE_EXTENSIONS } from '../utils/sampleFiles';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -54,6 +57,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
 
   const extractFileContent = async (file: File): Promise<{ content: string; fileType: FileType }> => {
     const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!SUPPORTED_SAMPLE_EXTENSIONS.includes(extension as never)) {
+      throw new Error(`${file.name} is a .${extension} file. Save it as PDF, Word (.docx), Markdown, or plain text and try again.`);
+    }
     let detectedType: FileType = 'txt';
     if (extension === 'pdf') detectedType = 'pdf';
     else if (extension === 'docx') detectedType = 'docx';
@@ -209,6 +215,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
     }
 
     // Upload mode
+    const erroredItems = stagedFiles.filter((item) => item.status === 'error');
+    if (erroredItems.length > 0) {
+      setGeneralError(
+        erroredItems.length === 1
+          ? `Remove “${erroredItems[0].fileName}” before adding the others.`
+          : `Remove the ${erroredItems.length} files that can’t be added before adding the others.`,
+      );
+      return;
+    }
+
     const readyItems = stagedFiles.filter((item) => item.status === 'ready' && item.content.trim());
     if (readyItems.length === 0) {
       setGeneralError('Please select at least one document with readable content.');
@@ -218,21 +234,37 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
     setIsSubmitting(true);
 
     try {
+      const added: string[] = [];
+      const failed: Array<{ item: StagedFile; error: string }> = [];
+
       for (let i = 0; i < readyItems.length; i++) {
         const item = readyItems[i];
         setSubmitProgress(`Adding sample ${i + 1} of ${readyItems.length}...`);
-        await addSample({
-          title: item.title.trim() || item.fileName || 'Untitled sample',
-          content: item.content.trim(),
-          fileType: item.fileType,
-          fileName: item.fileName,
-          wordCount: item.wordCount,
-          charCount: item.content.length,
-        });
+        try {
+          await addSample({
+            title: item.title.trim() || item.fileName || 'Untitled sample',
+            content: item.content.trim(),
+            fileType: item.fileType,
+            fileName: item.fileName,
+            wordCount: item.wordCount,
+            charCount: item.content.length,
+          });
+          added.push(item.id);
+        } catch (err: any) {
+          failed.push({ item, error: err.message || 'Failed to add sample' });
+        }
       }
 
-      setStagedFiles([]);
-      onClose();
+      if (failed.length > 0) {
+        setStagedFiles(prev => prev.filter(f => failed.some(fail => fail.item.id === f.id)).map(f => {
+          const failure = failed.find(fail => fail.item.id === f.id);
+          return failure ? { ...f, status: 'error' as const, errorMessage: failure.error } : f;
+        }));
+        setGeneralError(`Could not add ${failed.length} ${failed.length === 1 ? 'sample' : 'samples'}.`);
+      } else {
+        setStagedFiles([]);
+        onClose();
+      }
     } catch (err: any) {
       setGeneralError(err.message || 'Failed to add samples');
     } finally {
@@ -308,7 +340,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
             className={`pb-2.5 px-2.5 text-xs font-medium border-b-2 transition flex items-center gap-1.5 ${
               mode === 'upload'
                 ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
             }`}
           >
             <UploadCloud className="w-3.5 h-3.5" />
@@ -321,7 +353,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
             className={`pb-2.5 px-2.5 text-xs font-medium border-b-2 transition flex items-center gap-1.5 ${
               mode === 'link'
                 ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
@@ -334,7 +366,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
             className={`pb-2.5 px-2.5 text-xs font-medium border-b-2 transition flex items-center gap-1.5 ${
               mode === 'paste'
                 ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -376,35 +408,38 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
                 }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border border-dashed rounded-lg p-6 text-center cursor-pointer transition ${
+                className={`border border-dashed rounded-lg p-6 text-center transition ${
                   isDragging
                     ? 'border-neutral-900 bg-neutral-50'
                     : 'border-neutral-200 hover:border-neutral-400 bg-neutral-50/50'
                 }`}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.doc,.txt,.md,.rtf"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      handleFiles(e.target.files);
-                      // Clear value so the same files can be re-selected if needed
-                      e.target.value = '';
-                    }
-                  }}
-                  className="hidden"
-                />
-
                 <div className="flex flex-col items-center">
+                  <input
+                    ref={fileInputRef}
+                    id="input-sample-files"
+                    type="file"
+                    multiple
+                    accept={SUPPORTED_SAMPLE_EXTENSIONS.map(e => '.' + e).join(',')}
+                    aria-describedby="dropzone-help"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleFiles(e.target.files);
+                        // Clear value so the same files can be re-selected if needed
+                        e.target.value = '';
+                      }
+                    }}
+                    className="sr-only"
+                  />
                   <UploadCloud className="w-6 h-6 text-neutral-400 mb-1.5" />
-                  <p className="text-xs font-medium text-neutral-900">
-                    Drop files here or click to browse
-                  </p>
-                  <p className="text-[11px] text-neutral-400 mt-1">
-                    Select one or multiple files (PDF, DOCX, Markdown, or plain text)
+                  <label
+                    htmlFor="input-sample-files"
+                    className="px-3 py-1.5 rounded-lg border border-neutral-300 text-xs font-medium text-neutral-800 hover:bg-neutral-50 cursor-pointer"
+                  >
+                    Choose files
+                  </label>
+                  <p id="dropzone-help" className="text-xs text-neutral-600 mt-2">
+                    or drop them here. PDF, Word (.docx), Markdown, or plain text.
                   </p>
                 </div>
               </div>
@@ -413,9 +448,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
               {stagedFiles.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-neutral-700">
+                    <span className="text-xs font-medium text-neutral-700">
                       Selected files ({stagedFiles.length})
-                    </label>
+                    </span>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -434,16 +469,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
                       >
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">
+                            <label htmlFor={`staged-title-${item.id}`} className="text-xs font-medium text-neutral-700 shrink-0">Title</label>
                             <input
+                              id={`staged-title-${item.id}`}
                               type="text"
                               value={item.title}
                               onChange={(e) => handleUpdateTitle(item.id, e.target.value)}
                               placeholder="Sample title"
-                              className="font-medium text-xs text-neutral-900 bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 focus:outline-none px-0.5 py-0.5 w-full truncate"
+                              className="font-medium text-xs text-neutral-900 bg-transparent border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 px-0.5 py-0.5 w-full truncate"
                             />
                           </div>
 
-                          <div className="flex items-center gap-2 text-[11px] text-neutral-400">
+                          <div className="flex items-center gap-2 text-[11px] text-neutral-500">
                             <span className="font-mono">{item.fileType}</span>
                             <span>•</span>
                             <span className="truncate max-w-[140px] sm:max-w-xs">
@@ -495,7 +532,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
             /* Paste Mode */
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-neutral-700">
+                <label htmlFor="input-sample-title" className="block text-xs font-medium text-neutral-700">
                   Title
                 </label>
                 <input
@@ -504,16 +541,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
                   value={pasteTitle}
                   onChange={(e) => setPasteTitle(e.target.value)}
                   placeholder="e.g. Essay draft, Technical memo"
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 bg-white"
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs text-neutral-900 focus:border-neutral-900 bg-white"
                 />
               </div>
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-neutral-700">
+                  <label htmlFor="textarea-sample-content" className="block text-xs font-medium text-neutral-700">
                     Content
                   </label>
-                  <span className="text-[11px] text-neutral-400 font-mono">
+                  <span className="text-[11px] text-neutral-500 font-mono">
                     {pasteWordCount} words
                   </span>
                 </div>
@@ -523,7 +560,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, initi
                   value={pasteContent}
                   onChange={(e) => setPasteContent(e.target.value)}
                   placeholder="Paste representative writing sample..."
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 bg-white font-sans leading-relaxed"
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs text-neutral-900 focus:border-neutral-900 bg-white font-sans leading-relaxed"
                 />
               </div>
             </div>

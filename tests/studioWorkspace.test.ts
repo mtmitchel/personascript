@@ -25,6 +25,7 @@ test('restores current inputs and the active version without mixing their source
   const reloaded = readStudioWorkspace(storage);
   assert.equal(reloaded.found, true);
   assert.deepEqual(reloaded.workspace, workingCopy);
+  assert.equal(reloaded.workspace.rewriteResult.review.ignoredFindings, undefined);
   assert.equal(reloaded.workspace.rewriteResult.projectBrief, 'Brief A.');
   assert.match(reloaded.workspace.projectBrief, /Brief B/);
 });
@@ -79,6 +80,7 @@ test('damaged nested result data is rejected before it can crash the recovery UI
     { review: { ...workingCopy.rewriteResult.review, findings: [null] } },
     { review: { ...workingCopy.rewriteResult.review, localChecks: [{}] } },
     { review: { ...workingCopy.rewriteResult.review, voiceObservations: [{}] } },
+    { review: { ...workingCopy.rewriteResult.review, ignoredFindings: 5 } },
     { profileName: {} }, { wordCountRewritten: 'two' }, { projectBrief: {} },
     { feedbackItems: [{ id: 'x', selectedText: 'x', label: {}, tag: 'custom', createdAt: 'now' }] },
     { modelSettings: { writingModel: {} } }, { preservationSettings: { customLocks: {} } },
@@ -110,3 +112,20 @@ test('version identity uses random bytes without requiring secure-context random
   assert.equal(ids.size, 100);
   assert.ok([...ids].every((id) => /^rewrite-[a-f0-9]{32}$/.test(id)));
 });
+
+test('saved workspace with review ignoredFindings preserves the array after parseStudioWorkspace', () => {
+  const someKey = 'finding:claim|unverified rate|12%';
+  const copyWithIgnored: StudioWorkspace = {
+    ...workingCopy,
+    rewriteResult: {
+      ...workingCopy.rewriteResult!,
+      review: {
+        ...workingCopy.rewriteResult!.review!,
+        ignoredFindings: [someKey],
+      },
+    },
+  };
+  const parsed = parseStudioWorkspace(JSON.stringify(copyWithIgnored));
+  assert.deepEqual(parsed.rewriteResult?.review?.ignoredFindings, [someKey]);
+});
+

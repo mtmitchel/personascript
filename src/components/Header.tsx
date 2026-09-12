@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useWritingAssistant, NavigationTab } from '../context/WritingAssistantContext';
-import { Feather, RotateCcw, X } from 'lucide-react';
+import { Feather, RotateCcw } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export const Header: React.FC = () => {
   const {
@@ -58,7 +59,7 @@ export const Header: React.FC = () => {
                   <span>{item.label}</span>
                   {item.count !== undefined && (
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                      className={`text-[11px] px-1.5 py-0.2 rounded font-mono ${
                         isActive
                           ? 'bg-neutral-800 text-neutral-200'
                           : 'bg-neutral-200 text-neutral-700'
@@ -92,62 +93,20 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Reset Confirmation Modal */}
-      {showResetConfirm && (
-        <div
-          id="modal-reset-confirm-backdrop"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/40 backdrop-blur-xs animate-in fade-in duration-100"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowResetConfirm(false);
-          }}
-        >
-          <div
-            id="modal-reset-confirm"
-            role="dialog"
-            aria-modal="true"
-            className="bg-white rounded-xl border border-neutral-200 shadow-xl max-w-sm w-full p-5 space-y-4 animate-in zoom-in-95 duration-100"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-900">
-                  Reset voice and model presets?
-                </h3>
-                <p className="text-xs text-neutral-500 mt-1">
-                  This restores default samples, voice, tone, and model choices. Your drafts, brief, and version history are kept.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1 rounded-md"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(false)}
-                className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                id="btn-confirm-reset-all"
-                type="button"
-                onClick={() => {
-                  resetPresets();
-                  setShowResetConfirm(false);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={showResetConfirm}
+        title="Reset presets?"
+        confirmLabel="Reset presets"
+        cancelLabel="Keep everything"
+        destructive
+        onConfirm={() => {
+          resetPresets();
+          setShowResetConfirm(false);
+        }}
+        onCancel={() => setShowResetConfirm(false)}
+      >
+        <p>This restores default samples, voice, tone, and model choices. Your drafts, brief, and version history are kept.</p>
+      </ConfirmDialog>
     </header>
   );
 };

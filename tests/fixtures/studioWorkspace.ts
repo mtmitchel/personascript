@@ -134,3 +134,19 @@ export const approvedPlanWithRewriteFixture: StudioWorkspace = {
     },
   },
 };
+
+const editedDraft = 'First paragraph of original draft, now edited.\n\nSecond paragraph of original draft.';
+
+export const editedDraftWithOpenVersionFixture: StudioWorkspace = {
+  ...approvedPlanWithRewriteFixture,
+  draftText: editedDraft,
+  editorialPlan: {
+    ...approvedPlanState,
+    approved: false,
+    sources: {
+      ...approvedPlanState.sources,
+      draft: editedDraft,
+    },
+  },
+};
+

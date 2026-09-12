@@ -147,10 +147,6 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
     setScanStep('Connecting to website and discovering writing pieces...');
 
     try {
-      const timer = setTimeout(() => {
-        setScanStep('Analyzing authorial voice and scoring alignment with your audience...');
-      }, 3500);
-
       const res = await fetch('/api/discover-portfolio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +159,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
         }),
       });
 
-      clearTimeout(timer);
+      setScanStep('Response received.');
 
       const data = await res.json();
       if (!res.ok) {
@@ -269,7 +265,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
           {!fetchedArticle ? (
             <form onSubmit={handleFetchSingle} className="space-y-3.5">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-800 flex items-center justify-between">
+                <label htmlFor="input-single-url" className="text-xs font-medium text-neutral-800 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-neutral-500" />
                     <span>Article, Essay, or Blog Post Link</span>
@@ -283,7 +279,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                     value={singleUrl}
                     onChange={(e) => setSingleUrl(e.target.value)}
                     placeholder="https://example.com/blog/my-essay or Substack / Medium link"
-                    className="flex-1 px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 bg-white"
+                    className="flex-1 px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:border-neutral-900 text-neutral-900 bg-white"
                     disabled={isFetchingSingle}
                     autoFocus
                     required
@@ -307,7 +303,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                     )}
                   </button>
                 </div>
-                <p className="text-[11px] text-neutral-400">
+                <p className="text-[11px] text-neutral-500">
                   Instantly extracts the full article text and paragraph structure without needing audience alignment or waiting.
                 </p>
               </div>
@@ -347,7 +343,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
 
                 {/* Editable Title */}
                 <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-neutral-600">Sample Title</label>
+                  <label htmlFor="input-fetched-article-title" className="text-[11px] font-medium text-neutral-600">Sample Title</label>
                   <input
                     type="text"
                     id="input-fetched-article-title"
@@ -355,7 +351,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                     onChange={(e) =>
                       setFetchedArticle({ ...fetchedArticle, title: e.target.value })
                     }
-                    className="w-full px-2.5 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 focus:outline-none focus:border-neutral-900 bg-white"
+                    className="w-full px-2.5 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 focus:border-neutral-900 bg-white"
                   />
                 </div>
 
@@ -527,14 +523,14 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                             </label>
 
                             {piece.recommended && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-900 text-white">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-neutral-900 text-white">
                                 <BookmarkCheck className="w-2.5 h-2.5 text-emerald-400" />
                                 <span>Recommended</span>
                               </span>
                             )}
 
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${
+                              className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-medium ${
                                 piece.alignmentScore >= 88
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
@@ -543,7 +539,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                               {piece.alignmentScore}% Match
                             </span>
 
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600">
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600">
                               {piece.detectedType}
                             </span>
                           </div>
@@ -557,7 +553,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                             {piece.alignmentRationale}
                           </div>
 
-                          <div className="mt-2 flex items-center justify-between text-[10px] text-neutral-400">
+                          <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
                             <div className="flex items-center gap-2">
                               {piece.url && (
                                 <a
@@ -636,12 +632,12 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
             /* Portfolio Form */
             <form onSubmit={handleScanPortfolio} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-800 flex items-center justify-between">
+                <label htmlFor="input-portfolio-site-url" className="text-xs font-medium text-neutral-800 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-neutral-500" />
                     <span>Portfolio or Publication Site Link</span>
                   </span>
-                  <span className="text-[11px] text-neutral-400">Required</span>
+                  <span className="text-[11px] text-neutral-500">Required</span>
                 </label>
                 <input
                   type="url"
@@ -649,19 +645,19 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                   value={portfolioUrl}
                   onChange={(e) => setPortfolioUrl(e.target.value)}
                   placeholder="https://yourname.com/writing or Substack publication homepage"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:border-neutral-900 text-neutral-900 bg-white"
                   disabled={isScanning}
                   required
                 />
-                <p className="text-[11px] text-neutral-400">
+                <p className="text-[11px] text-neutral-500">
                   Scans your site or publication to discover articles matching your target audience.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-800 flex items-center justify-between">
+                <label htmlFor="input-portfolio-audience-goal" className="text-xs font-medium text-neutral-800 flex items-center justify-between">
                   <span>Target audience or writing goal</span>
-                  <span className="text-[11px] text-neutral-400">Helps agent curate pieces</span>
+                  <span className="text-[11px] text-neutral-500">Helps agent curate pieces</span>
                 </label>
                 <input
                   type="text"
@@ -669,7 +665,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
                   placeholder="e.g. Technical leaders, executive founders, general audience"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:border-neutral-900 text-neutral-900 bg-white"
                   disabled={isScanning}
                 />
                 <div className="flex flex-wrap gap-1 pt-1">
@@ -678,7 +674,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                       key={sug}
                       type="button"
                       onClick={() => setTargetAudience(sug)}
-                      className={`text-[10px] px-2 py-0.5 rounded-full border transition ${
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition ${
                         targetAudience === sug
                           ? 'border-neutral-900 bg-neutral-900 text-white'
                           : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
@@ -691,7 +687,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-800">
+                <label htmlFor="input-portfolio-format-goal" className="text-xs font-medium text-neutral-800">
                   Desired writing format
                 </label>
                 <input
@@ -700,7 +696,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                   value={writingType}
                   onChange={(e) => setWritingType(e.target.value)}
                   placeholder="e.g. Long-form essays, strategic memos, architectural deep dives"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900 text-neutral-900 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-200 focus:border-neutral-900 text-neutral-900 bg-white"
                   disabled={isScanning}
                 />
                 <div className="flex flex-wrap gap-1 pt-1">
@@ -709,7 +705,7 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
                       key={typeSug}
                       type="button"
                       onClick={() => setWritingType(typeSug)}
-                      className={`text-[10px] px-2 py-0.5 rounded-full border transition ${
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition ${
                         writingType === typeSug
                           ? 'border-neutral-900 bg-neutral-900 text-white'
                           : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
@@ -722,15 +718,11 @@ export const WebImportTab: React.FC<WebImportTabProps> = ({
               </div>
 
               {isScanning && (
-                <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2.5">
-                  <div className="flex items-center gap-2 text-xs font-medium text-neutral-900">
-                    <Loader2 className="w-4 h-4 animate-spin text-neutral-700 shrink-0" />
-                    <span>Curating Portfolio Pieces</span>
-                  </div>
-                  <p className="text-xs text-neutral-500">{scanStep}</p>
-                  <div className="w-full bg-neutral-200 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-neutral-900 h-full rounded-full animate-pulse w-3/4" />
-                  </div>
+                <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-neutral-700 shrink-0" />
+                  <p role="status" className="text-sm text-neutral-700">
+                    {scanStep}
+                  </p>
                 </div>
               )}
 

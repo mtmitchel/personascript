@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RewriteResult } from '../src/types';
-import { normalizeRewriteHistory, retainRewriteVersions, REWRITE_HISTORY_LIMIT } from '../src/utils/rewriteHistory';
+import {
+  normalizeRewriteHistory,
+  retainRewriteVersions,
+  revisionLabel,
+  revisionExcerpt,
+  REWRITE_HISTORY_LIMIT,
+} from '../src/utils/rewriteHistory';
 
 function version(id: string, rewrittenText = id): RewriteResult {
   return {
@@ -71,3 +77,30 @@ test('a planned version validates against its own saved rewrite instructions', (
   const mismatched = { ...version('bad'), editorialPlan: { ...base, sources: { draft: 'A different draft entirely.', projectBrief: '', readerPurpose: '', customInstructions: 'x' } } };
   assert.throws(() => normalizeRewriteHistory([mismatched]), /could not be read/);
 });
+
+test('revisionLabel returns expected human-readable label for revision kinds', () => {
+  assert.equal(revisionLabel({ ...version('1'), revision: { kind: 'refine', instruction: 'edit' } }), 'Edit');
+  assert.equal(revisionLabel({ ...version('2'), revision: { kind: 'selection', instruction: 'edit' } }), 'Edit to selected text');
+  assert.equal(revisionLabel({ ...version('3'), revision: { kind: 'rewrite', instruction: 'edit' } }), 'Rewrite');
+  assert.equal(revisionLabel(version('4')), 'Version');
+});
+
+test('revisionExcerpt returns normalized excerpt or empty string', () => {
+  // Empty or missing instruction
+  assert.equal(revisionExcerpt(version('1')), '');
+  assert.equal(revisionExcerpt({ ...version('2'), revision: { kind: 'refine', instruction: '' } }), '');
+  assert.equal(revisionExcerpt({ ...version('3'), revision: { kind: 'refine', instruction: '   \n  \t ' } }), '');
+
+  // Normal instruction
+  assert.equal(
+    revisionExcerpt({ ...version('4'), revision: { kind: 'refine', instruction: 'Make the tone  more  direct.\nAnd clear.' } }),
+    'Make the tone more direct. And clear.',
+  );
+
+  // Long instruction truncated with ellipsis
+  const longText = 'This is a very long author instruction intended to exceed the eighty character maximum limit for the history excerpt.';
+  const excerpt = revisionExcerpt({ ...version('5'), revision: { kind: 'refine', instruction: longText } });
+  assert.ok(excerpt.endsWith('…'));
+  assert.ok(excerpt.length <= 80);
+});
+

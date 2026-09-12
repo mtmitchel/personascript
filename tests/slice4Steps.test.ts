@@ -60,12 +60,14 @@ test('DomainTopicsSection empty state renders Generate topics once and draft/bri
   );
 
   // Generate topics button appears
-  assert.match(html, /id="btn-regenerate-topics"/);
+  assert.match(html, /id="btn-regenerate-topics-empty"/);
+  assert.doesNotMatch(html, /id="btn-regenerate-topics"/);
   assert.match(html, /Generate topics/);
   // Checkbox appears
-  assert.match(html, /id="checkbox-use-draft-brief"/);
+  assert.match(html, /id="checkbox-use-draft-brief-empty"/);
+  assert.doesNotMatch(html, /id="checkbox-use-draft-brief"/);
   // Exactly one Generate topics button in output
-  const matches = html.match(/id="btn-regenerate-topics"/g);
+  const matches = html.match(/id="btn-regenerate-topics-empty"/g);
   assert.equal(matches?.length, 1);
   // No Clear all topics button in empty state
   assert.doesNotMatch(html, /id="btn-clear-topics"/);
@@ -131,8 +133,9 @@ test('DomainProductsSection renders Add product once in empty state and Remove b
   );
 
   // Only one Add product button in empty state
-  const emptyMatches = emptyHtml.match(/id="btn-add-product"/g);
+  const emptyMatches = emptyHtml.match(/id="btn-add-product-empty"/g);
   assert.equal(emptyMatches?.length, 1);
+  assert.doesNotMatch(emptyHtml, /id="btn-add-product"/);
 
   const populatedExpertise = makeExpertise({
     productKnowledge: [

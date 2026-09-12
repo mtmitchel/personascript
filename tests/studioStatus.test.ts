@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { suggestionsStatus } from '../src/utils/studioStatus';
+import { joinList, suggestionsStatus } from '../src/utils/studioStatus';
+
+test('joinList is importable and formats lists with Oxford comma', () => {
+  assert.equal(joinList([]), '');
+  assert.equal(joinList(['draft']), 'draft');
+  assert.equal(joinList(['draft', 'brief']), 'draft and brief');
+  assert.equal(joinList(['draft', 'brief', 'instructions']), 'draft, brief, and instructions');
+});
 
 test('Priority 1: !hasDraft asks for draft and provides action', () => {
   const result = suggestionsStatus({ hasDraft: false, hasPlan: false });
@@ -11,7 +18,7 @@ test('Priority 1: !hasDraft asks for draft and provides action', () => {
 
 test('Priority 2: isPlanning shows reading indicator', () => {
   const result = suggestionsStatus({ hasDraft: true, hasPlan: false, isPlanning: true });
-  assert.equal(result.text, 'Reading your draft and brief…');
+  assert.equal(result.text, 'Getting suggestions…');
   assert.equal(result.tone, 'status');
 });
 
@@ -27,27 +34,59 @@ test('Priority 4: isUploading shows upload indicator', () => {
   assert.equal(result.tone, 'status');
 });
 
+test('Priority 4.5: isSavingVoice shows saving indicator and takes precedence over error', () => {
+  const result = suggestionsStatus({ hasDraft: true, hasPlan: true, isSavingVoice: true, rewriteError: 'Some error' });
+  assert.equal(result.text, 'Saving your voice preference…');
+  assert.equal(result.tone, 'status');
+
+  // isUploading beats isSavingVoice
+  const uploadResult = suggestionsStatus({ hasDraft: true, hasPlan: true, isUploading: true, isSavingVoice: true });
+  assert.equal(uploadResult.text, 'Waiting for your upload…');
+});
+
 test('Priority 5: rewriteError shows error alert', () => {
   const result = suggestionsStatus({ hasDraft: true, hasPlan: true, rewriteError: 'Model timeout.' });
-  assert.equal(result.text, 'Model timeout.');
+  assert.equal(result.text, 'Could not finish. Your current work is unchanged.');
   assert.equal(result.tone, 'alert');
+  assert.equal(result.detail, 'Model timeout.');
 });
 
 test('Priority 6: !hasPlan prompts to get suggestions first', () => {
   const result = suggestionsStatus({ hasDraft: true, hasPlan: false });
-  assert.equal(result.text, 'Get suggestions first. The rewrite follows the suggestions you accept.');
+  assert.equal(result.text, 'Get suggestions above first. The rewrite follows the ones you accept.');
   assert.equal(result.tone, 'status');
 });
 
-test('Priority 7: planStale with reasons names changed inputs', () => {
-  const result = suggestionsStatus({
+test('Priority 7: planStale with reasons names changed inputs with Oxford comma join', () => {
+  // One reason
+  const one = suggestionsStatus({
+    hasDraft: true,
+    hasPlan: true,
+    planStale: true,
+    staleReasons: ['draft'],
+  });
+  assert.equal(one.text, 'Your draft changed after these suggestions were prepared. Get suggestions again before rewriting.');
+  assert.equal(one.tone, 'status');
+
+  // Two reasons
+  const two = suggestionsStatus({
     hasDraft: true,
     hasPlan: true,
     planStale: true,
     staleReasons: ['rewrite instructions', 'draft'],
   });
-  assert.equal(result.text, 'Your rewrite instructions, draft changed after these suggestions were prepared. Get new suggestions before rewriting.');
-  assert.equal(result.tone, 'status');
+  assert.equal(two.text, 'Your rewrite instructions and draft changed after these suggestions were prepared. Get suggestions again before rewriting.');
+  assert.equal(two.tone, 'status');
+
+  // Three reasons
+  const three = suggestionsStatus({
+    hasDraft: true,
+    hasPlan: true,
+    planStale: true,
+    staleReasons: ['rewrite instructions', 'draft', 'brief'],
+  });
+  assert.equal(three.text, 'Your rewrite instructions, draft, and brief changed after these suggestions were prepared. Get suggestions again before rewriting.');
+  assert.equal(three.tone, 'status');
 });
 
 test('Priority 7b: planStale without reasons indicates older format', () => {
@@ -57,7 +96,7 @@ test('Priority 7b: planStale without reasons indicates older format', () => {
     planStale: true,
     staleReasons: [],
   });
-  assert.equal(result.text, 'These suggestions are in an older format. Get new suggestions before rewriting.');
+  assert.equal(result.text, 'These suggestions were made with an older version of the app. Get suggestions again before rewriting.');
   assert.equal(result.tone, 'status');
 });
 
@@ -67,18 +106,19 @@ test('Priority 8: planIssue surfaces the readiness issue verbatim', () => {
     hasPlan: true,
     planIssue: 'Review 1 conflict before approving.',
   });
-  assert.equal(result.text, 'Review 1 conflict before approving.');
+  assert.equal(result.text, 'These suggestions no longer match your draft. Get suggestions again before rewriting.');
   assert.equal(result.tone, 'status');
+  assert.equal(result.detail, 'Review 1 conflict before approving.');
 });
 
-test('Priority 9: planApproved && hasRewrite indicates last rewrite followed suggestions', () => {
+test('Priority 9: planApproved && hasRewrite asks for no status line', () => {
   const result = suggestionsStatus({
     hasDraft: true,
     hasPlan: true,
     planApproved: true,
     hasRewrite: true,
   });
-  assert.equal(result.text, 'The last rewrite followed these suggestions. Rewrite writes a new version from the original draft.');
+  assert.equal(result.text, '');
   assert.equal(result.tone, 'status');
 });
 
@@ -100,7 +140,7 @@ test('Priority ordering: earlier priorities take precedence', () => {
   // !hasDraft beats isPlanning
   assert.equal(suggestionsStatus({ hasDraft: false, isPlanning: true, hasPlan: false }).text, 'Add your draft in Draft & Brief to begin.');
   // rewriteError beats !hasPlan
-  assert.equal(suggestionsStatus({ hasDraft: true, hasPlan: false, rewriteError: 'Failed' }).text, 'Failed');
+  assert.equal(suggestionsStatus({ hasDraft: true, hasPlan: false, rewriteError: 'Failed' }).text, 'Could not finish. Your current work is unchanged.');
   // planStale beats pendingSuggestions
-  assert.equal(suggestionsStatus({ hasDraft: true, hasPlan: true, planStale: true, staleReasons: ['draft'], pendingSuggestions: 2 }).text, 'Your draft changed after these suggestions were prepared. Get new suggestions before rewriting.');
+  assert.equal(suggestionsStatus({ hasDraft: true, hasPlan: true, planStale: true, staleReasons: ['draft'], pendingSuggestions: 2 }).text, 'Your draft changed after these suggestions were prepared. Get suggestions again before rewriting.');
 });

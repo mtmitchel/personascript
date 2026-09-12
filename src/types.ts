@@ -67,6 +67,7 @@ export interface WritingSample {
   analyzing?: boolean;
   analysisError?: string;
   enabled: boolean;
+  isExample?: boolean;
 }
 
 export interface ProfileMetrics {
@@ -273,6 +274,8 @@ export interface WritingReview {
   modelUsed?: string;
   durationMs?: number;
   error?: string;
+  /** Finding keys the author chose to ignore; optional so saved versions stay readable. */
+  ignoredFindings?: string[];
 }
 
 export type FeedbackTag =

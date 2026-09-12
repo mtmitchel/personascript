@@ -10,10 +10,18 @@
   textarea {
     resize: vertical;
   }
+  :where(button, summary, select, textarea, input, a, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-neutral-900);
+    outline-offset: 3px;
+  }
+  .sr-only:focus-visible ~ label[for] {
+    outline: 2px solid var(--color-neutral-900);
+    outline-offset: 3px;
+  }
 }
 
 /* Studio uses the same neutral palette, type, and controls as the source views. */
-.studio-app { height: 100dvh; min-height: 640px; }
+.studio-app { height: 100dvh; min-height: 600px; }
 .studio-app > main { display: flex; min-height: 0; }
 .studio-app > footer { display: none; }
 .studio-app > header { flex-shrink: 0; }
@@ -25,7 +33,6 @@
 .studio-secondary { border: 1px solid var(--color-neutral-300); background: white; color: var(--color-neutral-800); }
 .studio-secondary:hover { background: var(--color-neutral-100); }
 .studio-shell button:disabled { opacity: .45; cursor: not-allowed; }
-.studio-shell :is(button, summary, select, textarea, input, [tabindex]):focus-visible { outline: 2px solid var(--color-neutral-900); outline-offset: 3px; }
 .studio-shell button:not(:disabled), .studio-shell summary { cursor: pointer; }
 .studio-shell [hidden] { display: none !important; }
 .studio-split { display: grid; grid-template-columns: minmax(0, 1fr) clamp(460px, 40vw, 560px); gap: 20px; flex: 1; min-height: 0; }
@@ -72,22 +79,22 @@ hr.studio-source-paragraph { border: 0; border-top: 1px solid var(--color-neutra
    rewrite on the right. A changed passage strikes its departed words in rose
    on the left and marks its new words in green on the right, with its answers
    on a quiet line beneath the rewrite. Unchanged passages read as plain text. */
-.studio-changes { padding-top: 24px; font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }
+.studio-changes { padding-top: 24px; font-size: 15px; line-height: 1.8; overflow-wrap: break-word; }
 /* Sticky boxes stick at the scroller's content edge, so the changes view carries its own top padding. */
 .studio-prose-scroll:has(> .studio-changes) { padding-top: 0; }
 .studio-compare-head, .studio-change { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
 .studio-compare-head { position: static; margin: 0 -8px 12px; padding: 8px 8px 6px; background: white; border-bottom: 1px solid var(--color-neutral-200); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-500); }
 .studio-change { margin: 0 -8px 1.15em; padding: 4px 8px 6px; border-left: 2px solid transparent; border-radius: 0 6px 6px 0; }
 .studio-change.is-changed, .studio-change.is-added, .studio-change.is-removed { border-left-color: var(--color-amber-300); }
-.studio-change.is-accepted { border-left-color: var(--color-neutral-200); }
+.studio-change.is-current { border-left-color: var(--color-neutral-900); }
 .studio-change-side { min-width: 0; }
 .studio-change-side > del, .studio-change-side > ins { display: block; text-decoration: none; }
 .studio-change-side > del .studio-source-paragraph { text-decoration: line-through; }
-.studio-change-added { background: var(--color-emerald-50); color: var(--color-emerald-900); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+.studio-change-added { background: var(--color-emerald-50); color: var(--color-emerald-900); text-decoration: underline; text-decoration-color: var(--color-emerald-700, #047857); text-underline-offset: 3px; border-radius: 3px; padding: 0 2px; }
 .studio-change-removed { background: var(--color-rose-50); color: var(--color-rose-700); text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
 .studio-change-side > del.studio-change-removed, .studio-change-side > ins.studio-change-added { padding: 0; background: none; }
 .studio-change-side > del.studio-change-removed .studio-source-paragraph { color: var(--color-rose-700); }
-.studio-change-side > ins.studio-change-added .studio-source-paragraph { color: var(--color-emerald-900); }
+.studio-change-side > ins.studio-change-added .studio-source-paragraph { color: var(--color-emerald-900); text-decoration: underline; text-decoration-color: var(--color-emerald-700, #047857); text-underline-offset: 3px; }
 .studio-change-actions { grid-column: 2; display: flex; align-items: baseline; gap: 14px; margin-top: 4px; font-size: 12px; }
 .studio-change-actions .studio-text-button { min-height: 26px; font-size: 12px; color: var(--color-neutral-700); }
 .studio-change-actions .studio-text-button:hover { color: var(--color-neutral-900); text-decoration: underline; }
@@ -112,12 +119,11 @@ hr.studio-source-paragraph { border: 0; border-top: 1px solid var(--color-neutra
 .studio-inspector details[open] > summary::after { content: " −"; }
 .studio-inspector summary::-webkit-details-marker { display: none; }
 
-/* The plan reads as an editor's note: one direction, then the draft's own
-   sections, each opening on the suggestions inside it. Emphasis comes from
-   weight and space, not chips or borders. */
+/* The suggestions read as an editor's note: guidance on the opening, then the
+   draft's own sections, each opening on the suggestions inside it. Rows are
+   separated by hairline rules. */
 .studio-note { display: grid; gap: 18px; font-size: 13px; line-height: 1.7; color: var(--color-neutral-800); }
 .studio-note.is-saved { gap: 12px; margin-top: 8px; }
-.studio-note-opening { font-size: 14px; line-height: 1.6; color: var(--color-neutral-900); }
 .studio-note-group { display: grid; gap: 6px; }
 .studio-note-heading { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-500); }
 .studio-note-group ul { display: grid; gap: 4px; }
@@ -127,14 +133,16 @@ hr.studio-source-paragraph { border: 0; border-top: 1px solid var(--color-neutra
 /* The count follows the heading; the inherited +/− marker stays at the edge. */
 .studio-note-section > summary::after { margin-left: auto; }
 .studio-note-section > summary > .studio-note-name { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-500); }
-.studio-note-section > ul { display: grid; gap: 4px; }
-/* Each suggestion reads as: where — what changes, then why. The author's
-   answer (Accept, Reject, Ignore) sits at the end of the row; an answered
-   row shows its state and one Undo. Rejected and ignored rows fade. */
-.studio-note-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 -8px; padding: 6px 8px; min-width: 0; border-radius: 6px; }
+.studio-note-section > ul { display: grid; gap: 0; }
+/* Each suggestion is separated by a hairline rule; a row is named only by a
+   quotation when narrower than its section. The author's answer sits at the end;
+   an answered row shows its state and Undo. Rejected and ignored rows fade. */
+.studio-note-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 -8px; padding: 10px 8px; min-width: 0; border-radius: 6px; border-top: 1px solid var(--color-neutral-200); }
+.studio-note-row:first-child { border-top: none; }
 .studio-note-row:hover { background: var(--color-amber-50); }
 .studio-note-row-text { margin: 0; min-width: 0; display: grid; gap: 2px; }
 .studio-note-row-text p { margin: 0; }
+.studio-note-lead { font-size: 14px; line-height: 1.6; color: var(--color-neutral-900); }
 .studio-note-name { font-weight: 600; color: var(--color-neutral-900); }
 .studio-note-reason { font-size: 12px; line-height: 1.6; color: var(--color-neutral-600); }
 .studio-note-actions { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; }
@@ -143,12 +151,12 @@ hr.studio-source-paragraph { border: 0; border-top: 1px solid var(--color-neutra
 .studio-note-state { font-size: 12px; font-weight: 600; color: var(--color-neutral-600); white-space: nowrap; }
 .studio-note-row.is-accepted .studio-note-state { color: var(--color-emerald-700, #047857); }
 .studio-note-row.is-rejected .studio-note-row-text,
-.studio-note-row.is-ignored .studio-note-row-text { color: var(--color-neutral-400); }
+.studio-note-row.is-ignored .studio-note-row-text { color: var(--color-neutral-500); }
 .studio-note-row.is-rejected .studio-note-row-text > p:first-child { text-decoration: line-through; }
 .studio-note-row.is-rejected .studio-note-name,
 .studio-note-row.is-ignored .studio-note-name { color: var(--color-neutral-500); }
 .studio-note-row.is-rejected .studio-note-reason,
-.studio-note-row.is-ignored .studio-note-reason { color: var(--color-neutral-400); }
+.studio-note-row.is-ignored .studio-note-reason { color: var(--color-neutral-500); }
 .studio-note-kept { color: var(--color-neutral-700); }
 .studio-note-kept > span:not([aria-hidden]) { border-radius: 4px; }
 .studio-note-kept > span:not([aria-hidden]):hover { background: var(--color-amber-50); }
@@ -176,6 +184,7 @@ hr.studio-source-paragraph { border: 0; border-top: 1px solid var(--color-neutra
 .studio-checkbox { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.6; color: var(--color-neutral-800); }
 .studio-checkbox input { margin-top: 4px; accent-color: var(--color-neutral-900); }
 .studio-settings-fields { display: grid; gap: 16px; min-width: 0; }
+.studio-settings-fields .studio-field-note { margin: 0; }
 .studio-settings-fields :is(select, textarea) { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; background: white; color: var(--color-neutral-900); }
 .studio-settings-fields textarea { field-sizing: content; min-height: 90px; line-height: 1.7; }
 .studio-tone-range { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-neutral-600); }
@@ -214,26 +223,46 @@ hr.studio-source-paragraph { border: 0; border-top: 1px solid var(--color-neutra
   .studio-inspector { min-height: 420px; }
   .studio-inspector-scroll { max-height: 70vh; }
 }
-@media (prefers-reduced-motion: reduce) { .studio-shell .animate-spin { animation: none; } }
+@media (max-width: 700px) {
+  .studio-compare-head { display: none; }
+  .studio-change { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
+  .studio-change-side::before { display: block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-500); }
+  .studio-change-side[data-side="original"]::before { content: 'Original'; }
+  .studio-change-side[data-side="rewrite"]::before { content: 'Rewrite'; }
+  .studio-change-actions { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .animate-spin, .animate-ping, .animate-pulse, .animate-in { animation: none !important; } }
 
 .studio-rail-tabs { padding: 12px 20px 0; }
 .studio-rail-tabs .studio-view-switcher { display: flex; }
 .studio-rail-tabs .studio-view-switcher > button { flex: 1; }
-.studio-rail-tabs [aria-disabled="true"] { color: var(--color-neutral-400); cursor: not-allowed; }
-.studio-rail-actions { display: grid; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--color-neutral-200); }
+.studio-rail-tabs [aria-disabled="true"] { color: var(--color-neutral-500); cursor: not-allowed; }
+.studio-rail-actions { display: grid; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--color-neutral-200); }
 .studio-rail-actions > div { display: flex; gap: 10px; align-items: center; }
-.studio-edit-actions { padding: 8px 0; border-bottom: none; }
-.studio-edit-actions > div { gap: 12px; }
+.studio-edit-actions { padding: 8px 0; border-top: none; }
+.studio-edit-actions > div { gap: 12px; justify-content: flex-end; }
+/* The Suggestions footer's own modifier. It must not reuse the name of the
+   list header (.studio-suggestions-actions), whose display: flex would replace
+   the rail footer's grid and leave nothing for the row to stretch into. */
+.studio-rail-footer > div { justify-content: flex-end; }
 .studio-rail-status { margin: 0; font-size: 12px; line-height: 1.6; color: var(--color-neutral-600); }
+.studio-status-detail { font-size: 12px; color: var(--color-neutral-600); }
+.studio-status-detail summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .studio-changes-header { position: sticky; top: 0; z-index: 2; margin: 0 -8px; padding: 0 8px; background: var(--color-white); }
 .studio-changes-toolbar { display: flex; align-items: baseline; gap: 14px; padding: 10px 0; background: var(--color-white); border-bottom: 1px solid var(--color-neutral-200); font-size: 13px; }
 .studio-changes-toolbar > span:first-child { margin-right: auto; }
 .studio-prose-scroll { position: relative; }
 .studio-selection-toolbar { position: absolute; z-index: 3; background: var(--color-white); border: 1px solid var(--color-neutral-300); border-radius: 6px; padding: 4px 10px; box-shadow: 0 4px 16px rgb(0 0 0 / 7%); user-select: none; }
 .studio-selection-toolbar .studio-text-button { min-height: 28px; font-size: 12px; }
-.studio-note-summary { display: flex; align-items: baseline; justify-content: space-between; font-size: 12px; color: var(--color-neutral-600); }
-.studio-settings > summary { display: flex; align-items: baseline; gap: 12px; font-size: 12px; color: var(--color-neutral-600); }
-.studio-settings > summary::after { margin-left: auto; }
+.studio-suggestions { display: grid; gap: 12px; }
+.studio-suggestions-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.studio-suggestions-header h2 { font-size: 14px; font-weight: 600; color: var(--color-neutral-900); }
+.studio-suggestions-actions { display: flex; gap: 14px; align-items: baseline; white-space: nowrap; }
+.studio-suggestions-source { margin: 0; font-size: 12px; line-height: 1.6; color: var(--color-neutral-600); }
+.studio-note-opening-job { display: grid; gap: 4px; }
+.studio-note-opening-job p:last-child { margin: 0; font-size: 13px; line-height: 1.7; color: var(--color-neutral-800); }
+.studio-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; color: var(--color-neutral-700); }
+.studio-icon-button:hover:not(:disabled) { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 
 .studio-work-content, .studio-edit-form { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .studio-protect-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }

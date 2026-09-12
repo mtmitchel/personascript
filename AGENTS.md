@@ -48,6 +48,8 @@ unverified until a plan or rewrite is regenerated and judged by the user.
   paragraph IDs) or offer more than one primary action per screen.
 - A Studio action's label is stable; availability is `disabled` + a reason line.
 - Selecting text never changes rail or document view by itself.
+- Rail tabs never change the document view; only the view switcher does.
+- No `window.confirm`/`window.prompt`; use `ConfirmDialog` with consequence-naming buttons.
 - Fonts load from Google Fonts, so a confined loopback browser renders with
   system fallbacks; rendered acceptance is the user's.
 - Commit only when asked. Leave untracked paths you did not create alone.

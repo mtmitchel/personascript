@@ -17,6 +17,7 @@ import {
   SelectionRange,
   EditorialPlan,
   EditorialPlanState,
+  ReviewFinding,
 } from '../types';
 import { DEFAULT_SAMPLES, DEFAULT_PROFILE, SAMPLE_DRAFT_TO_REWRITE } from '../data/defaultSamples';
 import { normalizeDomainExpertise, normalizePreservationSettings, validateProjectBrief, validateReaderPurpose } from '../writingPipeline';
@@ -24,6 +25,7 @@ import { normalizeRewriteHistory, retainRewriteVersions, createVersionId } from 
 import { unappliedFeedback, persistFeedbackProfile, persistFeedbackRetirement, feedbackForHistory } from '../utils/voiceFeedback';
 import { readStudioWorkspace, saveStudioWorkspace, StudioWorkspace } from '../utils/studioWorkspace';
 import { validateApprovedPlan, validateEditorialPlan, validatePlanSources } from '../editorialPlan';
+import { findingKey } from '../utils/reviewEvidence';
 
 export type NavigationTab = 'samples' | 'profile' | 'draft-brief' | 'domain' | 'studio';
 
@@ -76,6 +78,7 @@ interface WritingAssistantContextType {
   deleteRewriteVersion: (id: string) => void;
   /** Replace the current version's text with an author edit made in the app; no model is called. */
   updateRewrittenText: (text: string) => void;
+  setReviewFindingIgnored: (finding: ReviewFinding, ignored: boolean) => void;
   isSynthesizingProfile: boolean;
   activeSampleId: string | null;
   setActiveSampleId: (id: string | null) => void;
@@ -116,6 +119,7 @@ interface WritingAssistantContextType {
   cancelSampleAnalysis: (sampleId: string) => void;
   toggleSample: (sampleId: string) => void;
   deleteSample: (sampleId: string) => void;
+  restoreSample: (sample: WritingSample) => void;
   restoreDefaultSamples: () => void;
   synthesizeProfileFromActiveSamples: () => Promise<void>;
   updateActiveProfile: (profile: StyleProfile) => void;
@@ -419,8 +423,10 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     const link = document.createElement('a');
     link.href = url;
     link.download = 'personascript-working-copy.json';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const updateDraftText = (text: string) => {
@@ -735,6 +741,10 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
     });
   };
 
+  const restoreSample = (sample: WritingSample) => {
+    setSamples((prev) => (prev.some((s) => s.id === sample.id) ? prev : [...prev, sample]));
+  };
+
   const restoreDefaultSamples = () => {
     for (const request of sampleAnalysisRequests.current.values()) request.abort();
     sampleAnalysisRequests.current.clear();
@@ -802,6 +812,18 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
       // The saved review described the previous text, so it no longer applies.
       const { review: _stale, ...rest } = current;
       return { ...rest, rewrittenText: text, wordCountRewritten: text.trim().split(/\s+/).filter(Boolean).length };
+    });
+  };
+
+  const setReviewFindingIgnored = (finding: ReviewFinding, ignored: boolean) => {
+    if (writingOperationLock.current || feedbackSaveLock.current) return;
+    setRewriteResult((current) => {
+      if (!current?.review) return current;
+      const key = findingKey(finding);
+      const existing = current.review.ignoredFindings || [];
+      const next = ignored ? (existing.includes(key) ? existing : [...existing, key]) : existing.filter((k) => k !== key);
+      if (next.length === existing.length && ignored === existing.includes(key)) return current;
+      return { ...current, review: { ...current.review, ignoredFindings: next.length ? next : undefined } };
     });
   };
 
@@ -1228,6 +1250,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         restoreRewriteVersion,
         deleteRewriteVersion,
         updateRewrittenText,
+        setReviewFindingIgnored,
         isSynthesizingProfile,
         activeSampleId,
         setActiveSampleId,
@@ -1258,6 +1281,7 @@ export const WritingAssistantProvider: React.FC<{ children: React.ReactNode }> =
         cancelSampleAnalysis,
         toggleSample,
         deleteSample,
+        restoreSample,
         restoreDefaultSamples,
         synthesizeProfileFromActiveSamples,
         updateActiveProfile,

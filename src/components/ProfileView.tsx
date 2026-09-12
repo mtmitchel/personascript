@@ -207,6 +207,7 @@ export const ProfileView: React.FC = () => {
                 type="range"
                 min="0"
                 max="100"
+                aria-label={metric.label}
                 value={metric.value}
                 onChange={(e) => {
                   const val = parseInt(e.target.value, 10);
@@ -221,14 +222,14 @@ export const ProfileView: React.FC = () => {
                 className="w-full accent-neutral-900 cursor-pointer"
               />
 
-              <div className="flex items-center justify-between text-[10px] text-neutral-400">
+              <div className="flex items-center justify-between text-[11px] text-neutral-500">
                 <span>{metric.minLabel}</span>
                 <span>{metric.maxLabel}</span>
               </div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-neutral-400">Saved automatically.</p>
+        <p className="text-xs text-neutral-500">Saved automatically.</p>
       </div>
 
       {/* Tone adjustments applied at write time */}
@@ -325,12 +326,16 @@ export const ProfileView: React.FC = () => {
       {/* Custom Directives */}
       <div className="p-5 rounded-xl border border-neutral-200 bg-white space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-neutral-900 block">
+          <label htmlFor="textarea-custom-directives" className="text-xs font-medium text-neutral-900 block">
             Additional style rules
           </label>
         </div>
+        <p id="custom-directive-description" className="text-xs text-neutral-500 leading-relaxed">
+          Add any specific instructions, style rules, or tone adjustments you want the rewrite engine to follow.
+        </p>
         <textarea
           id="textarea-custom-directives"
+          aria-describedby="custom-directive-description"
           rows={2}
           value={activeProfile.customDirectives}
           onChange={(e) =>
@@ -339,11 +344,11 @@ export const ProfileView: React.FC = () => {
               customDirectives: e.target.value,
             })
           }
-          placeholder="e.g. Keep sentences concise. Avoid marketing buzzwords."
-          className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs focus:outline-none focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-400"
+          placeholder="For example, keep sentences concise or avoid marketing buzzwords."
+          className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-xs focus:border-neutral-900 text-neutral-900 placeholder:text-neutral-500"
         />
         <div className="pt-1">
-          <span className="text-xs text-neutral-400">
+          <span className="text-xs text-neutral-500">
             Saved automatically
           </span>
         </div>

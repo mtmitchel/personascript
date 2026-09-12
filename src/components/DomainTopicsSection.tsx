@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DomainExpertise, DomainTopic } from '../types';
+import { ConfirmDialog } from './ConfirmDialog';
 import {
   Sparkles,
   Plus,
@@ -42,13 +43,31 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
   onEditDraftBrief,
 }) => {
   const generationBusy = useRef(false);
-  const generationController = useRef<AbortController | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingTopicId, setGeneratingTopicId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [topicGenerationError, setTopicGenerationError] = useState<{ id: string; message: string } | null>(null);
 
-  useEffect(() => () => generationController.current?.abort(), []);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    isDestructive: boolean;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    confirmLabel: '',
+    cancelLabel: '',
+    isDestructive: false,
+    onConfirm: () => {},
+  });
+
+  const [undoNotice, setUndoNotice] = useState<{ label: string; undo: () => void } | null>(null);
+  const [topicRuleInputs, setTopicRuleInputs] = useState<Record<string, string>>({});
 
   const [isAddingTopic, setIsAddingTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
@@ -120,18 +139,20 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
   };
 
   const handleAddConventionToTopic = (topicId: string) => {
-    const rule = window.prompt('Enter new rule or convention for this topic:');
-    if (!rule || !rule.trim()) return;
+    const rule = (topicRuleInputs[topicId] || '').trim();
+    if (!rule) return;
 
+    setUndoNotice(null);
     const currentTopics = localExpertise.topics || [];
     const updatedTopics = currentTopics.map((topic) => {
       if (topic.id !== topicId) return topic;
       return {
         ...topic,
-        conventions: [...(topic.conventions || []), rule.trim()],
+        conventions: [...(topic.conventions || []), rule],
       };
     });
 
+    setTopicRuleInputs((prev) => ({ ...prev, [topicId]: '' }));
     saveExpertise({
       ...localExpertise,
       topics: updatedTopics,
@@ -139,6 +160,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
   };
 
   const handleRemoveConventionFromTopic = (topicId: string, index: number) => {
+    setUndoNotice(null);
     const currentTopics = localExpertise.topics || [];
     const updatedTopics = currentTopics.map((topic) => {
       if (topic.id !== topicId) return topic;
@@ -159,6 +181,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
     e.preventDefault();
     if (!newTopicName.trim()) return;
 
+    setUndoNotice(null);
     const terms = newTopicTerms
       .split(/[,;]/)
       .map((t) => t.trim())
@@ -179,10 +202,9 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
       enabled: true,
     };
 
-    const updatedTopics = [...(localExpertise.topics || []), newTopic];
     saveExpertise({
       ...localExpertise,
-      topics: updatedTopics,
+      topics: [...(localExpertise.topics || []), newTopic],
     });
 
     setNewTopicName('');
@@ -194,21 +216,28 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
 
   const handleDeleteTopic = (topicId: string) => {
     const target = (localExpertise.topics || []).find((t) => t.id === topicId);
-    const label = target?.name ? ` "${target.name}"` : '';
-    if (!window.confirm(`Delete topic${label}? This cannot be undone.`)) return;
-
-    const updatedTopics = (localExpertise.topics || []).filter((t) => t.id !== topicId);
-    saveExpertise({
-      ...localExpertise,
-      topics: updatedTopics,
+    const name = target?.name || '';
+    setConfirmDialog({
+      open: true,
+      title: `Delete topic “${name}”?`,
+      description: 'Its concepts and rules are removed. This cannot be undone.',
+      confirmLabel: 'Delete topic',
+      cancelLabel: 'Keep topic',
+      isDestructive: true,
+      onConfirm: () => {
+        setUndoNotice(null);
+        const updatedTopics = (localExpertise.topics || []).filter((t) => t.id !== topicId);
+        saveExpertise({
+          ...localExpertise,
+          topics: updatedTopics,
+        });
+      },
     });
   };
 
   const handleGenerateKnowledge = async (targetTopic?: DomainTopic) => {
     if (generationBusy.current || sourceUploadPending) return;
     generationBusy.current = true;
-    const controller = new AbortController();
-    generationController.current = controller;
     if (targetTopic) {
       setGeneratingTopicId(targetTopic.id);
       setTopicGenerationError(null);
@@ -239,7 +268,6 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
       const res = await fetch('/api/generate-domain-knowledge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
         body: JSON.stringify(requestBody),
       });
 
@@ -253,11 +281,23 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
         throw new Error('No domain topics returned by the server.');
       }
 
-      if (controller.signal.aborted) return;
       if (targetTopic) {
         if (newTopics.length !== 1 || newTopics[0].name !== targetTopic.name.trim() ||
             newTopics[0].category !== (targetTopic.category === 'discipline' ? 'discipline' : 'intersecting')) {
           throw new Error('The model did not return the requested card. Your card has been kept.');
+        }
+        const prevTopic = (localExpertise.topics || []).find((t) => t.id === targetTopic.id);
+        if (prevTopic) {
+          setUndoNotice({
+            label: `Topic “${targetTopic.name}” regenerated.`,
+            undo: () => {
+              updateDomainExpertise((prev) => ({
+                ...prev,
+                topics: (prev.topics || []).map((t) => t.id === targetTopic.id ? prevTopic : t),
+              }));
+              setUndoNotice(null);
+            },
+          });
         }
         updateDomainExpertise((prev) => ({
           ...prev,
@@ -272,6 +312,21 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
             : topic),
         }));
       } else {
+        const lastReplaced = {
+          topics: localExpertise.topics || [],
+          keyTerminology: localExpertise.keyTerminology || [],
+          conventions: localExpertise.conventions || [],
+        };
+        setUndoNotice({
+          label: 'Topics regenerated.',
+          undo: () => {
+            updateDomainExpertise((prev) => ({
+              ...prev,
+              ...lastReplaced,
+            }));
+            setUndoNotice(null);
+          },
+        });
         updateDomainExpertise((prev) => ({
           ...prev,
           topics: newTopics,
@@ -281,46 +336,84 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
       }
       flashSaved();
     } catch (err: any) {
-      if (controller.signal.aborted) return;
       const message = err.message || 'Failed to generate domain knowledge';
       if (targetTopic) setTopicGenerationError({ id: targetTopic.id, message });
       else setGenerationError(message);
     } finally {
       generationBusy.current = false;
-      generationController.current = null;
       setIsGenerating(false);
       setGeneratingTopicId(null);
+    }
+  };
+
+  const handleRegenerateAllTopics = () => {
+    if (isGenerating || generatingTopicId !== null || sourceUploadPending) return;
+    if (hasTopics) {
+      const n = topicsList.length;
+      setConfirmDialog({
+        open: true,
+        title: 'Regenerate all topics?',
+        description: `Your ${n} topics, including any you wrote or edited, are replaced by new ones. You can undo once.`,
+        confirmLabel: 'Regenerate topics',
+        cancelLabel: 'Keep topics',
+        isDestructive: false,
+        onConfirm: () => {
+          handleGenerateKnowledge();
+        },
+      });
+    } else {
+      handleGenerateKnowledge();
     }
   };
 
   const handleClearTopic = (topicId: string) => {
     if (isGenerating || generatingTopicId === topicId) return;
     const target = (localExpertise.topics || []).find((t) => t.id === topicId);
-    const label = target?.name ? ` "${target.name}"` : '';
-    if (!window.confirm(`Clear concepts and conventions for topic${label}?`)) return;
-
-    setTopicGenerationError((prev) => prev?.id === topicId ? null : prev);
-    setTopicTermInputs((prev) => ({ ...prev, [topicId]: '' }));
-    updateDomainExpertise((prev) => ({
-      ...prev,
-      topics: (prev.topics || []).map((topic) => topic.id === topicId
-        ? { ...topic, description: undefined, keyTerminology: [], conceptAnnotations: undefined, conventions: [] }
-        : topic),
-    }));
-    flashSaved();
+    const name = target?.name || '';
+    setConfirmDialog({
+      open: true,
+      title: `Clear “${name}”?`,
+      description: 'Its description, concepts and rules are removed; the topic stays.',
+      confirmLabel: 'Clear topic',
+      cancelLabel: 'Keep contents',
+      isDestructive: true,
+      onConfirm: () => {
+        setUndoNotice(null);
+        setTopicGenerationError((prev) => prev?.id === topicId ? null : prev);
+        setTopicTermInputs((prev) => ({ ...prev, [topicId]: '' }));
+        updateDomainExpertise((prev) => ({
+          ...prev,
+          topics: (prev.topics || []).map((topic) => topic.id === topicId
+            ? { ...topic, description: undefined, keyTerminology: [], conceptAnnotations: undefined, conventions: [] }
+            : topic),
+        }));
+        flashSaved();
+      },
+    });
   };
 
   const handleClearTopics = () => {
     if (generationBusy.current) return;
-    if (!window.confirm('Remove all topics? This cannot be undone.')) return;
-    setGenerationError(null);
-    const updated: DomainExpertise = {
-      ...localExpertise,
-      topics: [],
-      keyTerminology: [],
-      conventions: [],
-    };
-    saveExpertise(updated);
+    const n = (localExpertise.topics || []).length;
+    setConfirmDialog({
+      open: true,
+      title: 'Remove all topics?',
+      description: `${n} topics and their concepts and rules are removed. This cannot be undone.`,
+      confirmLabel: 'Remove all topics',
+      cancelLabel: 'Keep topics',
+      isDestructive: true,
+      onConfirm: () => {
+        setUndoNotice(null);
+        setGenerationError(null);
+        const updated: DomainExpertise = {
+          ...localExpertise,
+          topics: [],
+          keyTerminology: [],
+          conventions: [],
+        };
+        saveExpertise(updated);
+      },
+    });
   };
 
   const getTopicIcon = (name: string, category?: string) => {
@@ -362,7 +455,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                   type="button"
                   id="btn-regenerate-topics"
                   disabled={isGenerating || generatingTopicId !== null || sourceUploadPending}
-                  onClick={() => handleGenerateKnowledge()}
+                  onClick={handleRegenerateAllTopics}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition disabled:opacity-50"
                   title="Regenerate topics and concepts from your configured fields"
                 >
@@ -423,6 +516,22 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
         </p>
       </div>
 
+      {undoNotice && (
+        <p
+          role="status"
+          className="p-3 bg-neutral-900 text-neutral-100 rounded-lg text-xs flex items-center justify-between border border-neutral-800"
+        >
+          <span>{undoNotice.label}</span>
+          <button
+            type="button"
+            onClick={undoNotice.undo}
+            className="text-white underline font-medium hover:text-neutral-200 text-xs ml-4"
+          >
+            Undo
+          </button>
+        </p>
+      )}
+
       {sourceUploadPending && (
         <p role="status" className="text-xs text-neutral-600">
           Waiting for draft and brief uploads to finish before generating concepts.
@@ -469,27 +578,29 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-neutral-700 block mb-1">
+              <label htmlFor="add-topic-name" className="text-[11px] font-medium text-neutral-700 block mb-1">
                 Topic name
               </label>
               <input
+                id="add-topic-name"
                 type="text"
                 value={newTopicName}
                 onChange={(e) => setNewTopicName(e.target.value)}
                 placeholder="e.g. Growth Experimentation & A/B Testing"
-                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
+                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900"
                 required
               />
             </div>
 
             <div>
-              <label className="text-[11px] font-medium text-neutral-700 block mb-1">
+              <label htmlFor="add-topic-category" className="text-[11px] font-medium text-neutral-700 block mb-1">
                 Category
               </label>
               <select
+                id="add-topic-category"
                 value={newTopicCategory}
                 onChange={(e) => setNewTopicCategory(e.target.value as any)}
-                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
+                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900"
               >
                 <option value="intersecting">Intersecting Topic</option>
                 <option value="discipline">Core Discipline</option>
@@ -498,42 +609,45 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-neutral-700 block mb-1">
+            <label htmlFor="add-topic-desc" className="text-[11px] font-medium text-neutral-700 block mb-1">
               Short description
             </label>
             <input
+              id="add-topic-desc"
               type="text"
               value={newTopicDesc}
               onChange={(e) => setNewTopicDesc(e.target.value)}
               placeholder="e.g. Conversion funnels, hypothesis testing, uplift metrics, sample size"
-              className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
+              className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-neutral-700 block mb-1">
+              <label htmlFor="add-topic-terms" className="text-[11px] font-medium text-neutral-700 block mb-1">
                 Concept examples (comma-separated)
               </label>
               <input
+                id="add-topic-terms"
                 type="text"
                 value={newTopicTerms}
                 onChange={(e) => setNewTopicTerms(e.target.value)}
                 placeholder="statistical significance, variance, primary metric, baseline"
-                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
+                className="w-full text-xs px-3 py-1.5 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900"
               />
             </div>
 
             <div>
-              <label className="text-[11px] font-medium text-neutral-700 block mb-1">
+              <label htmlFor="add-topic-conventions" className="text-[11px] font-medium text-neutral-700 block mb-1">
                 Conventions &amp; rules (one per line)
               </label>
               <textarea
+                id="add-topic-conventions"
                 rows={2}
                 value={newTopicConventions}
                 onChange={(e) => setNewTopicConventions(e.target.value)}
                 placeholder="Always report both relative and absolute uplift&#10;Tie microcopy changes to behavioral metrics"
-                className="w-full text-xs p-2 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-900"
+                className="w-full text-xs p-2 bg-white rounded-lg border border-neutral-200 focus:border-neutral-900"
               />
             </div>
           </div>
@@ -572,7 +686,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
             <button
               type="button"
-              id="btn-regenerate-topics"
+              id="btn-regenerate-topics-empty"
               disabled={isGenerating || sourceUploadPending}
               onClick={() => handleGenerateKnowledge()}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition shadow-xs disabled:opacity-50"
@@ -584,18 +698,18 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
             <div className="flex items-center gap-1.5 text-xs text-neutral-700">
               <input
                 type="checkbox"
-                id="checkbox-use-draft-brief"
+                id="checkbox-use-draft-brief-empty"
                 checked={useDraftAndBrief}
                 disabled={isGenerating}
                 onChange={(e) => setUseDraftAndBrief(e.target.checked)}
                 className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 accent-neutral-900 cursor-pointer shrink-0"
               />
-              <label htmlFor="checkbox-use-draft-brief" className="cursor-pointer font-medium select-none">
+              <label htmlFor="checkbox-use-draft-brief-empty" className="cursor-pointer font-medium select-none">
                 Use my draft and brief
               </label>
               <button
                 type="button"
-                id="btn-link-edit-draft-brief"
+                id="btn-link-edit-draft-brief-empty"
                 onClick={onEditDraftBrief}
                 className="text-neutral-500 hover:text-neutral-800 underline ml-0.5 text-xs"
               >
@@ -646,7 +760,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                             {topic.name}
                           </label>
                           <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded font-medium border ${
+                            className={`text-[11px] px-1.5 py-0.2 rounded font-medium border ${
                               topic.category === 'discipline'
                                 ? 'bg-neutral-100 text-neutral-800 border-neutral-200'
                                 : 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -698,7 +812,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                   </div>
 
                   {/* Summary line visible when collapsed */}
-                  <div className="group-open:hidden text-[11px] text-neutral-400 font-mono pl-6.5">
+                  <div className="group-open:hidden text-[11px] text-neutral-500 font-mono pl-6.5">
                     {(topic.keyTerminology || []).length} concepts · {(topic.conventions || []).length} conventions
                   </div>
                 </summary>
@@ -715,7 +829,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-medium text-neutral-700">Concept examples</span>
-                      <span className="text-neutral-400 font-mono">
+                      <span className="text-neutral-500 font-mono">
                         {(topic.keyTerminology || []).length} concepts
                       </span>
                     </div>
@@ -737,13 +851,13 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                           <span
                             key={term}
                             title={annotation?.explanation || (isSupported ? 'Supported concept' : isAdjacent ? 'Adjacent suggestion' : undefined)}
-                            className={`inline-flex items-center gap-1 text-[10px] border px-1.5 py-0.5 rounded-md ${badgeClass}`}
+                            className={`inline-flex items-center gap-1 text-[11px] border px-1.5 py-0.5 rounded-md ${badgeClass}`}
                           >
                             {isSupported && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
                             {isAdjacent && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
                             <span>{term}</span>
-                            {isSupported && <span className="text-[9px] text-emerald-600 font-normal">(supported)</span>}
-                            {isAdjacent && <span className="text-[9px] text-amber-600 font-normal">(adjacent)</span>}
+                            {isSupported && <span className="text-[11px] text-emerald-600 font-normal">(supported)</span>}
+                            {isAdjacent && <span className="text-[11px] text-amber-600 font-normal">(adjacent)</span>}
                             <button
                               type="button"
                               onClick={() => handleRemoveTermFromTopic(topic.id, term)}
@@ -759,13 +873,13 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
 
                     {topic.conceptAnnotations && Object.keys(topic.conceptAnnotations).length > 0 && (
                       <div className="space-y-1 pt-1">
-                        <div className="text-[10px] text-neutral-500 font-medium">Concept relevance:</div>
+                        <div className="text-[11px] text-neutral-500 font-medium">Concept relevance:</div>
                         <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
                           {topic.keyTerminology.map((conceptTerm) => {
                             const annot = topic.conceptAnnotations?.[conceptTerm];
                             if (!annot) return null;
                             return (
-                              <div key={conceptTerm} className="text-[10px] leading-snug flex items-start gap-1.5 text-neutral-600">
+                              <div key={conceptTerm} className="text-[11px] leading-snug flex items-start gap-1.5 text-neutral-600">
                                 <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${annot.status === 'supported' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                                 <span>
                                   <strong className="text-neutral-800">{conceptTerm}:</strong> {annot.explanation || (annot.status === 'supported' ? 'Demonstrated in source draft or brief.' : 'Related adjacent concept.')}
@@ -792,7 +906,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                           }
                         }}
                         placeholder="Add concept (e.g. information hierarchy, comprehension)"
-                        className="flex-1 text-[11px] px-2 py-1 bg-white rounded border border-neutral-200 focus:outline-none focus:border-neutral-900"
+                        className="flex-1 text-[11px] px-2 py-1 bg-white rounded border border-neutral-200 focus:border-neutral-900"
                       />
                       <button
                         type="button"
@@ -812,7 +926,7 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                       <span className="font-medium text-neutral-700">Writing Rules &amp; Conventions</span>
                       <button
                         type="button"
-                        onClick={() => handleAddConventionToTopic(topic.id)}
+                        onClick={() => document.getElementById(`rule-${topic.id}`)?.focus()}
                         className="text-neutral-500 hover:text-neutral-900 flex items-center gap-0.5 font-medium"
                       >
                         <Plus className="w-2.5 h-2.5" />
@@ -838,6 +952,36 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
                         </div>
                       ))}
                     </div>
+
+                    {/* Add rule inline */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleAddConventionToTopic(topic.id);
+                      }}
+                      className="flex gap-1.5 pt-1"
+                    >
+                      <label htmlFor={`rule-${topic.id}`} className="sr-only">
+                        New rule
+                      </label>
+                      <input
+                        id={`rule-${topic.id}`}
+                        type="text"
+                        value={topicRuleInputs[topic.id] || ''}
+                        onChange={(e) =>
+                          setTopicRuleInputs({ ...topicRuleInputs, [topic.id]: e.target.value })
+                        }
+                        placeholder="Add rule or convention"
+                        className="flex-1 text-[11px] px-2 py-1 bg-white rounded border border-neutral-200"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!(topicRuleInputs[topic.id] || '').trim()}
+                        className="px-2 py-1 rounded border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-[11px] font-medium transition disabled:opacity-40"
+                      >
+                        Add rule
+                      </button>
+                    </form>
                   </div>
                 </div>
               </details>
@@ -845,6 +989,21 @@ export const DomainTopicsSection: React.FC<DomainTopicsSectionProps> = ({
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        confirmLabel={confirmDialog.confirmLabel}
+        cancelLabel={confirmDialog.cancelLabel}
+        destructive={confirmDialog.isDestructive}
+        onConfirm={() => {
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          confirmDialog.onConfirm();
+        }}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      >
+        <p>{confirmDialog.description}</p>
+      </ConfirmDialog>
     </div>
   );
 };

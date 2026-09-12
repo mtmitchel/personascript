@@ -25,6 +25,7 @@ export const SamplesView: React.FC = () => {
     setActiveSampleId,
     toggleSample,
     deleteSample,
+    restoreSample,
     restoreDefaultSamples,
     analyzeSample,
     cancelSampleAnalysis,
@@ -35,7 +36,7 @@ export const SamplesView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sampleToDelete, setSampleToDelete] = useState<WritingSample | null>(null);
-  const [deleteToast, setDeleteToast] = useState<{ title: string; id: string } | null>(null);
+  const [deleteToast, setDeleteToast] = useState<{ sample: WritingSample } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
@@ -44,13 +45,12 @@ export const SamplesView: React.FC = () => {
 
   const handleConfirmDelete = () => {
     if (!sampleToDelete) return;
-    const deletedTitle = sampleToDelete.title;
-    const deletedId = sampleToDelete.id;
-    deleteSample(deletedId);
-    setDeleteToast({ title: deletedTitle, id: deletedId });
+    const deletedSample = sampleToDelete;
+    deleteSample(deletedSample.id);
+    setDeleteToast({ sample: deletedSample });
     setTimeout(() => {
-      setDeleteToast((cur) => (cur?.id === deletedId ? null : cur));
-    }, 4000);
+      setDeleteToast((cur) => (cur?.sample.id === deletedSample.id ? null : cur));
+    }, 8000);
     setSampleToDelete(null);
   };
 
@@ -60,20 +60,34 @@ export const SamplesView: React.FC = () => {
       {deleteToast && (
         <div
           id="toast-sample-deleted"
+          role="status"
           className="p-3 bg-neutral-900 text-neutral-100 rounded-lg text-xs flex items-center justify-between border border-neutral-800"
         >
           <div className="flex items-center gap-2">
             <Trash2 className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
             <span>
-              Document <strong className="text-white font-medium">"{deleteToast.title}"</strong> was removed.
+              “{deleteToast.sample.title}” deleted.
             </span>
           </div>
-          <button
-            onClick={() => setDeleteToast(null)}
-            className="text-neutral-400 hover:text-white text-xs ml-4"
-          >
-            Dismiss
-          </button>
+          <div className="flex items-center gap-3 ml-4">
+            <button
+              type="button"
+              onClick={() => {
+                restoreSample(deleteToast.sample);
+                setDeleteToast(null);
+              }}
+              className="text-white underline font-medium hover:text-neutral-200 text-xs"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteToast(null)}
+              className="text-neutral-400 hover:text-white text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -199,7 +213,7 @@ export const SamplesView: React.FC = () => {
               <span className="text-xs font-medium text-neutral-500">
                 Documents ({samples.length})
               </span>
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-neutral-500">
                 {activeSamplesCount} active
               </span>
             </div>
@@ -211,30 +225,39 @@ export const SamplesView: React.FC = () => {
                   <div
                     key={sample.id}
                     id={`sample-card-${sample.id}`}
-                    onClick={() => setActiveSampleId(sample.id)}
-                    className={`p-3.5 rounded-xl border transition cursor-pointer ${
+                    className={`p-3.5 rounded-xl border transition ${
                       isSelected
                         ? 'border-neutral-900 bg-white shadow-xs'
                         : 'border-neutral-200 bg-white hover:border-neutral-300'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
                         <input
                           type="checkbox"
                           id={`toggle-sample-${sample.id}`}
                           checked={sample.enabled}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleSample(sample.id);
-                          }}
-                          className="w-3.5 h-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 cursor-pointer mt-0.5"
+                          onChange={() => toggleSample(sample.id)}
+                          className="w-3.5 h-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 cursor-pointer mt-0.5 shrink-0"
+                          aria-label={`Use ${sample.title} in voice blueprint`}
                         />
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-medium text-neutral-900 truncate">
-                            {sample.title}
-                          </h4>
-                          <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 mt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSampleId(sample.id)}
+                          aria-pressed={isSelected}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-xs font-medium text-neutral-900 truncate">
+                              {sample.title}
+                            </h4>
+                            {sample.isExample && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-600 border border-neutral-200 shrink-0">
+                                Example
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 mt-0.5">
                             <span className="font-mono flex items-center gap-1">
                               {(sample.fileType === 'portfolio' || sample.fileType === 'url') && (
                                 <Globe className="w-2.5 h-2.5 text-neutral-500" />
@@ -244,7 +267,7 @@ export const SamplesView: React.FC = () => {
                             <span>•</span>
                             <span>{sample.wordCount} words</span>
                           </div>
-                        </div>
+                        </button>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
@@ -254,10 +277,7 @@ export const SamplesView: React.FC = () => {
                         <button
                           id={`btn-delete-sample-${sample.id}`}
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSampleToDelete(sample);
-                          }}
+                          onClick={() => setSampleToDelete(sample)}
                           className="p-1 text-neutral-400 hover:text-neutral-900 rounded transition"
                           aria-label={`Delete ${sample.title}`}
                           title={`Delete sample "${sample.title}"`}
@@ -285,10 +305,15 @@ export const SamplesView: React.FC = () => {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100">
                   <div>
-                    <h2 className="text-lg font-semibold text-neutral-900">
-                      {activeSample.title}
+                    <h2 className="text-lg font-semibold text-neutral-900 flex items-center gap-2">
+                      <span>{activeSample.title}</span>
+                      {activeSample.isExample && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">
+                          Example
+                        </span>
+                      )}
                     </h2>
-                    <div className="flex items-center gap-2 text-xs text-neutral-400 mt-0.5 font-mono">
+                    <div className="flex items-center gap-2 text-xs text-neutral-500 mt-0.5 font-mono">
                       <span>{activeSample.wordCount} words</span>
                       <span>•</span>
                       <span>{activeSample.fileType}</span>
@@ -357,14 +382,14 @@ export const SamplesView: React.FC = () => {
 
                         <div className="space-y-2 text-xs">
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Register</span>
+                            <span className="text-neutral-500 block text-[11px]">Register</span>
                             <span className="font-medium text-neutral-800">
                               {activeSample.analysis.wordChoice.vocabularyLevel}
                             </span>
                           </div>
 
                           <div>
-                            <span className="text-neutral-400 block text-[11px] mb-1">Registers</span>
+                            <span className="text-neutral-500 block text-[11px] mb-1">Registers</span>
                             <div className="flex flex-wrap gap-1">
                               {activeSample.analysis.wordChoice.favoredRegisters.map((reg, i) => (
                                 <span
@@ -378,7 +403,7 @@ export const SamplesView: React.FC = () => {
                           </div>
 
                           <div>
-                            <span className="text-neutral-400 block text-[11px] mb-1">Avoided patterns</span>
+                            <span className="text-neutral-500 block text-[11px] mb-1">Avoided patterns</span>
                             <div className="flex flex-wrap gap-1">
                               {activeSample.analysis.wordChoice.avoidedPatterns.map((pat, i) => (
                                 <span
@@ -406,21 +431,21 @@ export const SamplesView: React.FC = () => {
 
                         <div className="space-y-2 text-xs">
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Cadence</span>
+                            <span className="text-neutral-500 block text-[11px]">Cadence</span>
                             <p className="text-neutral-800 leading-relaxed">
                               {activeSample.analysis.rhythmAndPacing.cadence}
                             </p>
                           </div>
 
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Paragraph flow</span>
+                            <span className="text-neutral-500 block text-[11px]">Paragraph flow</span>
                             <p className="text-neutral-700">
                               {activeSample.analysis.rhythmAndPacing.paragraphLength}
                             </p>
                           </div>
 
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Transitions</span>
+                            <span className="text-neutral-500 block text-[11px]">Transitions</span>
                             <p className="text-neutral-700">
                               {activeSample.analysis.rhythmAndPacing.transitionStyle}
                             </p>
@@ -463,25 +488,25 @@ export const SamplesView: React.FC = () => {
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-neutral-100 text-xs">
                         <div className="p-2 rounded bg-neutral-50">
-                          <span className="text-neutral-400 block text-[10px]">Em-dashes</span>
+                          <span className="text-neutral-500 block text-[11px]">Em-dashes</span>
                           <span className="font-medium text-neutral-800 capitalize">
                             {activeSample.analysis.sentenceStructure.punctuationSignatures.emDashes}
                           </span>
                         </div>
                         <div className="p-2 rounded bg-neutral-50">
-                          <span className="text-neutral-400 block text-[10px]">Semicolons</span>
+                          <span className="text-neutral-500 block text-[11px]">Semicolons</span>
                           <span className="font-medium text-neutral-800 capitalize">
                             {activeSample.analysis.sentenceStructure.punctuationSignatures.semicolons}
                           </span>
                         </div>
                         <div className="p-2 rounded bg-neutral-50">
-                          <span className="text-neutral-400 block text-[10px]">Fragments</span>
+                          <span className="text-neutral-500 block text-[11px]">Fragments</span>
                           <span className="font-medium text-neutral-800 capitalize">
                             {activeSample.analysis.sentenceStructure.punctuationSignatures.fragments}
                           </span>
                         </div>
                         <div className="p-2 rounded bg-neutral-50">
-                          <span className="text-neutral-400 block text-[10px]">Active voice</span>
+                          <span className="text-neutral-500 block text-[11px]">Active voice</span>
                           <span className="font-medium text-neutral-800 font-mono">
                             {activeSample.analysis.sentenceStructure.activeVoicePercentage}%
                           </span>
@@ -498,13 +523,13 @@ export const SamplesView: React.FC = () => {
                         </span>
                         <div className="space-y-1.5 text-xs">
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Persona</span>
+                            <span className="text-neutral-500 block text-[11px]">Persona</span>
                             <p className="font-medium text-neutral-900">
                               {activeSample.analysis.voice.persona}
                             </p>
                           </div>
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Perspective</span>
+                            <span className="text-neutral-500 block text-[11px]">Perspective</span>
                             <span className="font-medium text-neutral-800 capitalize">
                               {activeSample.analysis.voice.perspective.replace(/_/g, ' ')}
                             </span>
@@ -523,26 +548,26 @@ export const SamplesView: React.FC = () => {
                         </span>
                         <div className="space-y-1.5 text-xs">
                           <div>
-                            <span className="text-neutral-400 block text-[11px]">Resonance</span>
+                            <span className="text-neutral-500 block text-[11px]">Resonance</span>
                             <p className="text-neutral-800">
                               {activeSample.analysis.tone.emotionalResonance}
                             </p>
                           </div>
                           <div className="grid grid-cols-3 gap-1.5 pt-1 text-center font-mono">
                             <div className="bg-neutral-50 p-1.5 rounded">
-                              <span className="text-[10px] text-neutral-400 block">Formality</span>
+                              <span className="text-[11px] text-neutral-500 block">Formality</span>
                               <span className="font-medium text-neutral-800 text-xs">
                                 {activeSample.analysis.tone.formalityScore}%
                               </span>
                             </div>
                             <div className="bg-neutral-50 p-1.5 rounded">
-                              <span className="text-[10px] text-neutral-400 block">Warmth</span>
+                              <span className="text-[11px] text-neutral-500 block">Warmth</span>
                               <span className="font-medium text-neutral-800 text-xs">
                                 {activeSample.analysis.tone.warmthScore}%
                               </span>
                             </div>
                             <div className="bg-neutral-50 p-1.5 rounded">
-                              <span className="text-[10px] text-neutral-400 block">Confidence</span>
+                              <span className="text-[11px] text-neutral-500 block">Confidence</span>
                               <span className="font-medium text-neutral-800 text-xs">
                                 {activeSample.analysis.tone.confidenceScore}%
                               </span>
@@ -597,8 +622,8 @@ export const SamplesView: React.FC = () => {
 
                     {/* Active in voice blueprint notice */}
                     <div className="pt-4 border-t border-neutral-100 flex items-center justify-between">
-                      <span className="text-xs text-neutral-400">
-                        Active in voice blueprint
+                      <span className="text-xs text-neutral-500">
+                        {activeSample.enabled ? 'Active in voice blueprint' : 'Not used in the voice blueprint'}
                       </span>
                     </div>
                   </div>

@@ -60,7 +60,7 @@ export const ModelPicker: React.FC<{
             }
             if (event.key === 'Enter' && open) { event.preventDefault(); if (options[activeIndex]) choose(options[activeIndex].id); }
           }}
-          className="h-10 w-full truncate rounded-lg border border-neutral-200 bg-white py-2 pl-3 pr-9 text-sm text-neutral-900 outline-none transition focus:border-neutral-500 focus:ring-2 focus:ring-neutral-900/10" />
+          className="h-10 w-full truncate rounded-lg border border-neutral-200 bg-white py-2 pl-3 pr-9 text-sm text-neutral-900 transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900" />
         <span className="pointer-events-none absolute right-3 top-3 text-neutral-400">
           {loading ? <Loader2 className="size-4 animate-spin" /> : open ? <Search className="size-4" /> : <ChevronDown className="size-4" />}
         </span>

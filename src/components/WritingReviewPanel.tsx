@@ -4,6 +4,7 @@ import { modelDisplayName } from '../modelChoice';
 import {
   actionableReviewIssueCount,
   dedupeReviewFindings,
+  isFindingIgnored,
   pairReviewEvidence,
   reviewEvidence,
 } from '../utils/reviewEvidence';
@@ -18,6 +19,7 @@ interface WritingReviewPanelProps {
   onConfigureReviewer?: () => void;
   onCompareSources?: () => void;
   onRequestEdit?: (instruction: string) => void;
+  onIgnore?: (finding: ReviewFinding, ignored: boolean) => void;
 }
 
 const findingLabels: Record<ReviewFinding['category'], string> = {
@@ -47,9 +49,9 @@ function correctionInstruction(
 ): string {
   const pair = pairReviewEvidence(sourceText, rewrittenText, evidenceText(finding));
   const pairedPassages = pair.source.length && pair.rewritten.length
-    ? `\nOriginal passage: ${pair.source.join(' | ')}\nCurrent rewrite: ${pair.rewritten.join(' | ')}`
+    ? `\nOriginal text: ${pair.source.join(' | ')}\nCurrent rewrite: ${pair.rewritten.join(' | ')}`
     : finding.evidence ? `\nReviewer evidence: ${finding.evidence}` : '';
-  return `Review this ${findingLabels[finding.category].toLocaleLowerCase()} against the original draft and correct it only if the source supports a change. Preserve approved editorial decisions and do not add unsupported facts.${pairedPassages}\nReviewer note: ${finding.detail}`;
+  return `Review this ${findingLabels[finding.category].toLocaleLowerCase()} against the original draft and correct it only if the source supports a change. Keep the approved suggestions and do not add unsupported facts.${pairedPassages}\nReviewer note: ${finding.detail}`;
 }
 
 function checkExplanation(kind: WritingReview['localChecks'][number]['kind']): string {
@@ -80,8 +82,8 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
   onConfigureReviewer,
   onCompareSources,
   onRequestEdit,
+  onIgnore,
 }) => {
-  const [checked, setChecked] = useState<string[]>([]);
   const findings = review.findings || [];
   const checks: WritingReview['localChecks'] = review.localChecks || [];
   const primaryFindings = dedupeReviewFindings(
@@ -91,17 +93,9 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
   const unavailable = review.status !== 'complete';
   const actionableCount = actionableReviewIssueCount(review, sourceText, rewrittenText);
 
-  const toggleChecked = (key: string) => setChecked((current) => current.includes(key)
-    ? current.filter((value) => value !== key)
-    : [...current, key]);
-
-  const actions = (key: string, instruction: string) => <div className="review-actions">
-    {onRequestEdit && <button type="button" onClick={() => onRequestEdit(instruction)}>Edit this issue</button>}
-    <button
-      type="button"
-      aria-pressed={checked.includes(key)}
-      onClick={() => toggleChecked(key)}
-    >{checked.includes(key) ? 'Reviewed · undo' : 'Mark reviewed'}</button>
+  const actions = (instruction: string, finding: ReviewFinding) => <div className="review-actions">
+    {onRequestEdit && <button type="button" onClick={() => onRequestEdit(instruction)}>Ask for a change</button>}
+    {onIgnore && <button type="button" onClick={() => onIgnore(finding, true)}>Ignore</button>}
   </div>;
 
   const renderFindingEvidence = (finding: ReviewFinding) => {
@@ -131,12 +125,12 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
   };
 
   const status = unavailable
-    ? 'The review failed. The rewrite itself is complete; read it yourself or run another edit to get a new review.'
+    ? 'The review failed. The rewrite itself is complete. Read it yourself, or ask for a change to get a new review.'
     : actionableCount > 0
-      ? `${actionableCount} possible ${actionableCount === 1 ? 'issue' : 'issues'}. Check the passages before editing.`
+      ? `${actionableCount} possible ${actionableCount === 1 ? 'issue' : 'issues'}. Check each one before editing.`
       : failedChecks.length > 0
         ? 'No issues flagged. Text checks found differences.'
-        : 'No issues flagged. Give the draft a final read.';
+        : 'No open issues. Give the draft a final read.';
 
   return <section id={id} className="review-panel">
     <p className="review-status">{status}</p>
@@ -144,18 +138,23 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
 
     {primaryFindings.map((finding, index) => {
       const key = `finding-${index}`;
-      return <article key={key} className={`review-issue ${checked.includes(key) ? 'is-checked' : ''}`}>
+      if (isFindingIgnored(review, finding)) {
+        return <article key={key} className="review-issue is-checked">
+          <p><span className="font-semibold">{findingLabels[finding.category]}</span> · Ignored <button type="button" className="underline ml-2" onClick={() => onIgnore?.(finding, false)}>Undo</button></p>
+        </article>;
+      }
+      return <article key={key} className="review-issue">
         <h3>{findingLabels[finding.category]}</h3>
         <p>{finding.detail}</p>
         {renderFindingEvidence(finding)}
-        {actions(key, correctionInstruction(finding, sourceText, rewrittenText))}
+        {actions(correctionInstruction(finding, sourceText, rewrittenText), finding)}
       </article>;
     })}
 
     {failedChecks.length > 0 && <details className="studio-notes">
       <summary>Text checks ({failedChecks.length})</summary>
       <p className="review-explanation">Counts show text differences, not necessarily errors.</p>
-      {onCompareSources && <button type="button" onClick={onCompareSources} className="underline">Compare sources</button>}
+      {onCompareSources && <button type="button" onClick={onCompareSources} className="underline">Show changes</button>}
       {failedChecks.map((check) => {
         const missing = [...new Set(check.missing || [])];
         const unexpected = [...new Set(check.unexpected || [])];
@@ -164,16 +163,12 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
           <p className="review-explanation">{checkExplanation(check.kind)}</p>
           {missing.length > 0 && <p>{occurrenceExplanation(check.kind, 'fewer')}</p>}
           {unexpected.length > 0 && <p>{occurrenceExplanation(check.kind, 'more')}</p>}
-          {!missing.length && !unexpected.length && <p className="review-explanation">This check found a difference but could not identify a passage. Compare the original and rewrite.</p>}
+          {!missing.length && !unexpected.length && <p className="review-explanation">This check found a difference but could not identify the text. Compare the original and rewrite.</p>}
           {renderCheckContexts(check.kind, 'missing', missing)}
           {renderCheckContexts(check.kind, 'unexpected', unexpected)}
         </section>;
       })}
     </details>}
-
-    {checked.length > 0 && <p className="review-explanation" role="status">
-      {checked.length} {checked.length === 1 ? 'issue' : 'issues'} marked reviewed this session.
-    </p>}
 
     <details className="studio-notes"><summary>Review details</summary>
       <p>{review.summary}</p>
@@ -181,8 +176,8 @@ export const WritingReviewPanel: React.FC<WritingReviewPanelProps> = ({
       {(review.voiceObservations || []).map((observation, index) => <p key={index}>{observation}</p>)}
       {checks.filter((check) => check.passed).map((check) => <p key={check.kind}>{check.detail}</p>)}
       <p>{unavailable ? 'Requested reviewer' : 'Reviewer'}: {review.modelUsed ? modelDisplayName(review.modelUsed) : 'Not recorded'}</p>
-      <p>Review notes may be wrong. Marking reviewed does not edit the draft.</p>
-      {onConfigureReviewer && <button type="button" onClick={onConfigureReviewer} className="underline">Change reviewer</button>}
+      <p>Review notes may be wrong. Nothing here changes the draft until you ask for a change.</p>
+      {onConfigureReviewer && <button type="button" onClick={onConfigureReviewer} className="underline">Model settings</button>}
     </details>
   </section>;
 };

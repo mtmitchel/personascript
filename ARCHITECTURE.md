@@ -36,8 +36,9 @@ localStorage                                     src/aiProvider.ts
   into `DomainTopicsSection` and `DomainProductsSection`), `StudioView`. Views
   share `StepFooter`. Studio composes `SelectionToolbar` (floating selection
   affordance), `EditorialDecisions` (suggestions), `StudioDraftControls`
-  (strength and locks, source side only), `RewriteFeedbackManager` (post-rewrite
-  request), `DiffViewer` (track changes), `WritingReviewPanel`, `RewriteHistory`.
+  (Rewrite settings flat form), `RewriteFeedbackManager` (post-rewrite
+  request), `DiffViewer` (track changes), `WritingReviewPanel` (review findings
+  with ignore/undo support; optional `WritingReview.ignoredFindings`), `RewriteHistory`.
 - Shared modules imported by both client and server: `src/types.ts`,
   `src/editorialPlan.ts`, `src/writingPipeline.ts`, `src/planAssertionReview.ts`,
   `src/sourceText.ts`, `src/domainGeneration.ts`, `src/modelChoice.ts`. They

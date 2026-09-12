@@ -19,10 +19,10 @@ const paragraphs = (texts: string[], prefix: string) =>
 
 /**
  * Track changes as two columns: the original draft on the left, the rewrite on
- * the right, aligned passage by passage. A revised passage strikes the words
+ * the right, aligned text by text. A revised text strikes the words
  * that went on the left and marks the words that arrived on the right, with
- * Accept, Keep original, Revise beneath; a cut passage offers Restore; a new
- * passage offers Remove. Unchanged passages read as plain text on both sides.
+ * Use original text and Ask for a change beneath; a cut text offers Restore deleted text;
+ * a new text offers Remove added text. Unchanged texts read as plain text on both sides.
  */
 export const DiffViewer: React.FC<DiffViewerProps> = ({
   blocks,
@@ -31,33 +31,16 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   onUndo,
   canUndo,
 }) => {
-  const [accepted, setAccepted] = useState<string[]>([]);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
-  const keyOf = (block: ParagraphBlock) =>
-    `${block.kind}:${block.original.join('\n')}→${block.rewritten.join('\n')}`;
   const changes = blocks.filter(block => block.kind !== 'equal');
-  const remaining = changes.filter(block => !accepted.includes(keyOf(block))).length;
+  const changeIndices = blocks
+    .map((block, index) => (block.kind !== 'equal' ? index : -1))
+    .filter(i => i >= 0);
 
-  const toggleAccepted = (block: ParagraphBlock) => {
-    const key = keyOf(block);
-    setAccepted(current =>
-      current.includes(key) ? current.filter(item => item !== key) : [...current, key]
-    );
-  };
-
-  const acceptAll = () => {
-    setAccepted(changes.map(keyOf));
-  };
-
-  const unacceptedIndices = blocks
-    .map((block, index) => ({ block, index }))
-    .filter(({ block }) => block.kind !== 'equal' && !accepted.includes(keyOf(block)))
-    .map(({ index }) => index);
-
-  const currentFocus = focusIndex ?? (unacceptedIndices.length > 0 ? unacceptedIndices[0] : null);
-  const hasPrev = currentFocus !== null && unacceptedIndices.some(i => i < currentFocus);
-  const hasNext = currentFocus !== null && unacceptedIndices.some(i => i > currentFocus);
+  const currentFocus = focusIndex ?? changeIndices[0] ?? null;
+  const hasPrev = currentFocus !== null && changeIndices.some(i => i < currentFocus);
+  const hasNext = currentFocus !== null && changeIndices.some(i => i > currentFocus);
 
   const focusChange = (targetIndex: number) => {
     setFocusIndex(targetIndex);
@@ -70,24 +53,24 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
   const handlePrev = () => {
     if (currentFocus === null) return;
-    const prevIndices = unacceptedIndices.filter(i => i < currentFocus);
-    const target = prevIndices.length > 0 ? prevIndices[prevIndices.length - 1] : unacceptedIndices[unacceptedIndices.length - 1];
+    const prevIndices = changeIndices.filter(i => i < currentFocus);
+    const target = prevIndices.length > 0 ? prevIndices[prevIndices.length - 1] : changeIndices[changeIndices.length - 1];
     if (target !== undefined) focusChange(target);
   };
 
   const handleNext = () => {
     if (currentFocus === null) return;
-    const nextIndices = unacceptedIndices.filter(i => i > currentFocus);
-    const target = nextIndices.length > 0 ? nextIndices[0] : unacceptedIndices[0];
+    const nextIndices = changeIndices.filter(i => i > currentFocus);
+    const target = nextIndices.length > 0 ? nextIndices[0] : changeIndices[0];
     if (target !== undefined) focusChange(target);
   };
 
   const countText =
     changes.length === 0
       ? 'No changes.'
-      : remaining === 0
-      ? `All ${changes.length} changes accepted.`
-      : `${remaining} of ${changes.length} ${changes.length === 1 ? 'change' : 'changes'} to look at.`;
+      : changes.length === 1
+      ? '1 change.'
+      : `${changes.length} changes.`;
 
   // Formatting is compared as the reader sees it, so Markdown marks never show as edits.
   const wordDiff = (block: ParagraphBlock) =>
@@ -127,7 +110,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     <div className="studio-changes">
       <div className="studio-changes-header">
         <div id="changes-toolbar" className="studio-changes-toolbar">
-          <span>{countText}</span>
+          <span role="status">{countText}</span>
           {changes.length > 1 && (
             <>
               <button
@@ -150,19 +133,14 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
               </button>
             </>
           )}
-          {remaining > 0 && (
-            <button type="button" className="studio-text-button" onClick={acceptAll}>
-              Accept all
-            </button>
-          )}
           {canUndo && onUndo && (
             <button
               type="button"
               className="studio-text-button"
-              title="Undo the last Keep original, Restore, or Remove"
+              title="Undo the last Use original text, Restore deleted text, or Remove added text"
               onClick={onUndo}
             >
-              Undo
+              Undo text change
             </button>
           )}
         </div>
@@ -172,23 +150,23 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         </div>
       </div>
       {blocks.map((block, index) => {
-        const isAccepted = block.kind !== 'equal' && accepted.includes(keyOf(block));
-        const settled = block.kind === 'equal' || isAccepted;
+        const settled = block.kind === 'equal';
         return (
           <section
             key={index}
             id={`change-${index}`}
             data-block={index}
             tabIndex={-1}
-            className={`studio-change is-${block.kind}${isAccepted ? ' is-accepted' : ''}`}
+            className={`studio-change is-${block.kind}${index === currentFocus ? ' is-current' : ''}`}
+            aria-current={index === currentFocus ? 'true' : undefined}
             aria-label={
               block.kind === 'equal'
-                ? 'Unchanged passage'
+                ? 'Unchanged text'
                 : block.kind === 'removed'
-                ? 'Removed passage'
+                ? 'Removed text'
                 : block.kind === 'added'
-                ? 'Added passage'
-                : 'Changed passage'
+                ? 'Added text'
+                : 'Changed text'
             }
           >
             <div className="studio-change-side" data-side="original">
@@ -207,29 +185,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             </div>
             {block.kind !== 'equal' && (
               <div className="studio-change-actions">
-                {isAccepted ? (
-                  <>
-                    <span className="studio-note-state">Accepted</span>
-                    <button type="button" className="studio-text-button" onClick={() => toggleAccepted(block)}>
-                      Undo
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" className="studio-text-button" onClick={() => toggleAccepted(block)}>
-                      Accept
-                    </button>
-                    {onKeepOriginal && (
-                      <button type="button" className="studio-text-button" onClick={() => onKeepOriginal(index)}>
-                        {block.kind === 'added' ? 'Remove' : block.kind === 'removed' ? 'Restore' : 'Keep original'}
-                      </button>
-                    )}
-                    {onRevise && block.rewritten.length > 0 && (
-                      <button type="button" className="studio-text-button" onClick={() => onRevise(block)}>
-                        Revise
-                      </button>
-                    )}
-                  </>
+                {onKeepOriginal && (
+                  <button type="button" className="studio-text-button" onClick={() => onKeepOriginal(index)}>
+                    {block.kind === 'added' ? 'Remove added text' : block.kind === 'removed' ? 'Restore deleted text' : 'Use original text'}
+                  </button>
+                )}
+                {onRevise && block.rewritten.length > 0 && (
+                  <button type="button" className="studio-text-button" onClick={() => onRevise(block)}>
+                    Ask for a change
+                  </button>
                 )}
               </div>
             )}

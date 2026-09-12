@@ -30,7 +30,7 @@ function AppContent() {
       <footer className="border-t border-neutral-200 bg-white py-4 text-xs text-neutral-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p>PersonaScript</p>
-          <p className="text-[11px] text-neutral-400">
+          <p className="text-[11px] text-neutral-500">
             Style and voice harmonizer
           </p>
         </div>

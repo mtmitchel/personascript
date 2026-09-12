@@ -11,12 +11,17 @@ export interface StudioStatusInput {
   planApproved?: boolean;
   hasRewrite?: boolean;
   pendingSuggestions?: number;
+  isSavingVoice?: boolean;
 }
+
+export const joinList = (items: string[]) =>
+  items.length <= 1 ? items.join('') : items.length === 2 ? `${items[0]} and ${items[1]}` : `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 
 export interface StudioStatusResult {
   text: string;
   tone: 'status' | 'alert';
   action?: { label: string; targetTab: 'draft-brief' };
+  detail?: string;
 }
 
 export function suggestionsStatus(input: StudioStatusInput): StudioStatusResult {
@@ -32,7 +37,7 @@ export function suggestionsStatus(input: StudioStatusInput): StudioStatusResult 
   // Priority 2: Planning in progress
   if (input.isPlanning) {
     return {
-      text: 'Reading your draft and brief…',
+      text: 'Getting suggestions…',
       tone: 'status',
     };
   }
@@ -53,18 +58,27 @@ export function suggestionsStatus(input: StudioStatusInput): StudioStatusResult 
     };
   }
 
+  // Priority 4.5: Saving voice preference
+  if (input.isSavingVoice) {
+    return {
+      text: 'Saving your voice preference…',
+      tone: 'status',
+    };
+  }
+
   // Priority 5: Error occurred
   if (input.rewriteError) {
     return {
-      text: input.rewriteError,
+      text: 'Could not finish. Your current work is unchanged.',
       tone: 'alert',
+      detail: input.rewriteError,
     };
   }
 
   // Priority 6: No plan yet
   if (!input.hasPlan) {
     return {
-      text: 'Get suggestions first. The rewrite follows the suggestions you accept.',
+      text: 'Get suggestions above first. The rewrite follows the ones you accept.',
       tone: 'status',
     };
   }
@@ -74,12 +88,12 @@ export function suggestionsStatus(input: StudioStatusInput): StudioStatusResult 
     const reasons = input.staleReasons || [];
     if (reasons.length > 0) {
       return {
-        text: `Your ${reasons.join(', ')} changed after these suggestions were prepared. Get new suggestions before rewriting.`,
+        text: `Your ${joinList(reasons)} changed after these suggestions were prepared. Get suggestions again before rewriting.`,
         tone: 'status',
       };
     }
     return {
-      text: 'These suggestions are in an older format. Get new suggestions before rewriting.',
+      text: 'These suggestions were made with an older version of the app. Get suggestions again before rewriting.',
       tone: 'status',
     };
   }
@@ -87,15 +101,17 @@ export function suggestionsStatus(input: StudioStatusInput): StudioStatusResult 
   // Priority 8: Plan has an issue/readiness blocker
   if (input.planIssue) {
     return {
-      text: input.planIssue,
+      text: 'These suggestions no longer match your draft. Get suggestions again before rewriting.',
       tone: 'status',
+      detail: input.planIssue,
     };
   }
 
-  // Priority 9: Plan approved and rewrite exists
+  // Priority 9: Plan approved and rewrite exists. Nothing needs saying: the
+  // provenance line already records that the last rewrite followed them.
   if (input.planApproved && input.hasRewrite) {
     return {
-      text: 'The last rewrite followed these suggestions. Rewrite writes a new version from the original draft.',
+      text: '',
       tone: 'status',
     };
   }

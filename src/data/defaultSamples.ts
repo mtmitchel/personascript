@@ -19,6 +19,7 @@ If a paragraph doesn't surprise me by the time I reach the final period, I strik
     charCount: 1102,
     createdAt: '2026-09-01T10:00:00.000Z',
     enabled: true,
+    isExample: true,
     analysis: {
       summary: 'Lyrical yet disciplined essayistic voice characterized by staccato declarative breaks interspersed between expansive sensory metaphors.',
       wordChoice: {
@@ -103,6 +104,7 @@ Real craftsmanship is stubborn. It insists on taking the long way around because
     charCount: 978,
     createdAt: '2026-09-02T14:30:00.000Z',
     enabled: true,
+    isExample: true,
     analysis: {
       summary: 'Incisive analytical polemic blending artisan metaphors with sharp cultural critique and crisp rhythmic cadences.',
       wordChoice: {

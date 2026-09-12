@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { EDITORIAL_PREFERENCES_MAX_CHARS, PROJECT_BRIEF_MAX_CHARS, READER_PURPOSE_MAX_CHARS } from '../writingPipeline';
 import { FileText, Sparkles, UploadCloud } from 'lucide-react';
@@ -25,6 +25,22 @@ export const DraftBriefView: React.FC = () => {
     setActiveTab,
   } = useWritingAssistant();
 
+  const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null);
+
+  const clearField = (label: string, current: string, set: (v: string) => void) => {
+    if (!current) return;
+    set('');
+    setUndo({ label: `${label} cleared.`, restore: () => { set(current); setUndo(null); } });
+  };
+
+  const handleLoadSampleDraft = () => {
+    const previous = draftText;
+    loadSampleDraft();
+    if (previous.trim()) {
+      setUndo({ label: 'Sample draft loaded.', restore: () => { setDraftText(previous); setUndo(null); } });
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const briefFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -47,6 +63,15 @@ export const DraftBriefView: React.FC = () => {
         </div>
       </div>
 
+      {undo && (
+        <div role="status" className="p-3 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-800 text-xs flex items-center justify-between">
+          <span>{undo.label}</span>
+          <button type="button" className="underline font-medium text-neutral-900" onClick={undo.restore}>
+            Undo
+          </button>
+        </div>
+      )}
+
       {/* Main Form Cards */}
       <div className="space-y-6">
         {/* Original Draft */}
@@ -62,7 +87,7 @@ export const DraftBriefView: React.FC = () => {
               <button
                 type="button"
                 id="btn-load-sample-draft"
-                onClick={loadSampleDraft}
+                onClick={handleLoadSampleDraft}
                 disabled={isUploadingDraft || isRewriting}
                 className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -82,7 +107,7 @@ export const DraftBriefView: React.FC = () => {
                 <button
                   type="button"
                   id="btn-clear-draft"
-                  onClick={() => setDraftText('')}
+                  onClick={() => clearField('Draft', draftText, setDraftText)}
                   disabled={isRewriting || isUploadingDraft}
                   className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -111,15 +136,18 @@ export const DraftBriefView: React.FC = () => {
             value={draftText}
             disabled={isUploadingDraft}
             aria-invalid={Boolean(draftUploadError)}
-            onChange={(e) => setDraftText(e.target.value)}
+            onChange={(e) => {
+              setDraftText(e.target.value);
+              setUndo(null);
+            }}
             placeholder="Paste or write your raw draft here..."
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 resize-y"
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 resize-y"
           />
 
           {draftUploadError && (
             <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">{draftUploadError}</p>
           )}
-          <div className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+          <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
             <span>{wordCountOriginal} words · {draftText.length} characters</span>
           </div>
         </div>
@@ -148,7 +176,7 @@ export const DraftBriefView: React.FC = () => {
               <button
                 type="button"
                 id="btn-clear-project-brief"
-                onClick={() => setProjectBrief('')}
+                onClick={() => clearField('Project brief', projectBrief, setProjectBrief)}
                 disabled={!projectBrief.length || isRewriting || isUploadingBrief}
                 className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -178,12 +206,15 @@ export const DraftBriefView: React.FC = () => {
             id="textarea-project-brief"
             rows={6}
             value={projectBrief}
-            onChange={(e) => setProjectBrief(e.target.value)}
+            onChange={(e) => {
+              setProjectBrief(e.target.value);
+              setUndo(null);
+            }}
             disabled={isUploadingBrief}
             aria-describedby="project-brief-help project-brief-count"
             aria-invalid={projectBrief.length > PROJECT_BRIEF_MAX_CHARS}
             placeholder="Paste background facts, metrics, decisions, and constraints for this draft..."
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
           />
 
           {(briefUploadError || projectBrief.length > PROJECT_BRIEF_MAX_CHARS) && (
@@ -192,7 +223,7 @@ export const DraftBriefView: React.FC = () => {
             </div>
           )}
 
-          <div id="project-brief-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+          <div id="project-brief-count" className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
             <span>{wordCountBrief} words</span>
             <span>{projectBrief.length} / {PROJECT_BRIEF_MAX_CHARS}</span>
           </div>
@@ -210,7 +241,7 @@ export const DraftBriefView: React.FC = () => {
             <button
               type="button"
               id="btn-clear-reader-purpose"
-              onClick={() => setReaderPurpose('')}
+              onClick={() => clearField('Reader and purpose', readerPurpose, setReaderPurpose)}
               disabled={!readerPurpose.length || isRewriting}
               className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -226,12 +257,15 @@ export const DraftBriefView: React.FC = () => {
             id="textarea-reader-purpose"
             rows={4}
             value={readerPurpose}
-            onChange={(e) => setReaderPurpose(e.target.value)}
+            onChange={(e) => {
+              setReaderPurpose(e.target.value);
+              setUndo(null);
+            }}
             disabled={isRewriting}
             aria-describedby="reader-purpose-help reader-purpose-count"
             aria-invalid={readerPurpose.length > READER_PURPOSE_MAX_CHARS}
             placeholder="For example: Experienced design leaders who already understand product workflows. Help them understand my role and the project-specific decisions."
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
           />
 
           {readerPurpose.length > READER_PURPOSE_MAX_CHARS && (
@@ -240,7 +274,7 @@ export const DraftBriefView: React.FC = () => {
             </div>
           )}
 
-          <div id="reader-purpose-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+          <div id="reader-purpose-count" className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
             <span>{wordCountReaderPurpose} words</span>
             <span>{readerPurpose.length} / {READER_PURPOSE_MAX_CHARS}</span>
           </div>
@@ -258,7 +292,7 @@ export const DraftBriefView: React.FC = () => {
             <button
               type="button"
               id="btn-clear-editorial-preferences"
-              onClick={() => setEditorialPreferences('')}
+              onClick={() => clearField('Standing preferences', editorialPreferences, setEditorialPreferences)}
               disabled={!editorialPreferences.length || isRewriting}
               className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -274,11 +308,14 @@ export const DraftBriefView: React.FC = () => {
             id="standing-editorial-preferences"
             rows={5}
             value={editorialPreferences}
-            onChange={(e) => setEditorialPreferences(e.target.value)}
+            onChange={(e) => {
+              setEditorialPreferences(e.target.value);
+              setUndo(null);
+            }}
             disabled={isRewriting}
             aria-describedby="standing-preferences-help standing-preferences-count"
             aria-invalid={editorialPreferences.length > EDITORIAL_PREFERENCES_MAX_CHARS}
-            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
+            className="w-full p-3.5 rounded-xl border border-neutral-200 text-sm focus:border-neutral-900 font-sans leading-relaxed text-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400 resize-y"
           />
 
           {editorialPreferences.length > EDITORIAL_PREFERENCES_MAX_CHARS && (
@@ -287,7 +324,7 @@ export const DraftBriefView: React.FC = () => {
             </div>
           )}
 
-          <div id="standing-preferences-count" className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+          <div id="standing-preferences-count" className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
             <span>{editorialPreferences.trim() ? editorialPreferences.trim().split(/\s+/).length : 0} words</span>
             <span>{editorialPreferences.length} / {EDITORIAL_PREFERENCES_MAX_CHARS}</span>
           </div>

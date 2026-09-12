@@ -9,7 +9,7 @@ test('SelectionToolbar renders nothing when enabled=false', () => {
   const html = renderToStaticMarkup(
     createElement(SelectionToolbar, {
       container,
-      label: 'Request a change to this passage',
+      label: 'Ask for a change',
       onAct: () => {},
       enabled: false,
     }),
@@ -23,7 +23,7 @@ test('SelectionToolbar renders nothing when enabled=true in server environment w
   const html = renderToStaticMarkup(
     createElement(SelectionToolbar, {
       container,
-      label: 'Request a change to this passage',
+      label: 'Ask for a change',
       onAct: () => {},
       enabled: true,
     }),

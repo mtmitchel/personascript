@@ -49,6 +49,7 @@ function isSavedRewrite(value: any): boolean {
       && ['omission', 'claim', 'addition', 'voice', 'preservation', 'editorial', 'local-check'].includes(finding.category)
       && ['info', 'warning', 'error'].includes(finding.severity) && string(finding.detail) && optional(finding.evidence, string))
     && strings(review.voiceObservations)
+    && optional(review.ignoredFindings, strings)
     && Array.isArray(review.localChecks) && review.localChecks.every((check) => record(check)
       && ['numbers', 'quotes', 'headings'].includes(check.kind) && typeof check.passed === 'boolean'
       && strings(check.missing) && strings(check.unexpected) && string(check.detail))
@@ -107,10 +108,17 @@ export function retainRewriteVersions(
 }
 
 export function revisionLabel(result: RewriteResult): string {
-  if (result.revision?.kind === 'refine') return 'Quick adjustment';
-  if (result.revision?.kind === 'selection') return 'Selection edit';
-  if (result.revision?.kind === 'rewrite') return 'Full rewrite';
-  return 'Saved version';
+  if (result.revision?.kind === 'refine') return 'Edit';
+  if (result.revision?.kind === 'selection') return 'Edit to selected text';
+  if (result.revision?.kind === 'rewrite') return 'Rewrite';
+  return 'Version';
+}
+
+/** First line of the author's instruction, shortened, so versions can be told apart. */
+export function revisionExcerpt(result: RewriteResult, max = 80): string {
+  const text = (result.revision?.instruction || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  return text.length > max ? text.slice(0, max - 1).trimEnd() + '…' : text;
 }
 
 export function versionDate(value: string): string {

@@ -7,7 +7,7 @@ import { ModelPicker } from './ModelPicker';
 import { ProviderConnections } from './ProviderConnections';
 
 type Role = 'writing' | 'analysis';
-const selectClass = 'h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-2 focus:ring-neutral-900/10 disabled:text-neutral-400';
+const selectClass = 'h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900 disabled:text-neutral-500';
 
 const RoleModelControls: React.FC<{
   model: ModelChoice;
@@ -142,7 +142,7 @@ export const ModelSelector: React.FC<{
         onReasoning={isWriting ? updateWritingReasoningLevel : updateAnalysisReasoningLevel} />
       <div className="mt-5 flex items-center justify-between border-t border-neutral-100 pt-3">
         <button type="button" data-connections onClick={() => setConnections(true)} className="flex items-center gap-1.5 text-xs text-neutral-600 hover:text-neutral-950"><Plug className="size-3.5" /> API connections</button>
-        <span className="text-[11px] text-neutral-400">Applies to your next action</span>
+        <span className="text-[11px] text-neutral-500">Applies to your next action</span>
       </div>
     </>}
   </>;

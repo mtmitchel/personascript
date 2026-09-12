@@ -2,14 +2,15 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import type { EditorialConflict, EditorialPlan, EditorialPlanState } from '../types';
 import { useWritingAssistant } from '../context/WritingAssistantContext';
 import { compactPlanText, planPreview, planStaleReasons, sectionPlan, uncoveredParagraphRefs, type PlanSection, type PlanSectionGroup } from '../utils/editorialSummary';
+import { joinList } from '../utils/studioStatus';
 
 type Response = NonNullable<EditorialPlan['items'][number]['response']>;
 
-const RESPONSE_LABEL: Record<Response, string> = { accepted: 'Accepted', rejected: 'Rejected', ignored: 'Ignored' };
+const RESPONSE_LABEL: Record<Response, string> = { accepted: 'Accepted', rejected: 'Declined', ignored: 'Declined' };
 
 /**
  * The model's suggestions, section by section, each with what changes and
- * why, and the author's answer to each: accept, reject, or ignore. The
+ * why, and the author's answer to each: accept or decline. The
  * author's own requests for selected passages come first. Hovering a
  * suggestion highlights its paragraphs in the draft.
  */
@@ -82,29 +83,14 @@ export const EditorialDecisions: React.FC = () => {
     editEditorialPlan({ ...plan, ...(requests.length ? { requests } : { requests: undefined }) });
   };
 
-  const changes = plan.items.filter(item => item.decision !== 'keep');
-  const total = changes.length;
-  const answered = changes.filter(item => Boolean(item.response)).length;
-  const pending = note.pending;
-
-  const acceptAllPending = () => {
-    editEditorialPlan({
-      ...plan,
-      items: plan.items.map(item => {
-        if (item.decision !== 'keep' && !item.response) {
-          return { ...item, response: 'accepted' as const };
-        }
-        return item;
-      }),
-    });
-  };
-
-  const renderSuggestion = (section: PlanSection) => {
+  const renderSuggestion = (section: PlanSection, group: PlanSectionGroup) => {
     const response = section.item.response;
     const limit = section.item.limit.trim();
     // A keep with a limit is a statement the writer must respect, not a
     // question for the author; it carries no accept/reject controls.
     const answerable = section.item.decision !== 'keep';
+    const prefix = `${group.name} — `;
+    const rowName = section.name === group.name ? '' : section.name.startsWith(prefix) ? section.name.slice(prefix.length) : section.name;
     return (
       <li
         key={section.index}
@@ -115,9 +101,10 @@ export const EditorialDecisions: React.FC = () => {
         onBlur={clearHighlight}
       >
         <div className="studio-note-row-text">
-          <p>
-            <span className="studio-note-name">{section.name}</span>
-            {section.item.idea.trim() && <> — {compactPlanText(section.item.idea)}</>}
+          <p className="studio-note-lead">
+            {rowName && <span className="studio-note-name">{rowName}</span>}
+            {rowName && section.item.idea.trim() && ' — '}
+            {section.item.idea.trim() && compactPlanText(section.item.idea)}
           </p>
           {section.item.reason?.trim() && <p className="studio-note-reason">{compactPlanText(section.item.reason)}</p>}
           {limit && <p className="studio-note-reason">Do not go beyond: {compactPlanText(limit)}</p>}
@@ -132,8 +119,7 @@ export const EditorialDecisions: React.FC = () => {
             ) : (
               <>
                 <button type="button" className="studio-text-button" onClick={() => respond(section, 'accepted')}>Accept</button>
-                <button type="button" className="studio-text-button" onClick={() => respond(section, 'rejected')}>Reject</button>
-                <button type="button" className="studio-text-button" onClick={() => respond(section, 'ignored')}>Ignore</button>
+                <button type="button" className="studio-text-button" onClick={() => respond(section, 'rejected')}>Decline</button>
               </>
             )}
           </div>
@@ -159,7 +145,7 @@ export const EditorialDecisions: React.FC = () => {
             {group.changes > 0 ? `${group.changes} change${group.changes === 1 ? '' : 's'}` : 'Unchanged'}
           </span>
         </summary>
-        {rows.length > 0 && <ul>{rows.map(renderSuggestion)}</ul>}
+        {rows.length > 0 && <ul>{rows.map(section => renderSuggestion(section, group))}</ul>}
         {unchanged.length > 0 && (
           <p className="studio-note-kept">
             Unchanged:{' '}
@@ -177,19 +163,15 @@ export const EditorialDecisions: React.FC = () => {
 
   return (
     <div className="studio-note">
-      {readOnly && (
-        <p className="studio-notice">These are the suggestions the last rewrite followed.</p>
-      )}
-
       {stale.length > 0 && (
         <p className="studio-notice is-warning" role="status">
-          Your {stale.join(', ')} changed after these suggestions were prepared. Get new suggestions before rewriting.
+          Your {joinList(stale)} changed after these suggestions were prepared. Get suggestions again before rewriting.
         </p>
       )}
 
       {missing.length > 0 && stale.length === 0 && (
         <p className="studio-notice is-error" role="alert">
-          These suggestions skip {missing.length === 1 ? 'a paragraph' : `${missing.length} paragraphs`} of your draft. Get new suggestions before rewriting.
+          These suggestions skip {missing.length === 1 ? 'a paragraph' : `${missing.length} paragraphs`} of your draft. Get suggestions again before rewriting.
         </p>
       )}
 
@@ -243,24 +225,13 @@ export const EditorialDecisions: React.FC = () => {
         </div>
       )}
 
-      <div className="studio-note-group">
-        <h3 className="studio-note-heading">Opening</h3>
-        <p className="studio-note-opening">{compactPlanText(plan.openingJob)}</p>
+      <div className="studio-note-opening-job">
+        <p className="studio-field-label">What the opening must establish</p>
+        <p>{compactPlanText(plan.openingJob)}</p>
       </div>
 
       {note.cuts.length + note.tightens.length === 0 && (
-        <p className="studio-note-opening">No section changes suggested; the rewrite adjusts wording only.</p>
-      )}
-
-      {total > 0 && (
-        <div className="studio-note-summary">
-          <span>{answered} of {total} suggestions answered</span>
-          {!readOnly && pending > 0 && (
-            <button type="button" className="studio-text-button" onClick={acceptAllPending}>
-              Accept all
-            </button>
-          )}
-        </div>
+        <p>No section changes suggested; the rewrite adjusts wording only.</p>
       )}
 
       {note.sections.map(group => renderSectionGroup(group, 'h3'))}
@@ -273,9 +244,12 @@ export const SavedEditorialDecisions: React.FC<{ state: EditorialPlanState }> = 
   const note = sectionPlan(state.plan, state.sources.draft);
   return (
     <div className="studio-note is-saved">
-      <p className="studio-note-opening">{compactPlanText(state.plan.openingJob)}</p>
+      <div className="studio-note-opening-job">
+        <p className="studio-field-label">What the opening must establish</p>
+        <p>{compactPlanText(state.plan.openingJob)}</p>
+      </div>
       {note.conflicts.filter(conflict => conflict.resolution).map((conflict, position) => (
-        <p key={position} className="studio-note-opening">{conflict.question} Used the {conflict.resolution}.</p>
+        <p key={position}>{conflict.question} Used the {conflict.resolution}.</p>
       ))}
       {note.requests.length > 0 && (
         <div className="studio-note-group">
@@ -304,18 +278,23 @@ export const SavedEditorialDecisions: React.FC<{ state: EditorialPlanState }> = 
             </summary>
             {rows.length > 0 && (
               <ul>
-                {rows.map(section => (
-                  <li key={section.index} className="studio-note-row">
-                    <div className="studio-note-row-text">
-                      <p>
-                        <span className="studio-note-name">{section.name}</span>
-                        {section.item.idea.trim() && <> — {compactPlanText(section.item.idea)}</>}
-                      </p>
-                      {section.item.reason?.trim() && <p className="studio-note-reason">{compactPlanText(section.item.reason)}</p>}
-                      {section.item.limit.trim() && <p className="studio-note-reason">Do not go beyond: {compactPlanText(section.item.limit)}</p>}
-                    </div>
-                  </li>
-                ))}
+                {rows.map(section => {
+                  const prefix = `${group.name} — `;
+                  const rowName = section.name === group.name ? '' : section.name.startsWith(prefix) ? section.name.slice(prefix.length) : section.name;
+                  return (
+                    <li key={section.index} className="studio-note-row">
+                      <div className="studio-note-row-text">
+                        <p className="studio-note-lead">
+                          {rowName && <span className="studio-note-name">{rowName}</span>}
+                          {rowName && section.item.idea.trim() && ' — '}
+                          {section.item.idea.trim() && compactPlanText(section.item.idea)}
+                        </p>
+                        {section.item.reason?.trim() && <p className="studio-note-reason">{compactPlanText(section.item.reason)}</p>}
+                        {section.item.limit.trim() && <p className="studio-note-reason">Do not go beyond: {compactPlanText(section.item.limit)}</p>}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {unchanged.length > 0 && (

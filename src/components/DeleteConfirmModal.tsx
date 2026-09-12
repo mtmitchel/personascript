@@ -57,6 +57,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             id="btn-close-delete-modal"
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="text-neutral-400 hover:text-neutral-600 p-1 rounded transition"
           >
             <X className="w-4 h-4" />
@@ -71,7 +72,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
               {sample.title}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-neutral-400">
+          <div className="flex items-center gap-2 text-[11px] text-neutral-500">
             <span className="font-mono">{sample.fileType}</span>
             <span>•</span>
             <span>{sample.wordCount} words</span>
@@ -79,7 +80,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         </div>
 
         <p className="text-xs text-neutral-600 leading-relaxed">
-          Are you sure you want to remove <strong className="text-neutral-900 font-medium">"{sample.title}"</strong> from your corpus?
+          Are you sure you want to remove <strong className="text-neutral-900 font-medium">"{sample.title}"</strong> from your writing samples?
         </p>
 
         {/* Action Buttons */}

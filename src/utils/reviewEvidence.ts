@@ -75,7 +75,7 @@ export function pairReviewEvidence(sourceText: string, rewrittenText: string, ev
   return source.length && rewritten.length ? { source, rewritten } : { source: [], rewritten: [] };
 }
 
-function findingKey(finding: ReviewFinding): string {
+export function findingKey(finding: ReviewFinding): string {
   return `finding:${normalize(finding.category)}|${normalize(finding.detail)}|${normalize(finding.evidence || '')}`;
 }
 
@@ -98,14 +98,20 @@ export function dedupeReviewFindings(findings: ReviewFinding[]): ReviewFinding[]
     .map(({ finding }) => finding);
 }
 
+export function isFindingIgnored(review: Pick<WritingReview, 'ignoredFindings'>, finding: ReviewFinding): boolean {
+  return (review.ignoredFindings || []).includes(findingKey(finding));
+}
+
 /** Count the primary issue rows rendered by WritingReviewPanel. */
 export function actionableReviewIssueCount(
-  review: Pick<WritingReview, 'findings'> | null | undefined,
+  review: Pick<WritingReview, 'findings' | 'ignoredFindings'> | null | undefined,
   _sourceText = '',
   _rewrittenText = '',
 ): number {
   if (!review) return 0;
-  return dedupeReviewFindings((review.findings || []).filter((finding) => finding.severity !== 'info')).length;
+  return dedupeReviewFindings(
+    (review.findings || []).filter((finding) => finding.severity !== 'info' && !(review.ignoredFindings || []).includes(findingKey(finding)))
+  ).length;
 }
 
 /** Show literal source context without inventing which occurrence caused a count mismatch. */
